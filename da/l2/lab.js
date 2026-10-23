@@ -291,7 +291,7 @@ function legaOsc() {
   cv.addEventListener("pointerdown", e => { const d = pozDiv(e); trag = Math.abs(d - sim.osc.c1) < Math.abs(d - sim.osc.c2) ? "c1" : "c2"; sim.osc[trag] = d; cv.setPointerCapture(e.pointerId); deseneazaOsc(); });
   cv.addEventListener("pointermove", e => { if (trag) { sim.osc[trag] = pozDiv(e); deseneazaOsc(); } });
   cv.addEventListener("pointerup", () => trag = null);
-  $$(".osc-canal").forEach((el, k) => {
+  $$(".osc-cutie .osc-canal").forEach((el, k) => {
     const ch = sim.osc.ch[k], on = el.querySelector("[data-ch-on]"), sc = el.querySelector("[data-ch-c]"), sv = el.querySelector("[data-ch-v]"), sp = el.querySelector("[data-ch-p]");
     const stil = () => el.classList.toggle("oprit", !ch.on);
     sc.value = ch.c; sv.value = String(ch.vdiv); sp.value = String(ch.poz); on.checked = ch.on; stil();

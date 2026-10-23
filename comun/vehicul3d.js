@@ -891,6 +891,10 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   { const gg = new THREE.Group(); gg.userData.c = "stop"; gg.position.set(1.1, 0.86, -0.38); caroserie.add(gg); gg.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.04, 12), new THREE.MeshStandardMaterial({ color: 0xd8d8d8 }))); grupuri.stop = gg;
     const o = new THREE.Object3D(); o.position.y = 0.03; gg.add(o); ancoraObj.stop = o; et.push({ obj: o, text: DK.stop.e, k: "stop" }); }
   const LISTA = {}; D.forEach(d => LISTA[d.k] = d.n);
+  const CUL = ["#ffe14d", "#4fd6ff", "#ff6bd6", "#6dff8e"];
+  const fmtT = T => T >= 1 ? `${fx(T, T < 10 ? 1 : 0)} s` : T >= 1e-3 ? `${fx(T * 1000, T < 0.01 ? 1 : 0)} ms` : T >= 1e-6 ? `${fx(T * 1e6, 0)} µs` : `${fx(T * 1e9, 0)} ns`;
+  const canaleActive = st => st.ch.map((c, i) => ({ on: c.on, i, k: i === 0 ? st.sel : c.k })).filter(c => c.i === 0 || c.on);
+  const durata = st => st.tdiv === "auto" ? fereastra(st.sel, st)[0] : +st.tdiv * 10;
   // doar etichetele sistemului ales
   et.forEach(e => { const d = DK[e.k]; e.filtru = () => (S0 || stare).sist === d.s; });
   // sfere invizibile de „prindere”, ca senzorii mici să poată fi selectați ușor cu mouse-ul
@@ -926,8 +930,15 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       <label>Senzorul afișat <select data-s="sel">${optiuniSist("motor")}</select></label>
       <button type="button" data-s-act="vezi">Arată senzorul</button>
       <span class="v3d-et">sau clic stânga pe senzor, în machetă</span>
+    </div>
+    <div class="v3d-grup v3d-osc-cmd">
+      <b>Osciloscop</b>
+      <label>Timp/div <select data-s="tdiv"><option value="auto">automat (după CH1)</option>${[2e-5, 1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 0.1, 0.2, 0.6, 1].map(v => `<option value="${v}">${fmtT(v)}</option>`).join("")}</select></label>
+      <span class="osc-canal" style="--cc:${CUL[0]}"><b>CH1</b> senzorul afișat (declanșare)</span>
+      ${[1, 2, 3].map(i => `<span class="osc-canal" style="--cc:${CUL[i]}"><label><input type="checkbox" data-v-ch-on="${i}"> <b>CH${i + 1}</b></label>
+        <select data-v-ch-k="${i}" aria-label="Senzorul pe canalul ${i + 1}">${Object.entries(SISTEME).map(([sk, sn]) => `<optgroup label="${sn}">${D.filter(d => d.s === sk).map(d => `<option value="${d.k}">${d.e}</option>`).join("")}</optgroup>`).join("")}</select></span>`).join("")}
     </div>`;
-  const stare = { motor: false, rpm: 0, v: 0, a: 0, thr: 0, brk: 0, gear: 1, sel: "ckp", sist: "motor", maf: 0, pUlei: 0, tEvac: 20, dpGpf: 0, tangajV: 0, pmax: 0.6, ect: 88, tEv: 300, t: 0, phi: 0, ltft: 4, stft: 0, accApasat: false, frApasat: false, buf: [] };
+  const stare = { motor: false, rpm: 0, v: 0, a: 0, thr: 0, brk: 0, gear: 1, sel: "ckp", sist: "motor", tdiv: "auto", ch: [{ on: true }, { k: "map", on: false }, { k: "l1", on: false }, { k: "vssFS", on: false }], maf: 0, pUlei: 0, tEvac: 20, dpGpf: 0, tangajV: 0, pmax: 0.6, ect: 88, tEv: 300, t: 0, phi: 0, ltft: 4, stft: 0, accApasat: false, frApasat: false, buf: [] };
   let API = null, S0 = null;
   const ig = [0, 3.73, 2.05, 1.32, 0.97, 0.76], i0 = 4.21, R = 0.3, MASA = 1150;
   function leaga(cmd, st) {
@@ -943,6 +954,14 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     ss.addEventListener("change", () => { st.sist = ss.value; sel.innerHTML = optiuniSist(st.sist); st.sel = sel.value; st.buf = []; aplicaSistem(st); });
     elSel = sel; elSist = ss; aplicaSistem(st);
     cmd.querySelector('[data-s-act="vezi"]').addEventListener("click", () => arata(st.sel));
+    const td = cmd.querySelector('[data-s="tdiv"]'); td.addEventListener("change", () => { st.tdiv = td.value; st.buf = []; });
+    [1, 2, 3].forEach(i => {
+      const on = cmd.querySelector(`[data-v-ch-on="${i}"]`), sk = cmd.querySelector(`[data-v-ch-k="${i}"]`), el = on.closest(".osc-canal");
+      const stil = () => el.classList.toggle("oprit", !st.ch[i].on);
+      sk.value = st.ch[i].k; on.checked = st.ch[i].on; stil();
+      on.addEventListener("change", () => { st.ch[i].on = on.checked; st.buf[i] = []; stil(); });
+      sk.addEventListener("change", () => { st.ch[i].k = sk.value; st.buf[i] = []; if (!st.ch[i].on) { st.ch[i].on = on.checked = true; stil(); } });
+    });
     window.addEventListener("keydown", e => { if (!API || !API.scena.offsetParent || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; if (["ArrowUp", "KeyW"].includes(e.code)) { st.accApasat = true; e.preventDefault(); } if (["ArrowDown", "KeyS", "Space"].includes(e.code)) { st.frApasat = true; e.preventDefault(); } });
     window.addEventListener("keyup", e => { if (["ArrowUp", "KeyW"].includes(e.code)) st.accApasat = false; if (["ArrowDown", "KeyS", "Space"].includes(e.code)) st.frApasat = false; });
   }
@@ -1052,8 +1071,8 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     st.dpGpf = st.motor ? 0.2 + st.maf * 0.07 : 0;
     evidentiaza(st);
     // tampon pentru semnalele lente (6 s)
-    const [Tf] = fereastra(st.sel, st);
-    if (Tf >= 1) { st.buf.push([st.t, semnal(st.sel, st, st.t)]); while (st.buf.length && st.buf[0][0] < st.t - Tf) st.buf.shift(); }
+    const Tf = durata(st);
+    if (Tf >= 1) canaleActive(st).forEach(c => { const b = st.buf[c.i] || (st.buf[c.i] = []); b.push([st.t, semnal(c.k, st, st.t)]); while (b.length && b[0][0] < st.t - Tf) b.shift(); });
     mot.actualizeaza({ rpm: st.rpm, tps: st.thr * 100, selectat: st.sel, timp: st.t, tEv: st.motor ? 300 + st.rpm * 0.08 : 60, decuplat: {} }, dt);
     ped.rotation.z = st.ped * 0.25;
   }
@@ -1075,34 +1094,48 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       if (hit) { let o = hit.object; while (o && !o.userData.c) o = o.parent; if (o && LISTA[o.userData.c] && S0) { S0.sel = o.userData.c; S0.buf = []; if (elSel) elSel.value = S0.sel; } }
     });
   }
+  // osciloscopul cu 4 canale: bază de timp comună, fiecare canal activ pe banda lui, cu domeniul propriu de tensiune
+  function infoK(k, st) {
+    const f = fx;
+    if (k === "ckp") return `f = ${f(st.rpm, 0)} Hz → n = ${f(st.rpm, 0)} rot/min`;
+    if (k === "cmp") return `f = ${f(st.rpm / 120, 1)} Hz (1 impuls / 2 rotații)`;
+    if (k.startsWith("vss")) return `f = ${f(48 * st.v / (2 * Math.PI * R), 0)} Hz → v = ${f(st.v * 3.6, 0)} km/h`;
+    if (k === "inj1") return st.fuelCut ? "injecție întreruptă (decelerare)" : `t_i = ${f(st.ti, 2)} ms`;
+    if (DK[k] && DK[k].info) return DK[k].info(st);
+    return `U = ${f(semnal(k, st, st.t), 2)} V`;
+  }
   function dupaRandare(st) {
     if (!cv) return;
-    const W = 330, H = 170, dpr = window.devicePixelRatio || 1, sc = (cv.clientWidth || W) / W;   // desenat în 330×170, scalat la mărimea afișată
-    if (cv.width !== Math.round(W * sc * dpr)) { cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); }
+    const act = canaleActive(st), n = act.length;
+    const W = 330, H = n > 1 ? 120 + 62 * n : 170, dpr = window.devicePixelRatio || 1, sc = (cv.clientWidth || W) / W;   // desenat în 330×H, scalat la mărimea afișată
+    const hcss = Math.round(H * sc) + "px"; if (cv.style.height !== hcss) cv.style.height = hcss;
+    if (cv.width !== Math.round(W * sc * dpr) || cv.height !== Math.round(H * sc * dpr)) { cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); }
     const g = cv.getContext("2d"); g.setTransform(dpr * sc, 0, 0, dpr * sc, 0, 0);
     g.fillStyle = "rgba(8,18,14,.92)"; g.fillRect(0, 0, W, H);
-    g.strokeStyle = "rgba(120,200,160,.18)"; for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(10 + i * 31, 22); g.lineTo(10 + i * 31, H - 18); g.stroke(); } for (let j = 0; j <= 4; j++) { const y = 22 + j * (H - 40) / 4; g.beginPath(); g.moveTo(10, y); g.lineTo(320, y); g.stroke(); }
-    const [Tf, [u0, u1]] = fereastra(st.sel, st), Y = u => 22 + (1 - (u - u0) / (u1 - u0)) * (H - 40);
-    g.strokeStyle = "#ffe14d"; g.lineWidth = 1.5; g.beginPath();
-    if (Tf >= 1) st.buf.forEach(([t, u], i) => { const x = 10 + (t - (st.t - Tf)) / Tf * 310; i ? g.lineTo(x, Y(u)) : g.moveTo(x, Y(u)); });
-    else { let t0 = st.t - Tf; if (st.sel === "ckp" && st.rpm > 50) { const p = 1 / st.rpm; t0 = Math.floor(t0 / p) * p; } if (st.sel === "inj1" && st.rpm > 50) { const p = 120 / st.rpm; t0 = Math.floor(t0 / p) * p - p * 0.1; } for (let i = 0; i <= 400; i++) { const t = t0 + Tf * i / 400, x = 10 + i / 400 * 310, y = Y(semnal(st.sel, st, t)); i ? g.lineTo(x, y) : g.moveTo(x, y); } }
-    g.stroke();
-    if (DK[st.sel] && DK[st.sel].tip === "can") {            // a doua linie a magistralei: CAN-L
-      let t0 = st.t - Tf; g.strokeStyle = "#5fd0ff"; g.beginPath();
-      for (let i = 0; i <= 400; i++) { const t = t0 + Tf * i / 400, x = 10 + i / 400 * 310, y = Y(5 - semnal(st.sel, st, t)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
-      g.stroke();
-    }
-    const f = (v, n = 1) => v.toFixed(n).replace(".", ",");
-    g.fillStyle = "#9fe6c0"; g.font = "600 11px system-ui"; g.fillText(LISTA[st.sel], 10, 15);
-    let info = "";
-    if (st.sel === "ckp") info = `f = ${f(st.rpm, 0)} Hz → n = ${f(st.rpm, 0)} rot/min`;
-    else if (st.sel === "cmp") info = `f = ${f(st.rpm / 120, 1)} Hz (1 impuls / 2 rotații)`;
-    else if (st.sel.startsWith("vss")) info = `f = ${f(48 * st.v / (2 * Math.PI * R), 0)} Hz → v = ${f(st.v * 3.6, 0)} km/h`;
-    else if (st.sel === "inj1") info = st.fuelCut ? "întreruperea injecției (decelerare)" : `t_i = ${f(st.ti, 2)} ms`;
-    else if (DK[st.sel] && DK[st.sel].info) info = DK[st.sel].info(st);
-    else info = `U = ${f(semnal(st.sel, st, st.t), 2)} V`;
-    g.fillText(info, 10, H - 5);
-    g.fillStyle = "#9fe6c0"; g.textAlign = "right"; g.fillText(Tf >= 1 ? `${Tf} s` : Tf >= 1e-3 ? `${f(Tf * 1000, 1)} ms` : Tf >= 1e-6 ? `${f(Tf * 1e6, 0)} µs` : `${f(Tf * 1e9, 0)} ns`, 320, H - 5); g.textAlign = "left";
+    const top = 22, jos = n > 1 ? 8 + 13 * n : 18, hz = H - top - jos;
+    g.strokeStyle = "rgba(120,200,160,.18)"; g.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(10 + i * 31, top); g.lineTo(10 + i * 31, top + hz); g.stroke(); }
+    for (let j = 0; j <= 4 * n; j++) { const y = top + j * hz / (4 * n); g.beginPath(); g.moveTo(10, y); g.lineTo(320, y); g.stroke(); }
+    g.strokeStyle = "rgba(120,200,160,.5)"; for (let j = 1; j < n; j++) { const y = top + j * hz / n; g.beginPath(); g.moveTo(10, y); g.lineTo(320, y); g.stroke(); }
+    const Tf = durata(st);
+    let t0 = st.t - Tf;
+    if (Tf < 1 && st.rpm > 50) { if (st.sel === "ckp") { const p = 1 / st.rpm; t0 = Math.floor(t0 / p) * p; } else if (st.sel === "inj1" || st.sel === "cmp") { const p = 120 / st.rpm; t0 = Math.floor(t0 / p) * p - p * 0.1; } }
+    act.forEach((c, b) => {
+      const [, [u0, u1]] = fereastra(c.k, st), y0 = top + b * hz / n, hb = hz / n, du = u1 - u0;
+      const Y = u => y0 + 3 + (1 - (clamp(u, u0 - 0.05 * du, u1 + 0.05 * du) - u0) / du) * (hb - 6);
+      const urma = (fn, col) => { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); let prim = true;
+        if (Tf >= 1) (st.buf[c.i] || []).forEach(([t, u]) => { const x = 10 + (t - (st.t - Tf)) / Tf * 310; if (x < 10) return; const y = Y(fn ? fn(u) : u); prim ? g.moveTo(x, y) : g.lineTo(x, y); prim = false; });
+        else for (let i = 0; i <= 400; i++) { const t = t0 + Tf * i / 400, u = semnal(c.k, st, t), y = Y(fn ? fn(u) : u); i ? g.lineTo(10 + i / 400 * 310, y) : g.moveTo(10, y); }
+        g.stroke(); };
+      if (DK[c.k] && DK[c.k].tip === "can") urma(u => 5 - u, "rgba(95,208,255,.8)");          // CAN-L
+      urma(null, CUL[c.i]);
+      if (n > 1) { g.fillStyle = CUL[c.i]; g.font = "700 9.5px system-ui"; g.fillText(`CH${c.i + 1}`, 13, y0 + 11); }
+    });
+    g.font = "600 11px system-ui"; g.fillStyle = n > 1 ? "#9fe6c0" : CUL[0];
+    g.fillText(n > 1 ? `Osciloscop – ${n} canale` : LISTA[st.sel], 10, 15);
+    if (n > 1) { g.font = "10px system-ui"; act.forEach((c, b) => { g.fillStyle = CUL[c.i]; const tx = `CH${c.i + 1} ${DK[c.k] ? DK[c.k].e : c.k}: ${infoK(c.k, st)}`; g.fillText(tx.length > 64 ? tx.slice(0, 63) + "…" : tx, 10, H - jos + 10 + b * 13); }); }
+    else { g.fillStyle = "#9fe6c0"; g.fillText(infoK(st.sel, st), 10, H - 5); }
+    g.fillStyle = "#9fe6c0"; g.textAlign = "right"; g.font = "600 11px system-ui"; g.fillText(`${fmtT(Tf / 10)}/div`, 320, n > 1 ? 15 : H - 5); g.textAlign = "left";
   }
   const f = (v, n = 1) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n).replace(".", ",");
   function hud(st) {
