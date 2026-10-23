@@ -387,6 +387,7 @@ export function creeaza(gazda, optiuni = {}) {
       <div>a <b>${f(st.a, 2)}</b> m/s²</div>
       <div>cursă pedală <b>${f(st.cursaP * 1000, 0)}</b> mm</div>
       <div>dist. frânare <b>${st.xStart !== null ? f(st.dist, 1) + " m" : "–"}</b></div>
+      ${optiuni.arataForte ? `<div>F pedală <b>${f(st.Fact, 0)}</b> N</div><div>F etrier față <b>${f(st.pRoti[0] * 1e5 * APF / 1000, 2)}</b> kN</div><div>F etrier spate <b>${f(st.pRoti[2] * 1e5 * APS / 1000, 2)}</b> kN</div>` : ""}
       ${st.absAct ? '<div class="v3d-abs">ABS activ</div>' : ""}${st.blocat ? '<div class="v3d-blocare">roți blocate</div>' : ""}
       ${st.cursaP > 0.105 ? '<div class="v3d-blocare">pedală moale!</div>' : ""}`;
   }

@@ -88,10 +88,16 @@ MODELE["mf-l3"] = (function () {
     });
     var date = d.date || {};
     if (Number(date.l) !== pr.l || Number(date.dc) !== pr.dc) { out.motive.push("dimensiunile standului diferă de varianta individuală"); out.incompatibile++; }
-    var inLog = function (F, srv, col, v) { return log.some(function (l) { return Math.abs(Number(l.Fp) - F) <= 3 && (!!l.servo) === srv && Math.abs(Number(col === "p" ? l.p1 : l.Fc) - v) < 0.051; }); };
+    var inLog = function (F, srv, col, v) { return log.some(function (l) { return Math.abs(Number(l.Fp) - F) <= 3 && (!!l.servo) === srv && Math.abs(Number(col === "p" ? l.p1 : col === "p2" ? l.p2 : l.Fc) - v) < 0.051; }); };
+    var s300 = U.num(((t.t33 || {}).s || {}).s);
+    if (isFinite(s300)) {
+      var cl = (d.log || []).filter(function (l) { return l.cursa != null; });
+      if (!cl.some(function (l) { return Math.abs(Number(l.cursa) - s300) < 0.051; })) out.faraCitire++;
+      if (Math.abs(s300 - cursaPedala(stare(300, 0, pr).p1, pr)) > 3) out.incompatibile++;
+    }
     [["t31", false], ["t32", true]].forEach(function (x) {
       Object.keys(t[x[0]] || {}).forEach(function (F) {
-        ["p", "Fc"].forEach(function (c) { var v = U.num(t[x[0]][F][c]); if (isFinite(v) && !inLog(Number(F), x[1], c, v)) out.faraCitire++; });
+        ["p", "p2", "Fc"].forEach(function (c) { var v = U.num(t[x[0]][F][c]); if (isFinite(v) && !inLog(Number(F), x[1], c, v)) out.faraCitire++; });
       });
     });
     var o = prelucreaza(t, date, U), a = asteptate(o), rasp = d.raspunsuri || {};
