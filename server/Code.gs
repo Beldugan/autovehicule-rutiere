@@ -134,6 +134,24 @@ const Stocare = {
   sterge(k) { try { localStorage.removeItem(k); } catch (e) { } }
 };
 
+/* Ecran complet pentru un element (machetă 3D + osciloscop). Unde API-ul Fullscreen lipsește (iPhone),
+   elementul se întinde peste toată fereastra prin clasa .ecran-plin. */
+function ecranComplet(el, btn) {
+  const nativ = () => (document.fullscreenElement || document.webkitFullscreenElement) === el;
+  const activ = () => nativ() || el.classList.contains("ecran-plin");
+  const eticheta = () => { btn.textContent = activ() ? "✕ Ieșire din ecran complet" : "⛶ Ecran complet"; btn.setAttribute("aria-pressed", activ() ? "true" : "false"); };
+  const plin = on => { el.classList.toggle("ecran-plin", on); document.documentElement.classList.toggle("fara-derulare", on); eticheta(); };
+  btn.addEventListener("click", () => {
+    if (activ()) { if (nativ()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else plin(false); return; }
+    const f = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!f) return plin(true);
+    try { const p = f.call(el); if (p && p.catch) p.catch(() => plin(true)); } catch (e) { plin(true); }
+  });
+  ["fullscreenchange", "webkitfullscreenchange"].forEach(ev => document.addEventListener(ev, eticheta));
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && el.classList.contains("ecran-plin")) plin(false); });
+  eticheta();
+}
+
 
 /* ---- da/l2/model.js ---- */
 /* DA – Lucrarea 2. Senzori și actuatori – date live și semnale reale (standul K7J 1.4 MPI).
@@ -665,9 +683,9 @@ function arataCod() {
     `<div style="font-family:system-ui,sans-serif;text-align:center">
        <div style="font-size:18px;color:#555">${(infoDisc_() || {}).nume} – Lucrarea ${lab}<br>${titluLab_(lab)}</div>
        <div style="font-size:96px;font-weight:800;letter-spacing:.12em;margin:18px 0;color:#1f5f9e">${cod}</div>
-       <div style="font-size:16px;color:#555">valabil ${h1}:00–${h1 + ORE_SLOT}:00 (și încă ${ORE_SLOT} ore pentru întârziați)</div>
+       <div style="font-size:16px;color:#555">valabil ${h1}:00–${h1 + ORE_SLOT}:00</div>
      </div>`).setWidth(680).setHeight(330);
-  ui.showModalDialog(html, "Cod de sesiune – afișați-l pe proiector");
+  ui.showModalDialog(html, "Cod de sesiune");
 }
 
 /* ============================== foi */

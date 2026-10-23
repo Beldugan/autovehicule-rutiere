@@ -83,9 +83,9 @@ function arataCod() {
     `<div style="font-family:system-ui,sans-serif;text-align:center">
        <div style="font-size:18px;color:#555">${(infoDisc_() || {}).nume} – Lucrarea ${lab}<br>${titluLab_(lab)}</div>
        <div style="font-size:96px;font-weight:800;letter-spacing:.12em;margin:18px 0;color:#1f5f9e">${cod}</div>
-       <div style="font-size:16px;color:#555">valabil ${h1}:00–${h1 + ORE_SLOT}:00 (și încă ${ORE_SLOT} ore pentru întârziați)</div>
+       <div style="font-size:16px;color:#555">valabil ${h1}:00–${h1 + ORE_SLOT}:00</div>
      </div>`).setWidth(680).setHeight(330);
-  ui.showModalDialog(html, "Cod de sesiune – afișați-l pe proiector");
+  ui.showModalDialog(html, "Cod de sesiune");
 }
 
 /* ============================== foi */
