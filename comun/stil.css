@@ -335,3 +335,18 @@ div.lucrare { opacity: .75; }
 .v3d-frana.activ { filter: brightness(.85); transform: translateY(1px); }
 @media (max-width: 640px) { .v3d-ajutor { display: none; } .v3d-hud { font-size: .74rem; } }
 .v3d-toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: #1d2733; color: #fff; padding: .6rem 1rem; border-radius: 10px; z-index: 50; max-width: 90vw; font-size: .9rem; }
+
+/* ---------- instrumente de diagnoză (DA) */
+.osc-cutie { background: #1b1f24; border-radius: 12px; padding: .5rem .6rem .3rem; margin-top: .6rem; color: #d8e3dc; }
+.osc-cutie canvas { width: 100%; display: block; border-radius: 6px; touch-action: none; cursor: ew-resize; }
+.osc-cutie .nota { color: #b8c7bf; margin: .3rem 0 0; }
+.osc-bara { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; margin-bottom: .4rem; font-size: .85rem; }
+.osc-bara select, .osc-bara button { padding: .2rem .4rem; font-size: .82rem; }
+.comutator-aparat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem; margin-bottom: .5rem; }
+.comutator-aparat button[aria-pressed="true"], [data-mm][aria-pressed="true"] { background: var(--accent); color: var(--pe-accent); border-color: var(--accent); }
+table.x431 { font-size: .8rem; width: 100%; }
+table.x431 td { padding: .15rem .35rem; }
+table.x431 td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; }
+.comp-da:hover { filter: brightness(1.25); }
+.osc-bara select, .osc-bara button { color: #10161b; background: #e6ecf1; border: 1px solid #9aa6b1; border-radius: 6px; }
+table.x431 td:first-child { text-align: left; }

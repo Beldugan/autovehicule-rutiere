@@ -29,6 +29,7 @@ const PORTAL = {
     DA: {
       nume: "Diagnosticarea autovehiculelor", an: "anul IV", sem: 1, cod: "MR4103", tip: "Laborator", dosar: "da",
       indrumar: "Îndrumar de laborator – Diagnosticarea autovehiculelor (T. Dordea; revizuire A.-M. Beldugan, 2026)",
+      pdf: "da/indrumar-diagnosticarea-autovehiculelor.pdf",
       endpoint: "",
       lucrari: [
         "Diagnoza computerizată și rețeaua de date CAN",
@@ -80,5 +81,5 @@ const PORTAL = {
     }
   },
   /** lucrările deja realizate în portal: cod → cale */
-  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/" }
+  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "da-l2": "da/l2/" }
 };
