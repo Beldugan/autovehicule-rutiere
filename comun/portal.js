@@ -12,7 +12,7 @@ function realizata(disc, n) { return PORTAL.realizate[`${PORTAL.discipline[disc]
 
 function paginaPrincipala() {
   const sem1 = Object.entries(PORTAL.discipline).filter(([, d]) => d.sem === 1);
-  document.body.innerHTML = antetPortal(`${esc(PORTAL.program)} – laboratoare și proiecte`, `Laboratoare virtuale realiste, prezență și referate predate în Google Classroom · ${esc(PORTAL.cadru)}`) + `
+  document.body.innerHTML = antetPortal(`${esc(PORTAL.program)} – laboratoare și proiecte`, `Laboratoare virtuale · ${esc(PORTAL.cadru)}`) + `
   <main class="pagina">
     <section class="semestru"><h2>Semestrul I</h2><div class="grila-discipline">
       ${sem1.map(([k, d]) => {
