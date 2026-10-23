@@ -1,167 +1,194 @@
 /* DA – Lucrarea 1. Diagnoza computerizată și rețeaua de date CAN.
-   Simulator: automobilul didactic cu 8 module, priza OBD J1962 cu cutie de acces, tester multimarcă X431 (scanare, coduri,
-   freeze-frame, monitoare, date live, analiza magistralei), cititor OBD generic, multimetru cu clește ampermetric și
-   osciloscop cu 4 canale pe CAN-H / CAN-L. Fiecare student are rețeaua proprie, un caz „client” și un defect de rețea ascuns. */
+   Simulator: autoturism 2025 cu gateway central și 5 magistrale (diagnoză, motor, șasiu CAN FD, confort, infotainment),
+   29 de module, Ethernet auto; machetă 3D și schema rețelei; tester multimarcă X431 (scanare, coduri, freeze-frame,
+   monitoare, date live, analiza magistralei), cititor OBD generic, multimetru cu clește ampermetric și osciloscop cu 4 canale
+   la priza OBD sau la conectorii gateway-ului. Fiecare student are rețeaua proprie, un caz „client” și un defect de rețea ascuns. */
 "use strict";
 const MD = MODELE["da-l1"];
-const { DEFECTE, MODULE, STARI } = MD;
+const { MODULE, MAG, STARI } = MD;
 const NUME_MOD = {}; MODULE.forEach(m => NUME_MOD[m.k] = m.nume);
 const NUME_MON = { mis: "Rateuri de aprindere", fuel: "Sistem de alimentare", ccm: "Componente (CCM)", cat: "Catalizator", o2: "Sonde λ și încălzitor", egr: "EGR / aer secundar", dpf: "Filtru de particule (diesel)" };
+const NUME_MAG = b => MAG[b].n.split(" (")[0];
+const PUNCTE = { diag: "Priza OBD, pinii 6 / 14 – CAN diagnoză", motor: "Conectorul gateway – CAN motor", sasiu: "Conectorul gateway – CAN șasiu (FD)", confort: "Conectorul gateway – CAN confort", info: "Conectorul gateway – CAN infotainment" };
 const T_REPAUS = 40;                       // [s] până la intrarea rețelei în repaus după decuplarea contactului
 
 /* ------------------------------------------------------------------ starea simulatorului */
 const sim = {
-  contact: false, tOff: 999, t: 0, defActiv: false, defectDemo: "term_lipsa", vent: false,
+  contact: false, tOff: 999, t: 0, defActiv: false, defectDemo: "term_lipsa", busDemo: "sasiu", vent: false,
   x431: false, obd: false, aparat: "x431", vx: "scan", scan: null, modCod: "ecm", sterse: false, ciclu: 0,
-  mm: "r614",
+  mm: "r", punct: "diag", vedere: "3d",
   osc: { tdiv: 2e-6, ruleaza: true, c1: 2, c2: 7, buf: [], t0: 0, benzi: false,
     ch: [{ c: "h", on: true, vdiv: 1, poz: -2 }, { c: "l", on: true, vdiv: 1, poz: -2 }, { c: "d", on: false, vdiv: 1, poz: -3 }, { c: "b", on: false, vdiv: 5, poz: -3 }] }
 };
 function P() { return Cadru.P; }
 function defect() { return MOD.eval ? P().defect : sim.defectDemo; }
-function pr() { return Object.assign({}, P(), { defect: defect() }); }
-function dA() { return sim.defActiv ? 1 : 0; }                         // defectul de rețea activ
-function treaza() { return sim.contact || sim.tOff < T_REPAUS; }        // rețeaua este activă
-function nivel() { return MD.niveluri(pr(), sim.defActiv); }
-function comunica() { return treaza() && nivel().com; }
-function codurileActuale() { return sim.sterse ? MD.coduri(pr(), sim.defActiv).filter(c => c.cod.startsWith("U") || sim.ciclu > 0) : MD.coduri(pr(), sim.defActiv); }
+function defBus() { return MOD.eval ? P().defBus : sim.busDemo; }
+function pr() { return Object.assign({}, P(), { defect: defect(), defBus: defBus() }); }
+function dA() { return sim.defActiv ? 1 : 0; }
+function treaza() { return sim.contact || sim.tOff < T_REPAUS; }
+function nivel(b = sim.punct) { return MD.niveluri(pr(), sim.defActiv, b); }
+function comunica(b = sim.punct) { return treaza() && nivel(b).com; }
+function raspunde(k) { return sim.contact && MD.raspunde(pr(), sim.defActiv, k); }
+function codurileActuale() { const l = MD.coduri(pr(), sim.defActiv); return sim.sterse && sim.ciclu === 0 ? l.filter(c => c.cod.startsWith("U")) : l; }
 
-/* ------------------------------------------------------------------ semnalele magistralei */
+/* ------------------------------------------------------------------ semnalele magistralei la punctul de măsură */
 const FB = MD.FBIT;
 function hash(n) { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }
-function perioadaCadru() { return Math.max(MD.NBITI + 3, Math.round(MD.NBITI / (MD.incarcare(P()) / 100))); }   // biți între începuturile cadrelor
-/** 1 = bit dominant la indexul de bit b (cadru standard simplificat: SOF, identificator, date, ACK, EOF) */
-function bitDom(b) {
-  const Tf = perioadaCadru(), k = Math.floor(b / Tf), p = b - k * Tf;
-  if (p >= MD.NBITI) return 0;                                         // magistrală liberă (recesiv)
-  if (p === 0) return 1;                                               // SOF
-  if (p === MD.NBITI - 10) return 1;                                   // bitul ACK (dominant, pus de receptori)
-  if (p >= MD.NBITI - 9) return 0;                                     // delimitatori + EOF (recesiv)
-  if (p <= 11) return hash(k * 7 + 3) * 2048 & (1 << (11 - p)) ? 0 : 1; // identificatorul de 11 biți
-  return hash(k * 131 + p) < 0.5 ? 1 : 0;
+function perioadaCadru(b) { return Math.max(MD.NBITI + 3, Math.round(MD.NBITI / (MD.incarcare(P(), b) / 100))); }      // [biți]
+function perioadaFD() { return 130e-6 / (MD.incarcare(P(), "sasiu") / 100); }                                         // [s]
+function bitDom(i, b) {
+  const Tf = perioadaCadru(b), k = Math.floor(i / Tf), p = i - k * Tf;
+  if (p >= MD.NBITI) return 0;
+  if (p === 0 || p === MD.NBITI - 10) return 1;                         // SOF, ACK
+  if (p >= MD.NBITI - 9) return 0;                                      // delimitatori + EOF
+  if (p <= 11) return (Math.floor(hash(k * 7 + 3 + b.length) * 2048) & (1 << (11 - p))) ? 0 : 1;
+  return hash(k * 131 + p + b.length * 1000) < 0.5 ? 1 : 0;
 }
-/** fracțiunea „dominantă” la momentul t, cu fronturile reale (constantă de timp ≈ 30 ns) și oscilații la terminare lipsă */
-function stareMag(t) {
-  const b = Math.floor(t * FB), dtb = t * FB - b, v = bitDom(b), vp = bitDom(b - 1), tau = 0.015;
-  let s = v;
-  if (v !== vp) s = vp + (v - vp) * (1 - Math.exp(-dtb / tau));
-  const df = sim.defActiv ? defect() : "";
-  if ((df === "term_lipsa" || df === "intrerupt_esp") && v !== vp) s += (v - vp) * 0.28 * Math.exp(-dtb / 0.06) * Math.sin(2 * Math.PI * dtb / 0.05);
+/** {v, vp, dt}: bitul curent, cel anterior și timpul scurs de la ultimul front [s] */
+function bitLa(t, b) {
+  if (b !== "sasiu") { const i = Math.floor(t * FB); return { v: bitDom(i, b), vp: bitDom(i - 1, b), dt: (t * FB - i) / FB }; }
+  const Tp = perioadaFD(), k = Math.floor(t / Tp), tt = t - k * Tp, A = 2e-6, D = 0.5e-6;
+  const arb = i => i === 0 ? 1 : (i <= 11 ? ((Math.floor(hash(k * 7 + 9) * 2048) & (1 << (11 - i))) ? 0 : 1) : hash(k * 131 + i) < 0.5 ? 1 : 0);
+  const dat = j => hash(k * 977 + j) < 0.5 ? 1 : 0;
+  if (tt >= 130e-6) return { v: 0, vp: 0, dt: 1 };
+  if (tt < 60e-6) { const i = Math.floor(tt / A); return { v: arb(i), vp: i ? arb(i - 1) : 0, dt: tt - i * A }; }
+  if (tt < 100e-6) { const j = Math.floor((tt - 60e-6) / D); return { v: dat(j), vp: j ? dat(j - 1) : arb(29), dt: tt - 60e-6 - j * D }; }
+  const i = Math.floor((tt - 100e-6) / A), f = n => n === 1 ? 1 : 0;
+  return { v: f(i), vp: i ? f(i - 1) : dat(79), dt: tt - 100e-6 - i * A };
+}
+function stareMag(t, b) {
+  const { v, vp, dt } = bitLa(t, b);
+  let s = v; if (v !== vp) s = vp + (v - vp) * (1 - Math.exp(-dt / 30e-9));
+  const e = sim.defActiv && b === defBus() ? defect() : "";
+  if ((e === "term_lipsa" || e === "intrerupt") && v !== vp) s += (v - vp) * 0.28 * Math.exp(-dt / 120e-9) * Math.sin(2 * Math.PI * dt / 100e-9);
   return s;
 }
 function semnal(c, t) {
   if (c === "b") return sim.contact ? P().Ubat - 0.06 + (sim.vent ? -P().I * 0.012 : 0) : P().Ubat;
   if (!treaza()) return (hash(t * 1e7) - 0.5) * 0.01;
-  const n = nivel(), zg = (hash(t * 3.1e7) - 0.5) * 0.02;
-  const s = n.com ? stareMag(t) : 0;
+  const b = sim.punct, n = nivel(b), zg = (hash(t * 3.1e7) - 0.5) * 0.02;
+  const s = n.com ? stareMag(t, b) : 0;
   const H = n.rH + (n.dH - n.rH) * s + zg, L = n.rL + (n.dL - n.rL) * s - zg * 0.8;
   return c === "h" ? H : c === "l" ? L : H - L;
 }
 
-/* ------------------------------------------------------------------ desenul rețelei */
+/* ------------------------------------------------------------------ schema rețelei (SVG) */
 const SV = {};
-const POZ_MOD = { ecm: [150, 70], tcu: [300, 70], ki: [460, 70], esp: [740, 70], eps: [330, 300], srs: [620, 300] };
+const RANDURI = ["motor", "sasiu", "confort", "info"], Y_RAND = { motor: 70, sasiu: 165, confort: 260, info: 355 };
+const CUL_H = { diag: "#ffc04d", motor: "#f39a2b", sasiu: "#e8503a", confort: "#5cbf5a", info: "#9b6ad6" }, CUL_L = "#8a5a2b";
 function construiesteSVG() {
   const svg = $("#svg-retea"); svg.innerHTML = "";
   const defs = mk("defs", {}, svg); defsComune(defs); filtre(defs);
   grad(defs, "gFundal", [[0, "#2a3038"], [1, "#161a1f"]]);
   grad(defs, "gModul", [[0, "#4a5058"], [0.5, "#30353b"], [1, "#1d2025"]]);
-  grad(defs, "gModulA", [[0, "#d9dde1"], [0.5, "#b9bfc6"], [1, "#8d949b"]]);
   const g = mk("g", {}, svg); SV.g = g;
-  mk("rect", { x: 0, y: 0, width: 900, height: 440, fill: "url(#gFundal)" }, g);
-  const T = (x, y, txt, o = {}) => { const e = mk("text", Object.assign({ x, y, "font-size": 11, fill: "#e6ebf0", "text-anchor": "middle", "font-weight": 600 }, o), g); e.textContent = txt; return e; };
-  // magistrala: cablu torsadat CAN-H (portocaliu) / CAN-L (albastru)
-  const tors = (x1, y1, x2, y2, gr) => {
-    const n = Math.max(4, Math.round(Math.hypot(x2 - x1, y2 - y1) / 10)), a = [], b = [];
-    for (let i = 0; i <= n; i++) { const u = i / n, x = x1 + (x2 - x1) * u, y = y1 + (y2 - y1) * u, nx = -(y2 - y1) / Math.hypot(x2 - x1, y2 - y1), ny = (x2 - x1) / Math.hypot(x2 - x1, y2 - y1), o = 3 * Math.sin(i * Math.PI / 2);
-      a.push(`${x + nx * o},${y + ny * o}`); b.push(`${x - nx * o},${y - ny * o}`); }
-    mk("polyline", { points: a.join(" "), fill: "none", stroke: "#f39a2b", "stroke-width": 2.6 }, gr);
-    mk("polyline", { points: b.join(" "), fill: "none", stroke: "#3f8fe0", "stroke-width": 2.6 }, gr);
+  mk("rect", { x: 0, y: 0, width: 900, height: 470, fill: "url(#gFundal)" }, g);
+  const T = (x, y, txt, o = {}) => { const e = mk("text", Object.assign({ x, y, "font-size": 10, fill: "#e6ebf0", "text-anchor": "middle", "font-weight": 600 }, o), g); e.textContent = txt; return e; };
+  const pereche = (x1, y1, x2, y2, b, gr) => {
+    const L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(3, Math.round(L / 8)), nx = -(y2 - y1) / L, ny = (x2 - x1) / L, a = [], c = [];
+    for (let i = 0; i <= n; i++) { const u = i / n, x = x1 + (x2 - x1) * u, y = y1 + (y2 - y1) * u, o = 2.4 * Math.sin(i * Math.PI / 2); a.push(`${x + nx * o},${y + ny * o}`); c.push(`${x - nx * o},${y - ny * o}`); }
+    mk("polyline", { points: a.join(" "), fill: "none", stroke: CUL_H[b], "stroke-width": 2.2 }, gr);
+    mk("polyline", { points: c.join(" "), fill: "none", stroke: CUL_L, "stroke-width": 2.2 }, gr);
   };
-  const Y = 190; SV.Y = Y;
-  const gb = mk("g", {}, g); tors(95, Y, 805, Y, gb);
-  Object.entries(POZ_MOD).forEach(([k, [x, y]]) => tors(x, y < Y ? y + 30 : y - 2, x, Y, gb));
-  tors(470, Y, 470, 318, gb);                                                           // ramura spre priza de diagnoză
-  // rezistențele de terminare
-  const rez = (x, et) => { mk("rect", { x: x - 16, y: Y - 7, width: 32, height: 14, rx: 3, fill: "#c9a227", stroke: "#4a3b0a" }, g); [6, 0, -6].forEach(d => mk("line", { x1: x + d, y1: Y - 7, x2: x + d, y2: Y + 7, stroke: ["#7a3b10", "#111", "#c62828"][(d + 6) / 6], "stroke-width": 2 }, g)); T(x, Y + 26, et, { "font-size": 10, fill: "#ffd36b" }); };
-  rez(90, "R₁ 120 Ω"); rez(810, "R₂ 120 Ω");
-  // modulele
-  SV.mod = {};
-  const ET = { ecm: "ECM motor", tcu: "TCU cutie", ki: "Bord / gateway", esp: "ESP / ABS", eps: "EPS direcție", srs: "SRS airbag" };
-  Object.entries(POZ_MOD).forEach(([k, [x, y]]) => {
-    const gg = mk("g", {}, g); SV.mod[k] = gg;
-    mk("rect", { x: x - 52, y: y - 26, width: 104, height: 56, rx: 7, fill: k === "ki" ? "url(#gModulA)" : "url(#gModul)", stroke: "#0b0d10", filter: "url(#fUmbra)" }, gg);
-    if (k === "ecm") for (let i = 0; i < 7; i++) mk("rect", { x: x - 44 + i * 13, y: y - 24, width: 7, height: 14, rx: 2, fill: "#8d949b" }, gg);
-    mk("rect", { x: x - 22, y: y < Y ? y + 22 : y - 30, width: 44, height: 10, rx: 2, fill: "#111" }, gg);
-    const t = mk("text", { x, y: y + 9, "font-size": 11.5, "text-anchor": "middle", "font-weight": 700, fill: k === "ki" ? "#1b1f24" : "#eef2f5" }, gg); t.textContent = ET[k];
+  const rez = (x, y) => { mk("rect", { x: x - 11, y: y - 5, width: 22, height: 10, rx: 2, fill: "#c9a227", stroke: "#4a3b0a" }, g); [-4, 0, 4].forEach((d, i) => mk("line", { x1: x + d, y1: y - 5, x2: x + d, y2: y + 5, stroke: ["#7a3b10", "#111", "#c62828"][i], "stroke-width": 1.6 }, g)); };
+  // gateway central
+  mk("rect", { x: 18, y: 30, width: 104, height: 360, rx: 10, fill: "url(#gModul)", stroke: "#0b0d10", filter: "url(#fUmbra)" }, g);
+  T(70, 205, "GATEWAY", { "font-size": 13, "font-weight": 800 }); T(70, 222, "central", { "font-size": 10, fill: "#aab4be" });
+  SV.mod = {}; SV.pozMod = {};
+  RANDURI.forEach(b => {
+    const y = Y_RAND[b], mods = MODULE.filter(m => m.b === b), x0 = 140, x1 = 860, w = (x1 - x0) / mods.length;
+    const gb = mk("g", {}, g); pereche(122, y, x1 + 14, y, b, gb);
+    rez(132, y); rez(x1 + 18, y);
+    T(140, y - 40, NUME_MAG(b) + " · " + MAG[b].v, { "text-anchor": "start", "font-size": 9.5, fill: CUL_H[b] });
+    mods.forEach((m, i) => {
+      const cx = x0 + w * (i + 0.5) + (m.k === MAG[b].capat ? 0 : 0), gg = mk("g", {}, g); SV.mod[m.k] = gg; SV.pozMod[m.k] = [cx, y - 20];
+      pereche(cx, y - 14, cx, y, b, gg);
+      mk("rect", { x: cx - w / 2 + 3, y: y - 34, width: w - 6, height: 22, rx: 4, fill: "url(#gModul)", stroke: m.k === MAG[b].capat ? "#ffd36b" : "#0b0d10" }, gg);
+      const t = mk("text", { x: cx, y: y - 20, "font-size": Math.min(9.5, (w - 8) / (m.sc.length * 0.56)), "text-anchor": "middle", "font-weight": 700, fill: "#eef2f5" }, gg); t.textContent = m.sc;
+    });
   });
-  // CAN de caroserie, prin gateway
-  mk("path", { d: "M512 64 L 600 64 L 600 24 L 870 24", fill: "none", stroke: "#8fd18f", "stroke-width": 2, "stroke-dasharray": "6 4" }, g);
-  T(735, 16, "CAN caroserie 125 kbit/s → SAM, climatizare", { "font-size": 10, fill: "#b6e3b6" });
-  // priza de diagnoză SAE J1962 (cutia de acces)
-  const ox = 470, oy = 345; SV.obd = [ox, oy];
-  mk("rect", { x: ox - 95, y: oy - 26, width: 190, height: 70, rx: 12, fill: "url(#gNegru)", stroke: "#000", filter: "url(#fUmbra)" }, g);
-  mk("path", { d: `M${ox - 80} ${oy - 14} L ${ox + 80} ${oy - 14} L ${ox + 70} ${oy + 30} L ${ox - 70} ${oy + 30} Z`, fill: "#15171a", stroke: "#555" }, g);
+  T(870, 30, "R = 120 Ω la capete (gateway și modulul de capăt, marcat cu galben)", { "text-anchor": "end", "font-size": 9, fill: "#ffd36b", "font-weight": 500 });
+  // magistrala de diagnoză și priza OBD
+  const yd = 430; SV.Yd = yd; pereche(122, yd - 30, 330, yd - 30, "diag", g); rez(132, yd - 30); rez(318, yd - 18);
+  T(140, yd - 42, "CAN diagnoză · 500 kbit/s", { "text-anchor": "start", "font-size": 9.5, fill: CUL_H.diag });
+  mk("path", { d: `M122 ${yd - 14} C 200 ${yd - 14}, 260 ${yd + 6}, 330 ${yd + 6}`, stroke: "#2fae5a", "stroke-width": 2, fill: "none", "stroke-dasharray": "5 3" }, g);
+  T(225, yd + 22, "Ethernet DoIP (pinii 3/11, 12/13)", { "font-size": 9, fill: "#7fd99a", "font-weight": 500 });
+  const ox = 410, oy = 420; SV.obd = [ox, oy];
+  mk("rect", { x: ox - 80, y: oy - 34, width: 160, height: 62, rx: 10, fill: "url(#gNegru)", stroke: "#000", filter: "url(#fUmbra)" }, g);
+  mk("path", { d: `M${ox - 68} ${oy - 24} L ${ox + 68} ${oy - 24} L ${ox + 60} ${oy + 18} L ${ox - 60} ${oy + 18} Z`, fill: "#15171a", stroke: "#555" }, g);
   SV.pin = {};
   for (let i = 1; i <= 16; i++) {
-    const r = i <= 8 ? 0 : 1, c = (i - 1) % 8, x = ox - 62 + c * 17.7 + (r ? 4 : 0), y = oy - 2 + r * 20;
-    const sp = { 4: "#9aa2ab", 5: "#9aa2ab", 6: "#f39a2b", 14: "#3f8fe0", 16: "#d32f2f" }[i];
-    mk("circle", { cx: x, cy: y, r: 4.2, fill: sp || "#5a6068", stroke: "#000" }, g);
-    const t = mk("text", { x, y: y + (r ? 14 : -7), "font-size": 7.5, fill: "#cfd6dd", "text-anchor": "middle" }, g); t.textContent = i;
+    const r = i <= 8 ? 0 : 1, c = (i - 1) % 8, x = ox - 52 + c * 15 + (r ? 3 : 0), y = oy - 12 + r * 18;
+    const sp = { 3: "#2fae5a", 11: "#2fae5a", 12: "#2fae5a", 13: "#2fae5a", 4: "#9aa2ab", 5: "#9aa2ab", 6: "#ffc04d", 14: CUL_L, 16: "#d32f2f" }[i];
+    mk("circle", { cx: x, cy: y, r: 3.6, fill: sp || "#5a6068", stroke: "#000" }, g);
+    const t = mk("text", { x, y: y + (r ? 12 : -6), "font-size": 6.5, fill: "#cfd6dd", "text-anchor": "middle" }, g); t.textContent = i;
     SV.pin[i] = [x, y];
   }
-  T(ox, oy + 58, "Priza de diagnoză SAE J1962 · 6 CAN-H · 14 CAN-L · 4/5 masă · 16 +12 V", { "font-size": 10, fill: "#cfd6dd", "font-weight": 500 });
-  // bateria, cutia de siguranțe, ventilatorul
-  mk("rect", { x: 22, y: 300, width: 110, height: 78, rx: 6, fill: "#1d1f22", stroke: "#000" }, g);
-  mk("rect", { x: 36, y: 290, width: 16, height: 12, fill: "#c62828" }, g); mk("rect", { x: 102, y: 290, width: 16, height: 12, fill: "#222" }, g);
-  T(77, 345, "12 V · 60 Ah", { fill: "#9aa3ad" });
-  mk("rect", { x: 150, y: 300, width: 100, height: 78, rx: 6, fill: "#2b2f35", stroke: "#000" }, g);
-  for (let i = 0; i < 4; i++) mk("rect", { x: 160 + i * 22, y: 312, width: 14, height: 26, rx: 2, fill: ["#e53935", "#1e88e5", "#fdd835", "#43a047"][i], opacity: i === 2 ? 1 : 0.55 }, g);
-  SV.sig = [160 + 2 * 22 + 7, 312]; T(200, 362, "siguranța ventilatorului", { "font-size": 9.5, fill: "#cfd6dd", "font-weight": 500 });
-  mk("path", { d: "M132 320 L 150 320", stroke: "#c62828", "stroke-width": 4 }, g);
-  mk("path", { d: "M211 300 C 211 260, 250 250, 268 250", stroke: "#c62828", "stroke-width": 3, fill: "none" }, g);
-  SV.vent = mk("g", { transform: "translate(290,250)" }, g);
-  mk("circle", { r: 26, fill: "#1b1d20", stroke: "#000" }, SV.vent);
-  SV.palete = mk("g", {}, SV.vent);
-  for (let k = 0; k < 5; k++) mk("path", { d: "M0 0 C 6 -10, 16 -16, 9 -24 L 3 -22 C 4 -14, 0 -7, 0 0", fill: "#3b4046", transform: `rotate(${k * 72})` }, SV.palete);
-  // traficul de pe magistrală (puncte luminoase) și sondele aparatelor
-  SV.pachete = mk("g", {}, g); SV.sonde = mk("g", {}, g); SV.defect = mk("g", {}, g);
+  // bateria, siguranța și ventilatorul
+  mk("rect", { x: 520, y: 400, width: 86, height: 56, rx: 6, fill: "#1d1f22", stroke: "#000" }, g); T(563, 432, "12 V · 70 Ah AGM", { fill: "#9aa3ad", "font-size": 9 });
+  mk("rect", { x: 620, y: 400, width: 90, height: 56, rx: 6, fill: "#2b2f35", stroke: "#000" }, g);
+  for (let i = 0; i < 4; i++) mk("rect", { x: 630 + i * 19, y: 408, width: 12, height: 22, rx: 2, fill: ["#e53935", "#1e88e5", "#fdd835", "#43a047"][i], opacity: i === 2 ? 1 : 0.55 }, g);
+  SV.sig = [636 + 2 * 19, 408]; T(665, 448, "siguranța ventilatorului", { "font-size": 8.5, fill: "#cfd6dd", "font-weight": 500 });
+  mk("path", { d: "M606 420 L 620 420", stroke: "#c62828", "stroke-width": 3 }, g);
+  mk("path", { d: "M674 400 C 690 380, 720 380, 742 400", stroke: "#c62828", "stroke-width": 2.5, fill: "none" }, g);
+  SV.vent = mk("g", { transform: "translate(768,425)" }, g); mk("circle", { r: 24, fill: "#1b1d20", stroke: "#000" }, SV.vent);
+  SV.palete = mk("g", {}, SV.vent); for (let k = 0; k < 5; k++) mk("path", { d: "M0 0 C 6 -10, 15 -15, 8 -22 L 3 -20 C 4 -13, 0 -7, 0 0", fill: "#3b4046", transform: `rotate(${k * 72})` }, SV.palete);
+  SV.pachete = mk("g", {}, g); SV.sonde = mk("g", {}, g); SV.defect = mk("g", {}, g); SV.stari = mk("g", {}, g);
   prefixeazaId(svg, "d1-");
   actualizeazaSVG(0);
 }
 function actualizeazaSVG(dt) {
-  if (!SV.g) return;
-  // trafic
+  if (!SV.g || sim.vedere !== "schema") return;
+  const ts = performance.now() / 1000;
   SV.pachete.innerHTML = "";
-  if (comunica()) {
-    const ts = performance.now() / 1000;
-    for (let i = 0; i < 6; i++) { const u = ((ts * 0.35 + i / 6) % 1); mk("circle", { cx: 95 + u * 710, cy: SV.Y, r: 3.4, fill: "#fff6c2", opacity: 0.85 }, SV.pachete); }
-  }
-  // ventilatorul
+  ["diag"].concat(RANDURI).forEach(b => {
+    if (!comunica(b)) return;
+    const y = b === "diag" ? SV.Yd - 30 : Y_RAND[b], x0 = 125, x1 = b === "diag" ? 330 : 874;
+    for (let i = 0; i < 4; i++) { const u = (ts * 0.3 + i / 4 + b.length * 0.13) % 1; mk("circle", { cx: x0 + u * (x1 - x0), cy: y, r: 3, fill: "#fff6c2", opacity: 0.85 }, SV.pachete); }
+  });
   if (sim.vent && sim.contact) { SV.uv = ((SV.uv || 0) + 1400 * dt) % 360; SV.palete.setAttribute("transform", `rotate(${SV.uv})`); }
   // sondele
   SV.sonde.innerHTML = "";
-  const fir = (p, col) => mk("path", { d: `M${p[0]} ${p[1]} C ${p[0] + 40} ${p[1] + 60}, ${p[0] + 120} 430, ${p[0] + 210} 436`, fill: "none", stroke: col, "stroke-width": 2.4 }, SV.sonde);
   const varf = (p, col) => mk("circle", { cx: p[0], cy: p[1], r: 5, fill: "none", stroke: col, "stroke-width": 2.2 }, SV.sonde);
-  if (sim.x431 || sim.obd) { const [x, y] = SV.obd; mk("path", { d: `M${x + 95} ${y + 6} C ${x + 160} ${y + 6}, ${x + 190} 420, 880 420`, fill: "none", stroke: sim.x431 ? "#2a5bd7" : "#8e44ad", "stroke-width": 5 }, SV.sonde); }
+  const fir = (p, col) => mk("path", { d: `M${p[0]} ${p[1]} C ${p[0] + 30} ${p[1] + 40}, ${p[0] + 80} 470, ${p[0] + 150} 470`, fill: "none", stroke: col, "stroke-width": 2 }, SV.sonde);
+  if (sim.x431 || sim.obd) { const [x, y] = SV.obd; mk("path", { d: `M${x + 80} ${y} C ${x + 100} ${y}, ${x + 100} 466, ${x + 120} 466`, fill: "none", stroke: sim.x431 ? "#2a5bd7" : "#8e44ad", "stroke-width": 5 }, SV.sonde); }
+  const pPunct = () => sim.punct === "diag" ? [SV.pin[6], SV.pin[14]] : [[124, Y_RAND[sim.punct] - 3], [124, Y_RAND[sim.punct] + 3]];
   if (sim.aparat === "mm") {
-    const m = sim.mm, P1 = { r614: [6, 14], v6: [6, 4], v14: [14, 4], v16: [16, 4] }[m];
-    if (P1) { varf(SV.pin[P1[0]], "#d32f2f"); fir(SV.pin[P1[0]], "#d32f2f"); varf(SV.pin[P1[1]], "#222"); fir(SV.pin[P1[1]], "#111"); }
-    else if (m === "vf0" || m === "vfs") { const p = [SV.sig[0], SV.sig[1] + (m === "vf0" ? 0 : 26)]; varf(p, "#d32f2f"); fir(p, "#d32f2f"); }
-    else if (m === "ia") { mk("ellipse", { cx: 240, cy: 262, rx: 12, ry: 16, fill: "none", stroke: "#fdd835", "stroke-width": 4 }, SV.sonde); fir([240, 262], "#fdd835"); }
+    if (["r", "vh", "vl"].includes(sim.mm)) { const [a, c] = pPunct(); const gnd = SV.pin[4]; varf(sim.mm === "vl" ? c : a, "#d32f2f"); fir(sim.mm === "vl" ? c : a, "#d32f2f"); const n = sim.mm === "r" ? c : gnd; varf(n, "#222"); fir(n, "#111"); }
+    else if (sim.mm === "v16") { varf(SV.pin[16], "#d32f2f"); fir(SV.pin[16], "#d32f2f"); varf(SV.pin[4], "#222"); fir(SV.pin[4], "#111"); }
+    else if (sim.mm === "vf0" || sim.mm === "vfs") { const p = [SV.sig[0] + 6, SV.sig[1] + (sim.mm === "vf0" ? 0 : 22)]; varf(p, "#d32f2f"); fir(p, "#d32f2f"); }
+    else if (sim.mm === "ia") { mk("ellipse", { cx: 720, cy: 392, rx: 10, ry: 14, fill: "none", stroke: "#fdd835", "stroke-width": 4 }, SV.sonde); }
   }
-  if (sim.aparat === "osc") { [[6, "#ffe14d"], [14, "#4fd6ff"]].forEach(([p, c]) => { varf(SV.pin[p], c); fir(SV.pin[p], c); }); }
-  // defectul (vizibil numai în modul demonstrativ)
+  if (sim.aparat === "osc") { const [a, c] = pPunct(); [[a, "#ffe14d"], [c, "#4fd6ff"]].forEach(([p, col]) => { varf(p, col); fir(p, col); }); }
+  // starea modulelor (după scanare – doar ce a raportat testerul)
+  SV.stari.innerHTML = "";
+  if (sim.scan) sim.scan.mods.forEach(m => { const p = SV.pozMod[m.k]; if (!p) return; mk("circle", { cx: p[0] + 22, cy: p[1] - 10, r: 3.5, fill: m.raspunde ? (m.erori ? "#ffb020" : "#3ccf6a") : "#ff3b3b" }, SV.stari); });
   SV.defect.innerHTML = "";
   if (!MOD.eval && sim.defActiv) {
-    const d = defect(), Y = SV.Y, X = { term_lipsa: [810, Y], term_supl: [620, Y], scurt_hl: [380, Y], canl_masa: [560, Y], intrerupt_esp: [740, Y + 2], alim_esp: [740, 70] }[d];
-    mk("circle", { cx: X[0], cy: X[1], r: 17, fill: "none", stroke: "#ff3b3b", "stroke-width": 3, "stroke-dasharray": "5 3" }, SV.defect);
-    const t = mk("text", { x: X[0], y: X[1] - 22, "text-anchor": "middle", "font-size": 10, fill: "#ff8a8a", "font-weight": 700 }, SV.defect); t.textContent = "defect (demo)";
+    const b = defBus(), cap = MAG[b].capat, y = Y_RAND[b], e = defect();
+    const X = { term_lipsa: [878, y], term_supl: [520, y], scurt_hl: [300, y], canl_masa: [420, y], intrerupt: [800, y], alim: SV.pozMod[cap] }[e];
+    mk("circle", { cx: X[0], cy: X[1], r: 14, fill: "none", stroke: "#ff3b3b", "stroke-width": 3, "stroke-dasharray": "5 3" }, SV.defect);
   }
 }
 
+/* ------------------------------------------------------------------ macheta 3D (aceeași rețea, pe autoturism) */
+function porneste3D() {
+  const el = $("#retea3d"); if (!el) return;
+  import(BAZA_COMUN + "vehicul3d.js?v=12").then(m => {
+    SV.v3d = m.creeaza(el, { sistem: "retea", control: {
+      stare: () => ({ contact: sim.contact || treaza(), defBus: defBus(), defTip: sim.defActiv ? defect() : "", arataDefect: !MOD.eval, punct: sim.punct, sonde: sim.aparat === "mm" || sim.aparat === "osc" }),
+      onSelect: k => { if (MD.MK[k] && raspunde(k)) { sim.modCod = k; if (sim.vx === "cod") panouX431(); } $("#af-sel").textContent = k === "obd" ? "Priza OBD (J1962)" : MD.MK[k].nume; $("#af-sel-b").textContent = k === "obd" ? "CAN diagnoză + DoIP" : k === "gw" ? "toate magistralele" : NUME_MAG(MD.MK[k].b) + " · " + MD.MK[k].adr; }
+    } });
+  }).catch(e => { console.warn("3D indisponibil:", e); comutaVedere("schema"); $("#btn-v3d").disabled = true; });
+}
+function comutaVedere(v) {
+  sim.vedere = v;
+  $("#retea3d").hidden = v !== "3d"; $("#svg-retea").style.display = v === "schema" ? "" : "none";
+  $$("[data-vedere]").forEach(b => b.setAttribute("aria-pressed", b.dataset.vedere === v ? "true" : "false"));
+  if (v === "schema") actualizeazaSVG(0);
+}
 /* ------------------------------------------------------------------ osciloscopul (4 canale) */
-const TDIV = [0.5e-6, 1e-6, 2e-6, 5e-6, 10e-6, 20e-6, 50e-6, 100e-6, 200e-6, 500e-6];
+const TDIV = [0.2e-6, 0.5e-6, 1e-6, 2e-6, 5e-6, 10e-6, 20e-6, 50e-6, 100e-6, 200e-6, 500e-6];
 const VDIV = [0.2, 0.5, 1, 2, 5];
 const SURSE = { h: "CAN-H (pin 6)", l: "CAN-L (pin 14)", d: "CH1 − CH2 (U<sub>diff</sub>)", b: "+12 V (pin 16)" };
 const CULORI_CH = ["#ffe14d", "#4fd6ff", "#ff6bd6", "#6dff8e"];
@@ -169,9 +196,10 @@ function fmtT(s) { return s >= 1e-3 ? fmt(s * 1000, s >= 0.01 ? 0 : 1) + " ms" :
 function achizitie() {
   const o = sim.osc, N = 1500, T = o.tdiv * 10;
   let t0 = sim.t - T;
-  if (comunica()) {                                                     // declanșare pe SOF (frontul descendent al lui U_diff → dominant)
-    const Tf = perioadaCadru(), b = Math.floor(t0 * FB), k = Math.floor(b / Tf);
-    t0 = (k * Tf) / FB - o.tdiv;
+  if (comunica()) {                                                     // declanșare pe SOF (începutul cadrului)
+    const b = sim.punct;
+    if (b === "sasiu") { const Tp = perioadaFD(); t0 = Math.floor(t0 / Tp) * Tp - o.tdiv; }
+    else { const Tf = perioadaCadru(b), i = Math.floor(t0 * FB), k = Math.floor(i / Tf); t0 = (k * Tf) / FB - o.tdiv; }
   }
   o.buf = o.ch.map(ch => { if (!ch.on) return null; const b = new Float32Array(N); for (let i = 0; i < N; i++) { const t = t0 + T * i / (N - 1); b[i] = ch.c === "d" ? semnal("h", t) - semnal("l", t) : semnal(ch.c, t); } return b; });
   o.t0 = t0;
@@ -238,19 +266,20 @@ function legaOsc() {
   });
 }
 
+
 /* ------------------------------------------------------------------ multimetrul */
 function citireMultimetru() {
-  const p = pr(), d = sim.defActiv, z = (a) => (hash(performance.now() / 700) - 0.5) * a;
+  const p = pr(), d = sim.defActiv, b = sim.punct, z = a => (hash(performance.now() / 700) - 0.5) * a;
   switch (sim.mm) {
-    case "r614": {
+    case "r": {
       if (sim.contact) return { txt: "—", msg: "Rezistența magistralei se măsoară numai cu contactul decuplat și rețeaua în repaus (NSSM)." };
       if (treaza()) return { txt: fmt(40 + 80 * hash(performance.now() / 300), 1) + " Ω", msg: `Rețeaua este încă activă – citire instabilă. Așteptați intrarea în repaus (${Math.ceil(T_REPAUS - sim.tOff)} s).` };
-      const R = MD.rezistenta(p, d); return { txt: fmt(R, R < 10 ? 2 : 1) + " Ω", v: Math.round(R * 10) / 10, unit: "Ω" };
+      const R = MD.rezistenta(p, d, b); return { txt: fmt(R, R < 10 ? 2 : 1) + " Ω", v: Math.round(R * 10) / 10, unit: "Ω" };
     }
-    case "v6": case "v14": {
+    case "vh": case "vl": {
       if (!treaza()) return { txt: "0,000 V", v: 0, unit: "V", msg: "Rețeaua este în repaus: liniile CAN nu sunt polarizate." };
       if (!sim.contact) return { txt: "—", msg: "Puneți contactul: tensiunile medii se măsoară cu rețeaua activă." };
-      const md = MD.medii(p, d), v = sim.mm === "v6" ? md.H : md.L; return { txt: fmt(v + z(0.002), 3) + " V", v, unit: "V" };
+      const md = MD.medii(p, d, b), v = sim.mm === "vh" ? md.H : md.L; return { txt: fmt(v + z(0.002), 3) + " V", v, unit: "V" };
     }
     case "v16": { const v = semnal("b", 0); return { txt: fmt(v, 2) + " V", v: Math.round(v * 100) / 100, unit: "V" }; }
     case "vf0": case "vfs": {
@@ -260,6 +289,25 @@ function citireMultimetru() {
     case "ia": { const I = sim.contact && sim.vent ? P().I : 0; return { txt: fmt(I, 1) + " A", v: I, unit: "A", msg: I ? "" : "Ventilatorul este oprit." }; }
   }
   return { txt: "—" };
+}
+const MM_MOD = { r: "Ω", vh: "V DC", vl: "V DC", v16: "V DC", vf0: "V DC", vfs: "V DC", ia: "A DC (clește)" };
+function multimetruSVG(txt) {
+  const el = $("#mm-aparat"); if (!el) return;
+  const [val, un] = (txt || "—").split(" ");
+  el.innerHTML = `<svg viewBox="0 0 150 230" aria-label="Multimetru digital">
+    <defs><linearGradient id="mmc" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffd23a"/><stop offset="1" stop-color="#e0a800"/></linearGradient></defs>
+    <rect x="4" y="4" width="142" height="222" rx="18" fill="url(#mmc)" stroke="#7a5a00"/>
+    <rect x="14" y="14" width="122" height="196" rx="12" fill="#2a2d31"/>
+    <rect x="22" y="24" width="106" height="52" rx="6" fill="#b9c8a8" stroke="#55604a"/>
+    <text x="122" y="62" text-anchor="end" font-family="'Courier New',monospace" font-size="27" font-weight="700" fill="#1c2416">${val}</text>
+    <text x="122" y="73" text-anchor="end" font-size="9" fill="#1c2416">${un || ""}</text>
+    <text x="28" y="36" font-size="8" fill="#1c2416">${MM_MOD[sim.mm] || ""}</text>
+    <circle cx="75" cy="128" r="30" fill="#3b4046" stroke="#111"/><circle cx="75" cy="128" r="20" fill="#1f2226"/>
+    <line x1="75" y1="128" x2="${75 + 26 * Math.cos({ r: -2.4, vh: -1.6, vl: -1.6, v16: -1.6, vf0: -1.6, vfs: -1.6, ia: -0.6 }[sim.mm] || -1.6)}" y2="${128 + 26 * Math.sin({ r: -2.4, vh: -1.6, vl: -1.6, v16: -1.6, vf0: -1.6, vfs: -1.6, ia: -0.6 }[sim.mm] || -1.6)}" stroke="#ffd23a" stroke-width="4" stroke-linecap="round"/>
+    <text x="34" y="98" font-size="8" fill="#ddd">Ω</text><text x="70" y="94" font-size="8" fill="#ddd">V⎓</text><text x="104" y="102" font-size="8" fill="#ddd">A</text>
+    ${[38, 75, 112].map((x, i) => `<circle cx="${x}" cy="190" r="7" fill="${i === 1 ? "#111" : i === 0 ? "#c62828" : "#c62828"}" stroke="#000"/>`).join("")}
+    <text x="38" y="207" font-size="6.5" text-anchor="middle" fill="#ccc">A</text><text x="75" y="207" font-size="6.5" text-anchor="middle" fill="#ccc">COM</text><text x="112" y="207" font-size="6.5" text-anchor="middle" fill="#ccc">VΩ</text>
+  </svg>`;
 }
 
 /* ------------------------------------------------------------------ comenzile */
@@ -278,14 +326,14 @@ function conecteaza(tip) {
 function comutaDefect() {
   if (sim.contact) return Cadru.mesajTemporar("Defectele de rețea se introduc și se înlătură numai cu contactul decuplat (NSSM).", "pericol");
   sim.defActiv = !sim.defActiv; sim.scan = null; actualizeazaPanou();
-  Cadru.mesajTemporar(sim.defActiv ? "Cadrul didactic a introdus un defect de rețea. Reluați scanarea (pasul 3) și măsurările (pașii 7 și 8)." : "Defectul de rețea a fost înlăturat.", "");
+  Cadru.mesajTemporar(sim.defActiv ? "Cadrul didactic a introdus un defect pe una dintre magistrale. Reluați scanarea (pasul 3), găsiți magistrala afectată și măsurați la conectorul ei de la gateway (pașii 7 și 8)." : "Defectul de rețea a fost înlăturat.", "");
 }
 function scaneaza() {
   if (!sim.x431) return Cadru.mesajTemporar("Conectați interfața X431 la priza de diagnoză (cu contactul decuplat).", "atentie");
   if (!sim.contact) return Cadru.mesajTemporar("Puneți contactul pentru a comunica cu modulele.", "atentie");
   const mods = MD.module(pr(), sim.defActiv), cs = codurileActuale();
   sim.scan = { d: dA(), mods: mods.map(m => Object.assign({}, m, { n: m.raspunde ? cs.filter(c => c.mod === m.k).length : null })) };
-  sim.vx = "scan"; actualizeazaPanou();
+  sim.vx = "scan"; actualizeazaPanou(); actualizeazaSVG(0);
 }
 
 /* ------------------------------------------------------------------ înregistrările */
@@ -306,19 +354,19 @@ function inregCod(e, i) {
   const c = codurileActuale()[i]; if (!c) return;
   const t12 = Cadru.D.t.t12, exista = Object.keys(t12).find(k => t12[k].cod === c.cod && t12[k].mod === NUME_MOD[c.mod]);
   if (exista) return Cadru.mesajTemporar(`Codul ${c.cod} (${NUME_MOD[c.mod]}) este deja în Tabelul 1.2.`, "atentie");
-  const k = ["1", "2", "3", "4", "5", "6"].find(k => t12[k].cod === ""); if (!k) return Cadru.mesajTemporar("Tabelul 1.2 este plin.", "atentie");
+  const k = ["1", "2", "3", "4", "5", "6", "7", "8"].find(k => t12[k].cod === ""); if (!k) return Cadru.mesajTemporar("Tabelul 1.2 este plin.", "atentie");
   const ff = c.ff ? `n = ${c.ff.n} rot/min; T = ${c.ff.T} °C; sarcină ${c.ff.sarc} %; v = ${c.ff.v} km/h` : "—";
   const ok = Cadru.inregistreaza(e, { log: { m: "dtc", cod: c.cod, mod: c.mod, d: dA() }, celule: [{ t: "t12", r: k, c: "cod", v: c.cod }, { t: "t12", r: k, c: "mod", v: NUME_MOD[c.mod] }, { t: "t12", r: k, c: "desc", v: c.desc }, { t: "t12", r: k, c: "st", v: c.stare }, { t: "t12", r: k, c: "ff", v: ff }] });
   if (ok) msgInreg(`Tabelul 1.2: ${c.cod} – ${c.desc}.`);
 }
 function inregMultimetru(e) {
-  const r = citireMultimetru(), d = dA(), col = d ? "d" : "n";
+  const r = citireMultimetru(), d = dA(), col = d ? "d" : "n", b = sim.punct, unde = d ? `cu defect, ${PUNCTE[b].split(" – ")[1] || PUNCTE[b]}` : "normal";
   if (r.v == null) return Cadru.mesajTemporar(r.msg || "Nu există o citire validă.", "atentie");
-  if (sim.mm === "r614") { const ok = Cadru.inregistreaza(e, { log: { m: "ohm", v: r.v, d }, celule: [{ t: "t15", r: "R", c: col, v: String(r.v) }] }); if (ok) msgInreg(`Tabelul 1.5 (${d ? "cu defect" : "normal"}): R pin 6 – pin 14 = ${r.txt}.`); return; }
-  if (sim.mm === "v6" || sim.mm === "v14") {
+  if (sim.mm === "r") { const ok = Cadru.inregistreaza(e, { log: { m: "ohm", v: r.v, d, b }, celule: [{ t: "t15", r: "R", c: col, v: String(r.v) }] }); if (ok) msgInreg(`Tabelul 1.5 (${unde}): R CAN-H – CAN-L = ${r.txt}.`); return; }
+  if (sim.mm === "vh" || sim.mm === "vl") {
     if (!sim.contact) return Cadru.mesajTemporar("Tensiunile medii CAN se măsoară cu contactul pus.", "atentie");
-    const p = sim.mm === "v6" ? "6" : "14", ok = Cadru.inregistreaza(e, { log: { m: "volt", p, v: r.v, d }, celule: [{ t: "t15", r: p === "6" ? "uh" : "ul", c: col, v: r.v.toFixed(3) }] });
-    if (ok) msgInreg(`Tabelul 1.5 (${d ? "cu defect" : "normal"}): U ${p === "6" ? "CAN-H" : "CAN-L"} medie = ${r.txt}.`); return;
+    const p = sim.mm === "vh" ? "6" : "14", ok = Cadru.inregistreaza(e, { log: { m: "volt", p, v: r.v, d, b }, celule: [{ t: "t15", r: p === "6" ? "uh" : "ul", c: col, v: r.v.toFixed(3) }] });
+    if (ok) msgInreg(`Tabelul 1.5 (${unde}): U ${p === "6" ? "CAN-H" : "CAN-L"} medie = ${r.txt}.`); return;
   }
   if (sim.mm === "vf0" || sim.mm === "vfs" || sim.mm === "ia") {
     if (!sim.vent || !sim.contact) return Cadru.mesajTemporar("Porniți ventilatorul (test activ) – căderea de tensiune se măsoară cu consumatorul pornit.", "atentie");
@@ -335,7 +383,7 @@ function inregTbit(e) {
   const dt = Math.abs(sim.osc.c2 - sim.osc.c1) * sim.osc.tdiv, n = Math.max(1, Math.round(num($("#in-biti").value) || 1));
   if (!(dt > 0)) return;
   const tb = Math.round(dt / n * 1e6 * 1000) / 1000, col = dA() ? "d" : "n";
-  const ok = Cadru.inregistreaza(e, { log: { m: "tbit", v: tb, n, d: dA() }, celule: [{ t: "t15", r: "tbit", c: col, v: tb.toFixed(3) }] });
+  const ok = Cadru.inregistreaza(e, { log: { m: "tbit", v: tb, n, d: dA(), b: sim.punct }, celule: [{ t: "t15", r: "tbit", c: col, v: tb.toFixed(3) }] });
   if (ok) msgInreg(`Tabelul 1.5: t_bit = ${fmtT(dt)}/${n} = ${fmt(tb, 3)} µs.`);
 }
 function inregDominant(e) {
@@ -346,7 +394,7 @@ function inregDominant(e) {
   if (!(H - L > 0.9)) return Cadru.mesajTemporar("Cursorul A nu este pe un bit dominant (U_diff < 0,9 V) sau magistrala nu are trafic.", "atentie");
   const nv = nivel(); if (Math.abs(H - nv.dH) > 0.06 || Math.abs(L - nv.dL) > 0.06) return Cadru.mesajTemporar("Cursorul A este pe un front sau pe o oscilație: mutați-l la mijlocul unui bit dominant.", "atentie");
   const h = Math.round(H * 100) / 100, l = Math.round(L * 100) / 100, col = dA() ? "d" : "n";
-  const ok = Cadru.inregistreaza(e, { log: { m: "dom", H: h, L: l, d: dA() }, celule: [{ t: "t15", r: "uhd", c: col, v: h.toFixed(2) }, { t: "t15", r: "uld", c: col, v: l.toFixed(2) }] });
+  const ok = Cadru.inregistreaza(e, { log: { m: "dom", H: h, L: l, d: dA(), b: sim.punct }, celule: [{ t: "t15", r: "uhd", c: col, v: h.toFixed(2) }, { t: "t15", r: "uld", c: col, v: l.toFixed(2) }] });
   if (ok) msgInreg(`Tabelul 1.5 (${dA() ? "cu defect" : "normal"}): dominant CAN-H = ${fmt(h, 2)} V, CAN-L = ${fmt(l, 2)} V.`);
 }
 
@@ -362,25 +410,30 @@ function actualizeazaPanou() {
   $$("[data-vx]").forEach(b => b.setAttribute("aria-pressed", b.dataset.vx === sim.vx ? "true" : "false"));
   panouX431(); panouOBD();
 }
-function tabel(rows, cap) { return `<table class="tabel x431">${cap ? `<thead><tr>${cap.map(c => `<th>${c}</th>`).join("")}</tr></thead>` : ""}<tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`; }
+function tabel(rows, cap) { return `<table class="tabel x431">${cap ? `<thead><tr>${cap.map(c => `<th>${c}</th>`).join("")}</tr></thead>` : ""}<tbody>${rows.map(r => Array.isArray(r) ? `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>` : `<tr class="sep"><td colspan="${cap ? cap.length : 4}">${r}</td></tr>`).join("")}</tbody></table>`; }
+function antetTester(t) { return `<div class="tester-antet"><span>LAUNCH X-431</span><span>${t}</span><span>${sim.contact ? "12,4 V" : ""}</span></div>`; }
 function panouX431() {
   const el = $("#x431-ecran"); if (!el) return;
-  if (!sim.x431) { el.innerHTML = `<p class="nota">Interfața VCI nu este conectată la priza de diagnoză.</p>`; return; }
-  if (!sim.contact) { el.innerHTML = `<p class="nota">VCI alimentată de la pinul 16. Puneți contactul pentru a comunica cu modulele.</p>`; return; }
-  const p = pr(), com = nivel().com;
+  if (!sim.x431) { el.innerHTML = antetTester("VCI deconectată") + `<p class="nota">Interfața VCI nu este conectată la priza de diagnoză.</p>`; return; }
+  if (!sim.contact) { el.innerHTML = antetTester("VCI alimentată") + `<p class="nota">VCI alimentată de la pinul 16. Puneți contactul pentru a comunica cu modulele.</p>`; return; }
+  const p = pr();
   if (sim.vx === "scan") {
-    if (!sim.scan) { el.innerHTML = `<p class="nota">Vehicul: Smart Fortwo (VIN citit automat). Apăsați „Scanare completă”.</p>`; return; }
-    el.innerHTML = tabel(sim.scan.mods.map(m => [m.nume, m.prot, m.raspunde ? m.n : "—", m.raspunde ? (m.erori ? "<span class='rau-t'>comunică cu erori</span>" : "comunică") : "<b class='rau-t'>nu răspunde</b>"]), ["Modul", "Protocol", "Coduri", "Comunicație"]) +
+    if (!sim.scan) { el.innerHTML = antetTester("Diagnoză inteligentă") + `<p class="nota">Vehicul identificat după VIN: autoturism compact 2025, motor 1.5 TSI mild hybrid 48 V, cutie DCT. Arhitectură cu gateway central. Apăsați „Scanare completă”.</p>`; return; }
+    const rows = [];
+    ["gw", "motor", "sasiu", "confort", "info"].forEach(b => { if (b !== "gw") rows.push(`<b>${MAG[b].n}</b> · ${MAG[b].v}`); sim.scan.mods.filter(m => m.b === b).forEach(m => rows.push([m.adr, MD.MK[m.k].sc, m.raspunde ? m.n : "—", m.raspunde ? (m.erori ? "<span class='rau-t'>erori</span>" : "OK") : "<b class='rau-t'>nu răspunde</b>"])); });
+    const nr = sim.scan.mods.filter(m => m.raspunde).length;
+    el.innerHTML = antetTester(`Scanare completă · ${nr}/${sim.scan.mods.length} module`) + tabel(rows, ["Adresă", "Modul", "Coduri", "Stare"]) +
       `<button type="button" class="primar lat" id="btn-inreg-scan">● Trece scanarea în ${sim.scan.d ? "Tabelul 1.7" : "Tabelul 1.1"}</button>`;
     $("#btn-inreg-scan").addEventListener("click", inregScan); return;
   }
-  if (!com) { el.innerHTML = `<p class="nota"><b>Nicio comunicare pe magistrala CAN.</b> Verificați alimentarea VCI, masa și liniile CAN-H / CAN-L (pinii 6 și 14).</p>`; return; }
   const mods = MD.module(p, sim.defActiv);
   if (sim.vx === "cod") {
     const cs = codurileActuale();
-    const opt = mods.filter(m => m.raspunde).map(m => `<option value="${m.k}"${m.k === sim.modCod ? " selected" : ""}>${m.nume}</option>`).join("");
+    if (!mods.find(m => m.k === sim.modCod && m.raspunde)) sim.modCod = "gw";
+    const opt = mods.filter(m => m.raspunde).map(m => `<option value="${m.k}"${m.k === sim.modCod ? " selected" : ""}>${m.adr} – ${m.nume}</option>`).join("");
     const lista = cs.map((c, i) => [c, i]).filter(([c]) => c.mod === sim.modCod);
-    el.innerHTML = `<label class="camp">Modulul <select id="x-mod">${opt}</select></label>` + (lista.length ? lista.map(([c, i]) => `<div class="cod-dtc"><b>${c.cod}</b> – ${c.desc}<br><small>Stare: ${c.stare}${c.ff ? ` · freeze-frame: n = ${c.ff.n} rot/min, T lichid = ${c.ff.T} °C, sarcină = ${c.ff.sarc} %, v = ${c.ff.v} km/h` : ""}</small><br><button type="button" data-cod="${i}">→ Tabelul 1.2</button></div>`).join("") : `<p class="nota">Niciun cod memorat în acest modul.</p>`) +
+    el.innerHTML = antetTester("Coduri de defect") + `<label class="camp">Modulul <select id="x-mod">${opt}</select></label>` + (lista.length ? lista.map(([c, i]) => `<div class="cod-dtc"><b>${c.cod}</b> – ${c.desc}<br><small>Stare: ${c.stare}${c.ff ? ` · freeze-frame: n = ${c.ff.n} rot/min, T lichid = ${c.ff.T} °C, sarcină = ${c.ff.sarc} %, v = ${c.ff.v} km/h` : ""}</small><br><button type="button" data-cod="${i}">→ Tabelul 1.2</button></div>`).join("") : `<p class="nota">Niciun cod memorat în acest modul.</p>`) +
+      `<p class="nota">Module cu coduri: ${[...new Set(cs.map(c => c.mod))].filter(k => mods.find(m => m.k === k && m.raspunde)).map(k => MD.MK[k].sc).join(", ") || "—"}</p>` +
       `<div class="rand-butoane"><button type="button" id="btn-sterge">Șterge codurile (toate modulele)</button><button type="button" id="btn-ciclu">Ciclu de conducere de confirmare</button></div>`;
     $("#x-mod").addEventListener("change", ev => { sim.modCod = ev.target.value; panouX431(); });
     $$("[data-cod]", el).forEach(b => b.addEventListener("click", ev => inregCod(ev, +b.dataset.cod)));
@@ -388,45 +441,49 @@ function panouX431() {
       const t12 = Cadru.D.t.t12; if (!Object.values(t12).some(r => r.cod)) return Cadru.mesajTemporar("Notați întâi codurile și datele freeze-frame (Tabelul 1.2) – apoi ștergeți (NSSM).", "pericol");
       sim.sterse = true; sim.ciclu = 0; sim.scan = null; Cadru.mesajTemporar("Codurile au fost șterse. Monitoarele de pregătire au trecut în „nefinalizat”.", ""); panouX431();
     });
-    $("#btn-ciclu").addEventListener("click", () => { if (!sim.sterse) return Cadru.mesajTemporar("Ciclul de confirmare se face după remediere și ștergerea codurilor.", "atentie"); sim.ciclu++; Cadru.mesajTemporar(`Ciclu de conducere efectuat: monitoarele au rulat din nou. ${sim.defActiv ? "Defectul de rețea este încă prezent." : ""} Recitiți codurile – defectul clientului (nereparat) reapare.`, "atentie"); panouX431(); });
+    $("#btn-ciclu").addEventListener("click", () => { if (!sim.sterse) return Cadru.mesajTemporar("Ciclul de confirmare se face după remediere și ștergerea codurilor.", "atentie"); sim.ciclu++; Cadru.mesajTemporar(`Ciclu de conducere efectuat. ${sim.defActiv ? "Defectul de rețea este încă prezent. " : ""}Recitiți codurile – defectul clientului (nereparat) reapare.`, "atentie"); panouX431(); });
     return;
   }
+  const ecm = raspunde("ecm");
   if (sim.vx === "mon") {
+    if (!ecm) { el.innerHTML = antetTester("Monitoare OBD") + `<p class="nota"><b>ECM nu răspunde</b> – monitoarele nu pot fi citite.</p>`; return; }
     const mo = MD.monitoare(p);
-    el.innerHTML = tabel(MD.MON.map(k => [NUME_MON[k], sim.sterse && sim.ciclu === 0 && mo[k] === "finalizat" ? "<b>nefinalizat</b>" : mo[k]]), ["Monitor", "Stare"]) + `<p class="nota">Lampa MIL: ${MD.CLIENT[p.client].stare === 1 && !(sim.sterse && sim.ciclu === 0) ? "<b>APRINSĂ</b>" : "stinsă"}.</p>`;
+    el.innerHTML = antetTester("Monitoare de pregătire (ECM)") + tabel(MD.MON.map(k => [NUME_MON[k], sim.sterse && sim.ciclu === 0 && mo[k] === "finalizat" ? "<b>nefinalizat</b>" : mo[k]]), ["Monitor", "Stare"]) + `<p class="nota">Lampa MIL: ${MD.CLIENT[p.client].stare === 1 && !(sim.sterse && sim.ciclu === 0) ? "<b>APRINSĂ</b>" : "stinsă"}.</p>`;
     return;
   }
   if (sim.vx === "live") {
+    if (!ecm) { el.innerHTML = antetTester("Date live") + `<p class="nota"><b>ECM nu răspunde.</b></p>`; return; }
     const cl = p.client;
-    el.innerHTML = tabel([["Turație motor", "0", "rot/min"], ["Temp. lichid răcire", cl === 3 ? "−40" : "21", "°C"], ["Temp. aer admis", "20", "°C"], ["Presiune colector", "101", "kPa"], ["Tensiune baterie", fmt(semnal("b", 0), 1), "V"], ["Poziție pedală", "0,0", "%"], ["Stare buclă λ", "deschisă", ""], ["Viteză vehicul", "0", "km/h"]], ["Parametru (ECM – 48 disponibili)", "Valoare", "Unitate"]) + `<p class="nota">Contact pus, motor oprit. Pentru defectul clientului valorile relevante sunt cele din freeze-frame.</p>`;
+    el.innerHTML = antetTester("Date live – ECM (62 parametri)") + tabel([["Turație motor", "0", "rot/min"], ["Temp. lichid răcire", cl === 3 ? "−40" : "21", "°C"], ["Temp. aer admis", "20", "°C"], ["Presiune colector", "101", "kPa"], ["Tensiune rețea 12 V", fmt(semnal("b", 0), 1), "V"], ["Tensiune rețea 48 V", "47,6", "V"], ["Poziție pedală", "0,0", "%"], ["Stare buclă λ", "deschisă", ""], ["Viteză vehicul", "0", "km/h"]], ["Parametru", "Valoare", "Unitate"]) + `<p class="nota">Contact pus, motor oprit. Pentru defectul clientului valorile relevante sunt cele din freeze-frame.</p>`;
     return;
   }
   if (sim.vx === "can") {
+    if (!raspunde("gw")) { el.innerHTML = ""; return; }
     const ids = (n, p0) => Array.from({ length: n }, (_, i) => "0x" + (p0 + i * 16 + Math.floor(hash(p0 + i) * 8)).toString(16).toUpperCase()).join(", ");
-    el.innerHTML = `<p class="nota">Analiza magistralei CAN motor (500 kbit/s, cadre standard cu 8 octeți de date ≈ 125 biți cu biții de umplere):</p>` +
+    el.innerHTML = antetTester("Analiza magistralei – CAN motor (prin gateway)") + `<p class="nota">Mesaje observate pe CAN motor (500 kbit/s, cadre standard cu 8 octeți de date ≈ 125 biți cu biții de umplere):</p>` +
       tabel([["10 ms", p.n10, ids(p.n10, 0x100)], ["20 ms", p.n20, ids(p.n20, 0x200)], ["100 ms", p.n100, ids(p.n100, 0x400)]], ["Perioada", "Nr. mesaje", "Identificatori"]) +
       `<p class="nota">Calculați încărcarea magistralei cu relația (1.4).</p>`;
   }
 }
 function panouOBD() {
   const el = $("#obd-ecran"); if (!el) return;
-  if (!sim.obd) { el.innerHTML = `<p class="nota">Cititorul ELM327 nu este conectat.</p>`; return; }
-  if (!sim.contact) { el.innerHTML = `<p class="nota">Puneți contactul.</p>`; return; }
-  if (!nivel().com) { el.innerHTML = `<p class="nota"><b>UNABLE TO CONNECT</b> – cititorul nu găsește niciun protocol OBD.</p>`; return; }
+  const ant = `<div class="tester-antet obd"><span>ELM327 · OBD-II</span><span>${sim.obd ? "conectat" : ""}</span></div>`;
+  if (!sim.obd) { el.innerHTML = ant + `<p class="nota">Cititorul nu este conectat.</p>`; return; }
+  if (!sim.contact) { el.innerHTML = ant + `<p class="nota">Puneți contactul.</p>`; return; }
+  if (!raspunde("ecm")) { el.innerHTML = ant + `<p class="nota">Protocol ISO 15765-4 detectat (gateway), dar <b>NO DATA</b> – ECM nu răspunde la cererile OBD.</p>`; return; }
   const p = pr(), cl = MD.CLIENT[p.client], mo = MD.monitoare(p), st = sim.sterse && sim.ciclu === 0;
   const conf = cl.stare === 1 && !st ? [cl.cod] : [], pend = cl.stare === 0 && !st ? [cl.cod] : [], perm = cl.stare === 1 ? [cl.cod] : [];
-  el.innerHTML = `<p class="nota">Protocol detectat: ISO 15765-4 (CAN 11 bit, 500 kbit/s) · un singur modul OBD (ECM).</p>` +
+  el.innerHTML = ant + `<p class="nota">Protocol: ISO 15765-4 (CAN 11 bit, 500 kbit/s) · un modul OBD (ECM, prin gateway).</p>` +
     tabel([["Mod 03 – coduri confirmate", conf.join(", ") || "niciunul"], ["Mod 07 – coduri în așteptare", pend.join(", ") || "niciunul"], ["Mod 0A – coduri permanente", perm.join(", ") || "niciunul"],
-      ["Mod 01 – MIL", conf.length ? "aprinsă" : "stinsă"], ["Mod 01 – monitoare", MD.MON.map(k => `${NUME_MON[k].split(" ")[0]}: ${st && mo[k] === "finalizat" ? "nefin." : mo[k].replace("finalizat", "fin.").replace("nefin.", "nefin.")}`).join("; ")],
-      ["Mod 02 – freeze-frame", conf.length || pend.length ? `n = ${p.ff.n} rot/min, T = ${p.ff.T} °C, sarcină ${p.ff.sarc} %` : "—"], ["Mod 01 – date live", "18 PID-uri (turație, T lichid, sarcină, STFT, LTFT, MAP, IAT, viteză…)"]]) +
-    `<p class="nota">Codurile „U”, „B”, „C” și modulele din afara grupului motopropulsor nu sunt accesibile prin OBD generic.</p>`;
+      ["Mod 01 – MIL", conf.length ? "aprinsă" : "stinsă"], ["Mod 01 – monitoare", MD.MON.map(k => `${NUME_MON[k].split(" ")[0]}: ${st && mo[k] === "finalizat" ? "nefin." : mo[k].replace("nefinalizat", "nefin.").replace("finalizat", "fin.")}`).join("; ")],
+      ["Mod 02 – freeze-frame", conf.length || pend.length ? `n = ${p.ff.n} rot/min, T = ${p.ff.T} °C, sarcină ${p.ff.sarc} %` : "—"], ["Mod 01 – date live", "≈ 20 PID-uri (turație, T lichid, sarcină, STFT, LTFT, MAP, IAT, viteză…)"]]) +
+    `<p class="nota">Codurile „U”, „B”, „C” și celelalte 28 de module nu sunt accesibile prin OBD generic.</p>`;
 }
-
 /* ------------------------------------------------------------------ calculele determinărilor */
 function calculeazaDA1(D) {
   const o = MD.prelucreaza(D.t, { num });
   const t15 = D.t.t15, cel = { t15: {}, t16: {} }, rele = { t15: {}, t16: {} };
-  const REF = { R: "≈ 60 Ω (120 ‖ 120)", uh: "≈ 2,6…2,7 V", ul: "≈ 2,3…2,4 V", uhd: "≈ 3,5 V (U<sub>diff</sub> ≈ 2 V)", uld: "≈ 1,5 V", tbit: "2 µs (500 kbit/s)" };
+  const REF = { R: "≈ 60 Ω (120 ‖ 120)", uh: "≈ 2,5…2,7 V (crește cu traficul)", ul: "≈ 2,3…2,5 V (scade cu traficul)", uhd: "≈ 3,5 V (U<sub>diff</sub> ≈ 2 V)", uld: "≈ 1,5 V", tbit: "2 µs (500 kbit/s)" };
   Object.keys(REF).forEach(k => cel.t15[k] = { ref: REF[k], calc: "" });
   const h = num(t15.uhd.n), l = num(t15.uld.n), hd = num(t15.uhd.d), ld = num(t15.uld.d);
   if (Number.isFinite(h) && Number.isFinite(l)) { cel.t15.uhd.calc = `U<sub>diff</sub> = ${fmt(h - l, 2)} V${Number.isFinite(hd) ? ` · cu defect ${fmt(hd - ld, 2)} V` : ""}`; rele.t15.uhd = { calc: h - l < 1.5 || h - l > 3 }; }
@@ -445,7 +502,7 @@ function calculeazaDA1(D) {
   if (Number.isFinite(o.Rn)) verdicte.push(Math.abs(o.Rn - 60) <= 6 ? { tip: "ok", text: `R = ${fmt(o.Rn, 1)} Ω – ambele terminări prezente.` } : { tip: "atentie", text: `R = ${fmt(o.Rn, 1)} Ω diferă de 60 Ω: verificați terminările.` });
   if (Number.isFinite(o.Rd)) {
     const t = o.Rd < 5 ? "R ≈ 0 Ω: CAN-H în scurtcircuit cu CAN-L." : Math.abs(o.Rd - 120) < 8 ? "R ≈ 120 Ω: o singură terminare – terminare lipsă sau magistrală întreruptă spre un capăt." : o.Rd < 50 ? "R < 50 Ω: terminare suplimentară pe magistrală." : "R ≈ 60 Ω: terminările sunt în regulă – defectul nu este de terminare (alimentare / masă modul, scurtcircuit la masă sau la plus).";
-    verdicte.push({ tip: "atentie", text: `Cu defect: ${t}` });
+    verdicte.push({ tip: "atentie", text: `Cu defect (la conectorul gateway al magistralei afectate): ${t}` });
   }
   if (Number.isFinite(o.Rc)) verdicte.push(o.Rc <= 0.01 ? { tip: "ok", text: `R<sub>c</sub> = ${fmt(o.Rc, 4)} Ω – contact bun (sub 0,01 Ω).` } : { tip: "atentie", text: `R<sub>c</sub> = ${fmt(o.Rc, 4)} Ω > 0,01 Ω: contact oxidat / slăbit – se curăță sau se înlocuiește suportul siguranței. Puterea disipată: ${fmt(o.Rc * I * I, 1)} W.` });
   // graficul: nivelurile măsurate reconstruite pe o secvență de biți
@@ -485,6 +542,8 @@ const HTML_TEORIE = `
 <p>Testerele multimarcă folosesc, pe lângă serviciile OBD (SAE J1979: modul 01 – date și monitoare, 02 – freeze-frame, 03 – coduri confirmate, 07 – coduri în așteptare, 0A – coduri permanente), protocoalele de diagnoză ale constructorilor bazate pe UDS – ISO 14229 (citirea codurilor și a datelor, comanda actuatorilor, rutine de service, codare). La vehiculele noi OBD migrează pe UDS (SAE J1979-2), iar comunicația rapidă se face prin CAN FD și Ethernet (DoIP, ISO 13400). De aceea un cititor OBD generic vede doar datele legate de emisii, iar un tester multimarcă vede toate modulele.</p>
 <p>Magistrala CAN de mare viteză (ISO 11898-2, 125 kbit/s…1 Mbit/s) transmite diferențial: o perturbație afectează la fel ambele linii și se anulează. În starea recesivă ambele linii au ≈ 2,5 V (U<sub>diff</sub> ≈ 0 V); în starea dominantă CAN-H urcă la ≈ 3,5 V, iar CAN-L coboară la ≈ 1,5 V (U<sub>diff</sub> ≈ 2 V; receptorul consideră dominant peste 0,9 V și recesiv sub 0,5 V). La capete se află două rezistențe de terminare de 120 Ω, care împiedică reflexiile; măsurate în paralel, între pinii 6 și 14 ai prizei de diagnoză, ele dau:</p>
 <div class="ec"><span>R<sub>e</sub> = R<sub>1</sub>·R<sub>2</sub>/(R<sub>1</sub> + R<sub>2</sub>) = 120·120/(120 + 120) = 60 Ω</span><span class="nr">(1.1)</span></div>
+<p><b>Arhitectura unui autoturism din 2025.</b> Modulele (adesea 30…80) nu mai stau pe o singură magistrală: un <b>gateway central</b> leagă mai multe rețele separate – CAN motor (grup motopropulsor), CAN șasiu / ADAS (frecvent CAN FD: faza de arbitrare la 500 kbit/s și faza de date la 2…5 Mbit/s), CAN confort / caroserie, CAN infotainment – plus magistrale LIN pentru actuatoare simple și Ethernet auto (100BASE-T1) pentru camere, infotainment și diagnoza rapidă DoIP (pinii 3/11 și 12/13 ai prizei, activare pe pinul 8). Priza OBD nu mai este legată direct de magistrala motorului: pinii 6/14 aparțin <b>CAN-ului de diagnoză</b> al gateway-ului, care rutează cererile testerului (și filtrează accesul – „Secure Gateway”). Consecința pentru diagnoză: un defect pe CAN confort nu se vede la pinii 6/14; magistrala afectată se identifică din scanare (grupul de module care nu răspund și codurile U din gateway), apoi se măsoară la conectorul ei de la gateway (back-probe), unde se găsește una dintre cele două terminări de 120 Ω.</p>
+<p>Culorile conductoarelor diferă după constructor; frecvent CAN-L este portocaliu-maro, iar CAN-H portocaliu cu dungă diferită pentru fiecare magistrală (negru – motor, verde – confort, violet – infotainment). În simulator culorile urmează această convenție.</p>
 <figure><img src="img/fig1_2.jpg" alt="Fig. 1.2 Topologia magistralei CAN" loading="lazy"><figcaption>Fig. 1.2. Topologia magistralei CAN, priza de diagnoză SAE J1962 și punctele de măsură</figcaption></figure>
 <p>Pe oscilogramă se măsoară tensiunea diferențială și durata unui bit t<sub>bit</sub>, din care rezultă rata de transfer. Gradul de încărcare a magistralei se estimează din numărul de mesaje pe secundă f<sub>k</sub> și lungimea lor N<sub>k</sub> (≈ 110…130 biți pentru un cadru standard cu 8 octeți de date, inclusiv biții de umplere):</p>
 <div class="ec"><span>U<sub>diff</sub> = U<sub>CANH</sub> − U<sub>CANL</sub></span><span class="nr">(1.2)</span></div>
@@ -502,20 +561,22 @@ const HTML_TEORIE = `
 <li><b>Încărcarea magistralei:</b> constructorii proiectează de regulă rețelele sub ≈ 50…60 %; peste ≈ 70…80 % cresc întârzierile mesajelor cu prioritate mică. Valoarea de 75 % din exemplu este deci la limită.</li>
 <li><b>Stările codurilor:</b> s-au adăugat definițiile complete (în așteptare / confirmat / permanent / istoric) și serviciile OBD 01, 02, 03, 07, 0A, folosite de cititorul generic.</li>
 <li><b>Pragurile receptorului CAN</b> (dominant peste 0,9 V, recesiv sub 0,5 V) și U<sub>diff</sub> recesiv ≈ 0 V au fost adăugate pentru interpretarea oscilogramei.</li>
-<li><b>Tensiunile medii CAN</b> citite cu multimetrul depind de încărcarea magistralei (proporția biților dominanți): la trafic intens CAN-H medie crește spre 2,7 V și CAN-L medie scade spre 2,3 V.</li></ul></div>
+<li><b>Tensiunile medii CAN</b> citite cu multimetrul depind de încărcarea magistralei (proporția biților dominanți): la trafic intens CAN-H medie crește spre 2,7 V și CAN-L medie scade spre 2,3 V. La priza OBD a unui autoturism cu gateway, CAN-ul de diagnoză are trafic numai cât testerul comunică, deci mediile sunt foarte apropiate de 2,5 V; valorile din îndrumar (2,6…2,7 / 2,3…2,4 V) corespund unei magistrale încărcate, de exemplu CAN motor măsurat la gateway.</li>
+<li><b>Arhitectura cu gateway</b> (autoturismele actuale) a fost adăugată la noțiunile teoretice: priza OBD este legată la CAN-ul de diagnoză, iar celelalte magistrale se verifică la conectorii gateway-ului.</li></ul></div>
 <h2>1.4. Modul de lucru (în simulator)</h2>
-<ol><li>Citiți fișa „client” cu simptomul și faceți inspecția vizuală: tensiunea bateriei în repaus (≥ 12,4 V, pinul 16 față de pinul 4).</li>
+<ol><li>Citiți fișa „client” cu simptomul și faceți inspecția vizuală: tensiunea bateriei în repaus (≥ 12,4 V, pinul 16 față de pinul 4). Identificați pe machetă gateway-ul, magistralele și priza de diagnoză.</li>
 <li>Cu contactul decuplat conectați interfața X431; puneți contactul (vehiculul este identificat automat după VIN).</li>
 <li>Executați scanarea completă și treceți rezultatul în Tabelul 1.1.</li>
 <li>Pentru fiecare cod notați descrierea, starea și datele freeze-frame (Tabelul 1.2); citiți monitoarele de pregătire și alegeți starea lor în Tabelul 1.3.</li>
 <li>Afișați datele live legate de cod și analiza magistralei (mesajele pe perioade, pentru relația 1.4).</li>
 <li>Repetați citirea cu cititorul OBD generic și completați Tabelul 1.4 (inclusiv timpul necesar, cronometrat de voi).</li>
-<li>Decuplați contactul și așteptați intrarea rețelei în repaus; măsurați rezistența între pinii 6 și 14.</li>
+<li>Decuplați contactul și așteptați intrarea rețelei în repaus; măsurați rezistența între pinii 6 și 14 (CAN diagnoză).</li>
 <li>Cu contactul pus măsurați tensiunile medii CAN-H și CAN-L; cu osciloscopul (CH1 pe pinul 6, CH2 pe pinul 14) vizualizați semnalele, opriți imaginea, măsurați nivelurile dominante (cursorul A pe un bit dominant) și durata unui bit (cursoarele A și B peste un număr cunoscut de biți) (Tabelul 1.5).</li>
 <li>Porniți ventilatorul (test activ), măsurați U<sub>0</sub> și U<sub>s</sub> la siguranța lui și curentul cu cleștele ampermetric; calculați rezistența de contact (Tabelul 1.6).</li>
-<li>Cadrul didactic introduce un defect de rețea: reluați pașii 3, 7 și 8, localizați defectul (Tabelul 1.7). După remediere ștergeți codurile și faceți un ciclu de confirmare.</li></ol>
+<li>Cadrul didactic introduce un defect pe una dintre magistrale: reluați scanarea, stabiliți din grupul modulelor care nu răspund și din codurile U ale gateway-ului care magistrală este afectată, apoi măsurați R, tensiunile și semnalul la conectorul ei de la gateway și localizați defectul (Tabelul 1.7). După remediere ștergeți codurile și faceți un ciclu de confirmare.</li></ol>
 <h2>1.7. Interpretarea rezultatelor</h2>
-<ul><li>Un cod „U” la mai multe module care indică același modul lipsă arată spre acel modul sau spre alimentarea / conexiunea lui; coduri „U” răspândite pe toată rețeaua arată spre magistrală (terminare, scurtcircuit, zgomot).</li>
+<ul><li>Un modul care nu răspunde împreună cu toate celelalte de pe aceeași magistrală arată spre magistrala respectivă (scurtcircuit CAN-H/CAN-L, bus-off – cod U0073 în gateway); un singur modul lipsă (U0100, U0121, U0140, U0184…) arată spre alimentarea, masa sau conexiunea lui.</li>
+<li>Un cod „U” la mai multe module care indică același modul lipsă arată spre acel modul sau spre alimentarea / conexiunea lui; coduri „U” răspândite pe toată rețeaua arată spre magistrală (terminare, scurtcircuit, zgomot).</li>
 <li>R ≈ 120 Ω – o terminare lipsă sau o linie întreruptă spre un capăt; R ≈ 0 Ω – CAN-H în scurt cu CAN-L; R &lt; 50 Ω – terminare suplimentară; R ≈ 60 Ω cu un modul care nu răspunde – alimentarea, masa sau conectorul acelui modul.</li>
 <li>Tensiuni de 0 V sau 12 V pe o linie indică scurtcircuit la masă sau la plus; semnalele care nu mai sunt în oglindă sau cu fronturi rotunjite / oscilante indică zgomot, capacitate parazită sau terminare incorectă.</li>
 <li>Codurile în așteptare și rezultatele serviciului 06 apropiate de prag indică defecte în formare. Un monitor nefinalizat după ștergerea codurilor este normal, dar la inspecția tehnică poate duce la respingere.</li>
@@ -558,21 +619,21 @@ const TEST = [
 ];
 
 /* ------------------------------------------------------------------ definiția lucrării */
-const SIMPTOME = ["lampa motorului aprinsă / clipește", "martorii ABS/ESP și airbag aprinși", "tabloul de bord nu afișează (fără comunicare)", "fără simptome la bord, doar coduri", "motorul nu pornește"];
+const SIMPTOME = ["lampa motorului aprinsă / clipește", "martori ABS / ESP / airbag aprinși", "funcții de confort inactive (geamuri, închidere, climatizare)", "ecranul infotainment / bordul nu afișează", "fără simptome la bord, doar coduri", "motorul nu pornește"];
 Cadru.porneste({
   disc: "DA", nr: 1, cod: "da-l1",
   titlu: "Diagnoza computerizată și rețeaua de date CAN",
   scurt: "Diagnoza computerizată și CAN",
-  subtitlu: "Laborator virtual – automobilul didactic, tester X431, cititor OBD, multimetru, osciloscop",
+  subtitlu: "Laborator virtual – autoturism 2025 cu gateway central, tester X431, cititor OBD, multimetru, osciloscop",
   parametri: MD.parametri,
   parametriDemo() { return MD.parametri(20261001); },
   date: [{ k: "Rt", et: "R terminare nominală [Ω]", v: 120, fix: true }, { k: "N", et: "biți / cadru (8 octeți)", v: 125, fix: true }, { k: "fb", et: "f<sub>bit</sub> nominal [kbit/s]", v: 500, fix: true }],
   tabele: [
     { id: "t11", titlu: "Tabelul 1.1. Scanarea completă (X431)", antetRand: "Modul / sistem", nota: "Se completează din tester (butonul de înregistrare din ecranul de scanare).",
-      randuri: MODULE.map(m => ({ k: m.k, et: m.nume })),
+      randuri: MODULE.map(m => ({ k: m.k, et: `${m.nume} <small>(${m.b === "gw" ? "gateway" : NUME_MAG(m.b)})</small>` })),
       coloane: [{ k: "prot", t: "Protocol", intrare: true }, { k: "n", t: "Nr. coduri", intrare: true }, { k: "st", t: "Stare comunicație", intrare: true, tip: "select", optiuni: ["comunică", "comunică cu erori", "nu răspunde"] }] },
     { id: "t12", titlu: "Tabelul 1.2. Coduri de defect", antetRand: "Nr.", nota: "Se completează din ecranul „Coduri” al testerului (→ Tabelul 1.2).",
-      randuri: ["1", "2", "3", "4", "5", "6"].map(k => ({ k, et: k })),
+      randuri: ["1", "2", "3", "4", "5", "6", "7", "8"].map(k => ({ k, et: k })),
       coloane: [{ k: "cod", t: "Cod", intrare: true }, { k: "mod", t: "Modul", intrare: true }, { k: "desc", t: "Descriere", intrare: true }, { k: "st", t: "Stare", intrare: true, tip: "select", optiuni: STARI }, { k: "ff", t: "Freeze-frame (n, T, sarcină)", intrare: true }] },
     { id: "t13", titlu: "Tabelul 1.3. Monitoare de pregătire", antetRand: "Monitor", nota: "Alegeți starea citită pe tester (înainte de ștergerea codurilor).",
       randuri: MD.MON.map(k => ({ k, et: NUME_MON[k] })),
@@ -580,24 +641,25 @@ Cadru.porneste({
     { id: "t14", titlu: "Tabelul 1.4. Tester multimarcă și cititor OBD generic", antetRand: "Criteriu", nota: "Se completează de voi, după ce ați folosit ambele aparate.",
       randuri: [{ k: "mod", et: "Module accesibile" }, { k: "cod", et: "Coduri găsite" }, { k: "live", et: "Date live disponibile" }, { k: "test", et: "Teste active / funcții de service" }, { k: "timp", et: "Timp necesar" }],
       coloane: [{ k: "x", t: "Launch X431", intrare: true, manualEval: true }, { k: "o", t: "Cititor OBD generic", intrare: true, manualEval: true }] },
-    { id: "t15", titlu: "Tabelul 1.5. Verificarea fizică a magistralei CAN", antetRand: "Mărime", nota: "Valorile se trec din multimetru și osciloscop; coloana se alege automat după starea rețelei (normal / cu defect).",
-      randuri: [{ k: "R", et: "R pin 6 – pin 14 [Ω]" }, { k: "uh", et: "U<sub>CANH</sub> medie [V]" }, { k: "ul", et: "U<sub>CANL</sub> medie [V]" }, { k: "uhd", et: "U<sub>CANH</sub> dominant [V]" }, { k: "uld", et: "U<sub>CANL</sub> dominant [V]" }, { k: "tbit", et: "t<sub>bit</sub> [µs]" }],
+    { id: "t15", titlu: "Tabelul 1.5. Verificarea fizică a magistralei CAN", antetRand: "Mărime", nota: "„Normal”: la priza OBD (pinii 6/14, CAN diagnoză). „Cu defect”: la conectorul gateway-ului al magistralei afectate. Coloana se alege automat după starea rețelei.",
+      randuri: [{ k: "R", et: "R CAN-H – CAN-L [Ω]" }, { k: "uh", et: "U<sub>CANH</sub> medie [V]" }, { k: "ul", et: "U<sub>CANL</sub> medie [V]" }, { k: "uhd", et: "U<sub>CANH</sub> dominant [V]" }, { k: "uld", et: "U<sub>CANL</sub> dominant [V]" }, { k: "tbit", et: "t<sub>bit</sub> [µs]" }],
       coloane: [{ k: "n", t: "Normal", intrare: true }, { k: "d", t: "Cu defect", intrare: true }, { k: "calc", t: "Calcul" }, { k: "ref", t: "Referință" }, { k: "conc", t: "Concluzie", intrare: true, tip: "select", optiuni: ["în regulă", "în afara limitelor (cu defect)", "în afara limitelor (normal)"], manualEval: true }] },
     { id: "t16", titlu: "Tabelul 1.6. Căderea de tensiune pe siguranța ventilatorului (ventilator pornit)", antetRand: "",
       randuri: [{ k: "f", et: "Siguranța ventilatorului" }],
       coloane: [{ k: "U0", t: "U<sub>0</sub> intrare [V]", intrare: true }, { k: "Us", t: "U<sub>s</sub> ieșire [V]", intrare: true }, { k: "I", t: "I [A]", intrare: true }, { k: "dU", t: "ΔU [V]" }, { k: "Rc", t: "R<sub>c</sub> [Ω]" }, { k: "conc", t: "Concluzie", intrare: true, tip: "select", optiuni: ["contact bun", "rezistență de contact prea mare"], manualEval: true }] },
     { id: "t17", titlu: "Tabelul 1.7. Defectul de rețea introdus", antetRand: "",
       randuri: [{ k: "d", et: "Defectul" }],
-      coloane: [{ k: "simptom", t: "Simptom", intrare: true, tip: "select", optiuni: SIMPTOME, manualEval: true }, { k: "mod", t: "Module care nu comunică", intrare: true, manualEval: true }, { k: "cod", t: "Coduri U", intrare: true, manualEval: true }, { k: "conf", t: "Măsurarea de confirmare", intrare: true, manualEval: true }, { k: "cauza", t: "Cauza", intrare: true, tip: "select", optiuni: MD.CHEI_DEF.map(k => DEFECTE[k].nume), manualEval: true }] }
+      coloane: [{ k: "simptom", t: "Simptom", intrare: true, tip: "select", optiuni: SIMPTOME, manualEval: true }, { k: "mod", t: "Module care nu comunică", intrare: true, manualEval: true }, { k: "cod", t: "Coduri U (gateway)", intrare: true, manualEval: true },
+        { k: "bus", t: "Magistrala afectată", intrare: true, tip: "select", optiuni: MD.CHEI_MAG.map(b => MAG[b].n), manualEval: true }, { k: "tip", t: "Tipul defectului", intrare: true, tip: "select", optiuni: MD.CHEI_DEF.map(k => MD.TIPURI_DEF[k]), manualEval: true }, { k: "conf", t: "Măsurarea de confirmare", intrare: true, manualEval: true }] }
   ],
   inaltimeGrafic: 300,
   calculeaza: calculeazaDA1,
   intrebari(D) {
     return [
       { id: "q1", u: "kbit/s", text: "Rata de transfer f<sub>bit</sub> din durata bitului măsurată de voi (Tabelul 1.5, coloana „Normal”):", textSimplu: "Rata de transfer din t_bit măsurat" },
-      { id: "q2", u: "%", text: "Încărcarea magistralei S, din analiza magistralei afișată de tester (mesajele pe perioade), cu 125 biți pe cadru și rata de 500 kbit/s:", textSimplu: "Încărcarea magistralei S" },
+      { id: "q2", u: "%", text: "Încărcarea magistralei CAN motor S, din analiza magistralei afișată de tester (mesajele pe perioade), cu 125 biți pe cadru și 500 kbit/s:", textSimplu: "Încărcarea magistralei CAN motor" },
       { id: "q3", u: "Ω", text: "Rezistența de contact R<sub>c</sub> a siguranței ventilatorului (Tabelul 1.6):", textSimplu: "Rezistența de contact a siguranței" },
-      { id: "q4", u: "Ω", text: "Rezistența pe care ați măsura-o între pinii 6 și 14 dacă s-ar adăuga o terminare suplimentară de 120 Ω la rețeaua voastră (pornind de la R normal măsurat):", textSimplu: "R cu terminare suplimentară" }
+      { id: "q4", u: "Ω", text: "Rezistența pe care ați măsura-o între pinii 6 și 14 dacă s-ar adăuga o terminare suplimentară de 120 Ω pe CAN-ul de diagnoză (pornind de la R normal măsurat):", textSimplu: "R cu terminare suplimentară" }
     ];
   },
   cerinte(D) {
@@ -605,42 +667,46 @@ Cadru.porneste({
     if (!MODULE.some(m => t.t11[m.k].st)) l.push("Tabelul 1.1: scanarea completă");
     if (!Object.values(t.t12).some(r => r.cod)) l.push("Tabelul 1.2: cel puțin un cod de defect");
     const m = MD.MON.filter(k => t.t13[k].st).length; if (m < 7) l.push(`Tabelul 1.3: starea monitoarelor (${m}/7)`);
-    ["R", "uh", "ul", "uhd", "uld", "tbit"].forEach(k => { if (t.t15[k].n === "") l.push(`Tabelul 1.5: ${{ R: "R pin 6–14", uh: "U CAN-H medie", ul: "U CAN-L medie", uhd: "CAN-H dominant", uld: "CAN-L dominant", tbit: "t_bit" }[k]} (normal)`); });
-    if (t.t15.R.d === "") l.push("Tabelul 1.5: R pin 6–14 cu defect");
+    ["R", "uh", "ul", "uhd", "uld", "tbit"].forEach(k => { if (t.t15[k].n === "") l.push(`Tabelul 1.5: ${{ R: "R CAN-H – CAN-L", uh: "U CAN-H medie", ul: "U CAN-L medie", uhd: "CAN-H dominant", uld: "CAN-L dominant", tbit: "t_bit" }[k]} (normal)`); });
+    if (t.t15.R.d === "") l.push("Tabelul 1.5: R cu defect (la gateway)");
     ["U0", "Us", "I"].forEach(k => { if (t.t16.f[k] === "") l.push(`Tabelul 1.6: ${k}`); });
-    if (t.t17.d.cauza === "") l.push("Tabelul 1.7: cauza defectului de rețea");
+    if (t.t17.d.bus === "" || t.t17.d.tip === "") l.push("Tabelul 1.7: magistrala și tipul defectului");
     return l;
   },
   exemplu(D) {
     const t = D.t;
-    Object.assign(t.t15.R, { n: "60.1", d: "120.2" }); Object.assign(t.t15.uh, { n: "2.650" }); Object.assign(t.t15.ul, { n: "2.350" });
+    Object.assign(t.t15.R, { n: "60.1", d: "120.2" }); Object.assign(t.t15.uh, { n: "2.520" }); Object.assign(t.t15.ul, { n: "2.480" });
     Object.assign(t.t15.uhd, { n: "3.52" }); Object.assign(t.t15.uld, { n: "1.48" }); Object.assign(t.t15.tbit, { n: "2.000" });
     Object.assign(t.t16.f, { U0: "12.400", Us: "11.600", I: "8.0" });
   },
   vehicul3d: {
     titluTab: "Pe autovehicul (3D)",
-    titlu: "Rețeaua CAN pe autovehicul",
-    intro: `<p>Modulele rețelei de mare viteză (500 kbit/s) montate pe autoturism, legate prin cablul torsadat CAN-H (portocaliu) / CAN-L (albastru), cu terminările de 120 Ω în ECM și în ESP și cu priza de diagnoză sub volan. Mesajele circulă pe magistrală ca puncte luminoase; osciloscopul din colț arată CAN-H, CAN-L și U<sub>diff</sub> la priza de diagnoză. Alegeți un modul din listă sau cu clic pe el; din meniul „Defect (demonstrație)” vedeți efectul fiecărui defect de rețea – independent de defectul vostru individual.</p>`,
-    dupa: `<p class="nota">Modelul semnalelor: 500 kbit/s, nivel recesiv 2,5 V, dominant 3,5 / 1,5 V, cadre standard de ≈ 125 biți. Valorile sunt tipice, nu cele individuale.</p>`,
+    titlu: "Rețeaua de date a unui autoturism 2025 – gateway central, 5 magistrale CAN, Ethernet auto",
+    intro: `<p>Cele 29 de module ale autoturismului, montate în pozițiile lor reale și legate prin perechile torsadate ale celor cinci magistrale (culoarea CAN-H diferă după magistrală, CAN-L este portocaliu-maro), cu gateway-ul central în spatele torpedoului, priza de diagnoză sub volan și Ethernet auto (verde) spre camere, infotainment, bord, telematică și DoIP. Mesajele circulă pe magistrale ca puncte luminoase; osciloscopul din colț arată CAN-H, CAN-L și U<sub>diff</sub> la punctul de măsură. Filtrați o magistrală, alegeți un modul din listă sau cu clic pe el; din meniul „Defect (demonstrație)” vedeți efectul fiecărui defect pe orice magistrală – independent de defectul vostru individual.</p>`,
+    dupa: `<p class="nota">Modelul semnalelor: 500 kbit/s, nivel recesiv 2,5 V, dominant 3,5 / 1,5 V, cadre standard de ≈ 125 biți; pe CAN FD faza de date la 2 Mbit/s. Valorile sunt tipice, nu cele individuale.</p>`,
     optiuni: () => ({ sistem: "retea" })
   },
   referat: {
-    scop: "Aplicarea procedurii de diagnosticare: scanarea completă, interpretarea codurilor, a datelor freeze-frame și a monitoarelor, compararea testerului multimarcă cu un cititor OBD generic și verificarea fizică a magistralei CAN, inclusiv localizarea unui defect de rețea.",
+    scop: "Aplicarea procedurii de diagnosticare pe un autoturism cu gateway central: scanarea completă, interpretarea codurilor, a datelor freeze-frame și a monitoarelor, compararea testerului multimarcă cu un cititor OBD generic și verificarea fizică a magistralelor CAN, inclusiv localizarea unui defect de rețea.",
     relatii: "R<sub>e</sub> = R<sub>1</sub>R<sub>2</sub>/(R<sub>1</sub> + R<sub>2</sub>); &nbsp; U<sub>diff</sub> = U<sub>CANH</sub> − U<sub>CANL</sub>; &nbsp; f<sub>bit</sub> = 1/t<sub>bit</sub>; &nbsp; S = ΣN<sub>k</sub>f<sub>k</sub>/f<sub>bit</sub>·100; &nbsp; ΔU = U<sub>0</sub> − U<sub>s</sub>; &nbsp; R<sub>c</sub> = ΔU/I.",
-    varianta: () => "Automobil didactic cu rețea proprie (terminări, trafic, contact de siguranță), un caz „client” și un defect de rețea ascuns, diferite de la student la student.",
-    indicatii: "Scrieți lanțul cauzal pentru defectul clientului și pentru defectul de rețea (simptom → cod și date → măsurare → cauză → remediere → verificare), comparați testerul cu cititorul generic și interpretați măsurările pe magistrală…"
+    varianta: () => "Autoturism 2025 cu rețea proprie (terminări pe fiecare magistrală, trafic, contact de siguranță), un caz „client” și un defect de rețea ascuns pe una dintre magistrale, diferite de la student la student.",
+    indicatii: "Scrieți lanțul cauzal pentru defectul clientului și pentru defectul de rețea (simptom → scanare și coduri U → magistrala afectată → măsurare la gateway → cauză → remediere → verificare), comparați testerul cu cititorul generic și interpretați măsurările…"
   },
-  subsol: "Modelul: magistrală CAN de 500 kbit/s cu două terminări proprii, trafic individual, niveluri recesiv/dominant, coduri UDS/OBD cu freeze-frame și monitoare, rezistență de contact individuală. Fiecare student are un caz „client” și un defect de rețea ascuns.",
+  subsol: "Modelul: autoturism 2025 cu gateway central, 29 de module pe 5 magistrale CAN (500 kbit/s; CAN FD 2 Mbit/s pe șasiu), terminări proprii, trafic individual, coduri UDS/OBD cu freeze-frame și monitoare, rezistență de contact individuală. Fiecare student are un caz „client” și un defect de rețea ascuns.",
   continut: { teorie: HTML_TEORIE, probleme: htmlProbleme, intrebari: INTREBARI, test: TEST },
   sim: {
     html: `<div class="sim-grila">
     <div class="card sim-scena scena">
       <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
-      <svg id="svg-retea" viewBox="0 0 900 440" role="img" aria-label="Rețeaua CAN a automobilului didactic, priza de diagnoză și cutia de siguranțe"></svg>
+      <div class="vedere-sim">
+        <div class="comutator-vedere" role="group"><button type="button" data-vedere="3d" id="btn-v3d">Machetă 3D</button><button type="button" data-vedere="schema">Schema rețelei</button></div>
+        <div id="retea3d"><p class="nota">Se încarcă macheta 3D…</p></div>
+        <svg id="svg-retea" viewBox="0 0 900 470" role="img" aria-label="Schema rețelei: gateway central, magistralele CAN, priza de diagnoză și cutia de siguranțe" style="display:none"></svg>
+      </div>
       <div class="afisaje">
-        <div class="afisaj"><span>Fișa client</span><b id="af-client" style="font-size:.86rem;line-height:1.25"></b><small>Smart Fortwo (didactic)</small></div>
-        <div class="afisaj"><span>Multimetru</span><b id="af-mm">—</b><small id="af-mm-mod"></small></div>
-        <div class="afisaj"><span>Rețeaua</span><b id="af-retea" style="font-size:1rem">repaus</b><small id="af-repaus"></small></div>
+        <div class="afisaj"><span>Fișa client</span><b id="af-client" style="font-size:.86rem;line-height:1.25"></b><small>Autoturism 2025 (didactic)</small></div>
+        <div class="afisaj"><span>Modulul selectat</span><b id="af-sel" style="font-size:.86rem;line-height:1.25">Gateway central</b><small id="af-sel-b">toate magistralele</small></div>
+        <div class="afisaj"><span>Rețeaua la punctul de măsură</span><b id="af-retea" style="font-size:1rem">repaus</b><small id="af-repaus"></small></div>
         <div class="afisaj"><span>Tensiune baterie</span><b id="af-bat">—</b><small>V (pin 16)</small></div>
       </div>
       <div class="osc-cutie">
@@ -649,7 +715,7 @@ Cadru.porneste({
           <label>Timp/div <select id="osc-t">${TDIV.map(v => `<option value="${v}">${fmtT(v)}</option>`).join("")}</select></label>
           <button type="button" id="osc-run">STOP</button>
           <label>Afișare <select id="osc-mod"><option value="supr">canale suprapuse</option><option value="benzi">canale separate</option></select></label>
-          <span class="nota" style="margin:0">declanșare pe începutul cadrului (SOF)</span>
+          <span class="nota" style="margin:0" id="osc-punct"></span>
         </div>
         <div class="osc-canale">${[0, 1, 2, 3].map(k => `<div class="osc-canal" style="--cc:${CULORI_CH[k]}">
           <label><input type="checkbox" data-ch-on="${k}"> <b>CH${k + 1}</b></label>
@@ -662,33 +728,38 @@ Cadru.porneste({
       </div>
     </div>
     <aside class="card sim-comenzi">
-      <h2>Automobilul</h2>
+      <h2>Autoturismul</h2>
       <div class="rand-butoane"><button type="button" id="btn-contact">Contact</button></div>
       <button type="button" class="lat" id="btn-vent">Pornește ventilatorul (test activ)</button>
       <button type="button" class="lat" id="btn-defect">Introdu defectul de rețea</button>
       <details class="setari" data-doar-demo><summary>Defectul de rețea (mod demonstrativ)</summary>
-        <select id="sel-defect">${MD.CHEI_DEF.map(k => `<option value="${k}">${DEFECTE[k].nume}</option>`).join("")}</select>
-        <p class="nota">În modul de evaluare defectul este individual și ascuns.</p></details>
+        <label class="camp">Magistrala <select id="sel-bus">${MD.CHEI_MAG.map(b => `<option value="${b}">${MAG[b].n}</option>`).join("")}</select></label>
+        <label class="camp">Tipul <select id="sel-defect">${MD.CHEI_DEF.map(k => `<option value="${k}">${MD.TIPURI_DEF[k]}</option>`).join("")}</select></label>
+        <p class="nota">În modul de evaluare defectul (magistrala și tipul) este individual și ascuns.</p></details>
+      <h2>Punctul de măsură</h2>
+      <select id="sel-punct" aria-label="Punctul de măsură pentru multimetru și osciloscop">${Object.entries(PUNCTE).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select>
+      <p class="nota">Multimetrul (CAN) și osciloscopul se conectează aici, prin cutia de acces sau cu adaptoare back-probe.</p>
       <h2>Instrumentul</h2>
       <div class="comutator-aparat" role="group"><button type="button" data-aparat="x431">Tester X431</button><button type="button" data-aparat="obd">Cititor OBD</button><button type="button" data-aparat="mm">Multimetru</button><button type="button" data-aparat="osc">Osciloscop</button></div>
       <div class="panou-aparat" data-p="x431">
         <button type="button" class="lat" id="btn-x431c">Conectează interfața X431</button>
         <div class="comutator-aparat mic" role="group"><button type="button" data-vx="scan">Scanare</button><button type="button" data-vx="cod">Coduri</button><button type="button" data-vx="mon">Monitoare</button><button type="button" data-vx="live">Date live</button><button type="button" data-vx="can">Magistrala</button></div>
         <button type="button" class="primar lat" id="btn-scan">Scanare completă</button>
-        <div id="x431-ecran" class="ecran-tester"></div>
+        <div class="tableta"><div id="x431-ecran" class="ecran-tester"></div></div>
       </div>
       <div class="panou-aparat" data-p="obd" hidden>
         <button type="button" class="lat" id="btn-obdc">Conectează cititorul OBD generic</button>
-        <div id="obd-ecran" class="ecran-tester"></div>
+        <div class="tableta telefon"><div id="obd-ecran" class="ecran-tester"></div></div>
       </div>
       <div class="panou-aparat" data-p="mm" hidden>
-        <label class="camp">Punctul de măsură <select id="sel-mm">
-          <option value="r614">Ω – pinii 6 și 14 (rețea în repaus)</option><option value="v6">V – pin 6 (CAN-H) față de pin 4</option><option value="v14">V – pin 14 (CAN-L) față de pin 4</option>
+        <label class="camp">Măsurarea <select id="sel-mm">
+          <option value="r">Ω – între CAN-H și CAN-L (rețea în repaus)</option><option value="vh">V – CAN-H față de masă</option><option value="vl">V – CAN-L față de masă</option>
           <option value="v16">V – pin 16 (+12 V) față de pin 4</option><option value="vf0">V – intrarea siguranței ventilatorului (U₀)</option><option value="vfs">V – ieșirea siguranței ventilatorului (U_s)</option><option value="ia">A – clește ampermetric pe cablul ventilatorului</option></select></label>
+        <div id="mm-aparat" class="mm-aparat"></div>
         <button type="button" class="primar lat" id="btn-mm">● Trece citirea în tabel</button>
       </div>
       <div class="panou-aparat" data-p="osc" hidden>
-        <p class="nota">CH1 pe pinul 6, CH2 pe pinul 14 (cutia de acces). Opriți imaginea (STOP) și trageți cursoarele A și B.</p>
+        <p class="nota">CH1 pe CAN-H, CH2 pe CAN-L la punctul de măsură ales. Opriți imaginea (STOP) și trageți cursoarele A și B.</p>
         <button type="button" class="lat" id="btn-dom">● Nivelurile dominante (cursorul A) → Tabelul 1.5</button>
         <label class="camp">Număr de biți între cursoare <input type="number" id="in-biti" value="1" min="1" max="200" step="1"></label>
         <button type="button" class="primar lat" id="btn-tbit">● Trece durata bitului în Tabelul 1.5</button>
@@ -697,7 +768,9 @@ Cadru.porneste({
     </aside>
   </div>`,
     init(C) {
-      construiesteSVG(); legaOsc();
+      construiesteSVG(); legaOsc(); porneste3D();
+      $$("[data-vedere]").forEach(b => b.addEventListener("click", () => comutaVedere(b.dataset.vedere)));
+      comutaVedere("3d");
       $("#osc-t").value = String(sim.osc.tdiv);
       $("#osc-t").addEventListener("change", e => { sim.osc.tdiv = +e.target.value; if (!sim.osc.ruleaza) { achizitie(); deseneazaOsc(); } });
       $("#osc-mod").addEventListener("change", e => { sim.osc.benzi = e.target.value === "benzi"; deseneazaOsc(); });
@@ -706,9 +779,11 @@ Cadru.porneste({
       ["fullscreenchange", "webkitfullscreenchange"].forEach(ev => document.addEventListener(ev, () => setTimeout(deseneazaOsc, 120)));
       $("#btn-ecran").addEventListener("click", () => setTimeout(deseneazaOsc, 150));
       $("#btn-contact").addEventListener("click", () => contact(!sim.contact));
-      $("#btn-vent").addEventListener("click", () => { if (!sim.contact) return Cadru.mesajTemporar("Puneți contactul.", "atentie"); if (!sim.x431 || !nivel().com) return Cadru.mesajTemporar("Testul activ se comandă din X431 (conectat și comunicând cu ECM).", "atentie"); sim.vent = !sim.vent; actualizeazaPanou(); });
+      $("#btn-vent").addEventListener("click", () => { if (!sim.contact) return Cadru.mesajTemporar("Puneți contactul.", "atentie"); if (!sim.x431 || !raspunde("ecm")) return Cadru.mesajTemporar("Testul activ se comandă din X431 (conectat și comunicând cu ECM).", "atentie"); sim.vent = !sim.vent; actualizeazaPanou(); });
       $("#btn-defect").addEventListener("click", comutaDefect);
       $("#sel-defect").addEventListener("change", e => { sim.defectDemo = e.target.value; sim.scan = null; actualizeazaPanou(); });
+      $("#sel-bus").addEventListener("change", e => { sim.busDemo = e.target.value; sim.scan = null; actualizeazaPanou(); });
+      $("#sel-punct").addEventListener("change", e => { sim.punct = e.target.value; if (!sim.osc.ruleaza) achizitie(); deseneazaOsc(); actualizeazaSVG(0); });
       $("#btn-x431c").addEventListener("click", () => conecteaza("x431"));
       $("#btn-obdc").addEventListener("click", () => conecteaza("obd"));
       $("#btn-scan").addEventListener("click", scaneaza);
@@ -721,11 +796,11 @@ Cadru.porneste({
       actualizeazaPanou();
       C.mesaj("Citiți fișa client; cu contactul decuplat conectați interfața X431 la priza de diagnoză, apoi puneți contactul și faceți scanarea completă.", "");
     },
-    aplicaEval(P2, C) { const s = $("#sel-defect"); if (s) s.disabled = true; },
+    aplicaEval(P2, C) { ["#sel-defect", "#sel-bus"].forEach(s => { const e = $(s); if (e) e.disabled = true; }); },
     reset() { Object.assign(sim, { contact: false, tOff: 999, defActiv: false, vent: false, x431: false, obd: false, scan: null, sterse: false, ciclu: 0 }); },
     cadru(dt0, C, vizibil) {
       const acum = performance.now(), dt = Math.min(1, Math.max(0, (acum - (sim._t || acum)) / 1000)); sim._t = acum;
-      sim.t += dt * 1e-3;                                                  // timpul semnalelor CAN avansează încet (imagine lizibilă)
+      sim.t += dt * 1e-3;
       if (!sim.contact) sim.tOff += dt;
       if (sim.osc.ruleaza && (vizibil || sim.aparat === "osc")) achizitie();
       if (!vizibil) return;
@@ -734,11 +809,12 @@ Cadru.porneste({
         this._ta = acum;
         deseneazaOsc();
         const r = sim.aparat === "mm" ? citireMultimetru() : null, cl = MD.CLIENT[P().client];
+        if (r) multimetruSVG(r.txt);
         $("#af-client").textContent = cl.simptom;
-        $("#af-mm").textContent = r ? r.txt : "—"; $("#af-mm-mod").textContent = r ? $("#sel-mm").selectedOptions[0].textContent.split(" – ")[0] : "";
         $("#af-retea").textContent = comunica() ? "activă" : treaza() ? "fără comunicare" : "repaus";
-        $("#af-repaus").textContent = !sim.contact && sim.tOff < T_REPAUS ? `repaus în ${Math.ceil(T_REPAUS - sim.tOff)} s` : sim.defActiv ? "defect introdus" : "";
+        $("#af-repaus").textContent = (!sim.contact && sim.tOff < T_REPAUS ? `repaus în ${Math.ceil(T_REPAUS - sim.tOff)} s · ` : "") + NUME_MAG(sim.punct);
         $("#af-bat").textContent = fmt(semnal("b", 0), 2);
+        $("#osc-punct").textContent = "la: " + PUNCTE[sim.punct];
         C.stare(1, sim.contact ? "contact pus" : "contact decuplat", sim.contact ? "inc" : "");
         C.stare(2, sim.defActiv ? "defect de rețea introdus" : "rețea fără defect introdus");
         if (sim.aparat === "mm" && r && r.msg) C.mesajAuto(r.msg, "atentie"); else C.mesajAuto("");
@@ -746,7 +822,7 @@ Cadru.porneste({
     },
     redeseneaza() { deseneazaOsc(); },
     formule() {
-      const o = sim.osc, dt = Math.abs(o.c2 - o.c1) * o.tdiv, n = Math.max(1, num($("#in-biti") && $("#in-biti").value) || 1), p = P();
+      const o = sim.osc, dt = Math.abs(o.c2 - o.c1) * o.tdiv, n = Math.max(1, num($("#in-biti") && $("#in-biti").value) || 1);
       return [
         ["Durata bitului și rata (1.3)", dt > 0 ? `t<sub>bit</sub> = ${fmtT(dt)}/${n} = ${fmt(dt / n * 1e6, 3)} µs → f<sub>bit</sub> = <span class="rez">${fmt(n / dt / 1000, 1)} kbit/s</span>` : "—"],
         ["Rezistența echivalentă (1.1)", "R<sub>e</sub> = 120·120/(120 + 120) = <span class=\"rez\">60 Ω</span> (valori nominale)"],

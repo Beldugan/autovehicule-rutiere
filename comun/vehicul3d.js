@@ -232,7 +232,7 @@ export function creeaza(gazda, optiuni = {}) {
   }
 
   /* --- sistemul de frânare */
-  const S = sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : sistem === "senzori" ? construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "retea" ? construiesteRetea({ caroserie }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
+  const S = sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : sistem === "senzori" ? construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "retea" ? construiesteRetea({ caroserie, optiuni }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
 
   /* --- etichete HTML */
   const elEt = gazda.querySelector(".v3d-etichete");
@@ -1151,139 +1151,203 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     cameraInitiala: [[4.3, 2.1, 3.2], [1.4, 0.55, 0]] };
 }
 
-/* ------------------------------------------------------------------ sistemul „retea”: magistrala CAN pe autoturism (DA L1) */
-function construiesteRetea({ caroserie }) {
+/* ------------------------------------------------------------------ sistemul „retea”: rețeaua CAN a unui autoturism 2025 (DA L1)
+   Gateway central cu 5 magistrale (diagnoză, motor, șasiu CAN FD, confort, infotainment) + Ethernet auto.
+   optiuni.control (din simulator): { stare() → {contact, defBus, defTip, arataDefect, punct}, onSelect(k) } */
+function construiesteRetea({ caroserie, optiuni }) {
+  const M = globalThis.MODELE && globalThis.MODELE["da-l1"];
+  const CTL = optiuni.control || null;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const G = new THREE.Group(); caroserie.add(G);
-  const et = [], ancore = {}, corpuri = {};
-  const MOD = {
-    ecm: { n: "ECM – motor", p: [1.95, 0.74, -0.42], s: [0.24, 0.05, 0.18], c: 0xb9c0c8, f: "Gestiunea motorului; terminarea R₁ = 120 Ω", msg: 14 },
-    tcu: { n: "TCU – cutie de viteze", p: [1.5, 0.36, 0.42], s: [0.16, 0.04, 0.12], c: 0x2b2f35, f: "Comanda cutiei automatizate", msg: 6 },
-    esp: { n: "ESP – ABS / stabilitate", p: [1.68, 0.72, 0.58], s: [0.13, 0.1, 0.12], c: 0x9aa2ab, f: "ABS, ESP; viteza roților; terminarea R₂ = 120 Ω", msg: 9 },
-    eps: { n: "EPS – servodirecție", p: [1.12, 0.6, -0.42], s: [0.12, 0.08, 0.1], c: 0x2b2f35, f: "Servodirecția electrică (unghi volan, cuplu)", msg: 4 },
-    ki: { n: "Bord / gateway", p: [0.82, 0.98, -0.36], s: [0.1, 0.16, 0.42], c: 0xd9dde1, f: "Afișaj bord; gateway spre CAN caroserie 125 kbit/s", msg: 5 },
-    srs: { n: "SRS – airbag", p: [0.3, 0.42, 0.0], s: [0.16, 0.05, 0.12], c: 0x2b2f35, f: "Comanda airbagurilor (senzori de impact)", msg: 2 },
-    obd: { n: "Priza de diagnoză J1962", p: [0.86, 0.56, -0.2], s: [0.05, 0.03, 0.08], c: 0x111111, f: "Pin 6 CAN-H, pin 14 CAN-L, 4/5 masă, 16 +12 V", msg: 0 }
+  const et = [], ancore = {}, corpuri = {}, matMod = {};
+  // poziția, mărimea și culoarea carcasei fiecărui modul
+  const POZ = {
+    gw: [0.92, 0.62, 0.36, 0.16, 0.05, 0.12, 0x3b4048], obd: [0.86, 0.5, -0.3, 0.05, 0.03, 0.08, 0x111111],
+    ecm: [1.95, 0.76, -0.45, 0.24, 0.05, 0.18, 0xb9c0c8], tcu: [1.55, 0.36, 0.42, 0.16, 0.05, 0.12, 0x2b2f35], bsg: [2.02, 0.48, 0.22, 0.14, 0.14, 0.14, 0x8d949b],
+    dcdc: [1.86, 0.32, -0.2, 0.16, 0.05, 0.13, 0x9aa2ab], fpm: [-0.95, 0.27, 0.36, 0.1, 0.03, 0.08, 0x2b2f35],
+    esp: [1.62, 0.7, -0.6, 0.13, 0.1, 0.12, 0x9aa2ab], eps: [1.45, 0.3, -0.33, 0.12, 0.08, 0.1, 0x2b2f35], epb: [-1.2, 0.3, 0.05, 0.12, 0.04, 0.1, 0x2b2f35],
+    srs: [0.3, 0.42, 0.0, 0.16, 0.05, 0.12, 0x2b2f35], scm: [0.76, 0.92, -0.4, 0.07, 0.07, 0.09, 0x2b2f35], rad: [2.39, 0.45, 0.0, 0.03, 0.09, 0.12, 0x222222], cam: [0.56, 1.31, 0.0, 0.07, 0.05, 0.1, 0x222222],
+    bcm: [0.95, 0.6, -0.58, 0.16, 0.12, 0.05, 0x2b2f35], dfs: [0.38, 0.7, -0.79, 0.12, 0.1, 0.03, 0x2b2f35], dfd: [0.38, 0.7, 0.79, 0.12, 0.1, 0.03, 0x2b2f35],
+    dss: [-0.62, 0.7, -0.79, 0.12, 0.1, 0.03, 0x2b2f35], dsd: [-0.62, 0.7, 0.79, 0.12, 0.1, 0.03, 0x2b2f35], hvac: [1.02, 0.76, 0.08, 0.12, 0.08, 0.1, 0x2b2f35],
+    kes: [-0.3, 0.4, 0.0, 0.12, 0.04, 0.1, 0x2b2f35], sea: [0.12, 0.38, -0.42, 0.12, 0.03, 0.1, 0x2b2f35], led: [2.22, 0.72, -0.6, 0.08, 0.05, 0.08, 0x2b2f35],
+    pdc: [-2.08, 0.55, 0.42, 0.1, 0.03, 0.08, 0x2b2f35], tlg: [-2.25, 0.95, 0.0, 0.05, 0.08, 0.14, 0x2b2f35],
+    hu: [0.86, 0.88, 0.02, 0.1, 0.12, 0.2, 0x1f2328], ki: [0.86, 0.98, -0.38, 0.08, 0.12, 0.3, 0x1f2328], ocu: [0.2, 1.37, 0.0, 0.1, 0.03, 0.12, 0x2b2f35],
+    amp: [-2.0, 0.55, -0.55, 0.14, 0.05, 0.12, 0x2b2f35], hud: [1.05, 0.98, -0.38, 0.12, 0.05, 0.16, 0x2b2f35]
   };
-  const mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.4, emissive: 0x000000 });
-  Object.entries(MOD).forEach(([k, m]) => {
-    const g = new THREE.Group(); g.position.set(...m.p); g.userData.c = k; G.add(g); corpuri[k] = g;
-    const b = new THREE.Mesh(new THREE.BoxGeometry(...m.s), mat(m.c)); b.castShadow = true; g.add(b);
-    if (k === "ecm") for (let i = 0; i < 6; i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.008), mat(0x8d949b)); r.position.set(0, 0.035, -0.07 + i * 0.028); g.add(r); }
-    const a = new THREE.Object3D(); a.position.y = m.s[1] / 2 + 0.02; g.add(a); ancore[k] = a; et.push({ obj: a, text: m.n.split(" –")[0], k });
+  const BUS_MOD = { diag: ["obd"], gw: [] }; M.MODULE.forEach(m => { if (m.b !== "gw") (BUS_MOD[m.b] = BUS_MOD[m.b] || []).push(m.k); });
+  const NUME = { obd: "Priza OBD (J1962)" }; M.MODULE.forEach(m => NUME[m.k] = m.sc);
+  const BUSOF = { obd: "diag" }; M.MODULE.forEach(m => BUSOF[m.k] = m.b);
+  const mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.45, metalness: 0.45, emissive: 0x000000, transparent: true });
+  Object.entries(POZ).forEach(([k, q]) => {
+    const g = new THREE.Group(); g.position.set(q[0], q[1], q[2]); g.userData.c = k; G.add(g); corpuri[k] = g;
+    const mm = mat(q[6]); matMod[k] = mm;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(q[3], q[4], q[5]), mm); b.castShadow = true; g.add(b);
+    const con = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.05, q[3] * 0.4), Math.min(0.025, q[4] * 0.6), Math.min(0.06, q[5] * 0.5)), mat(0x111111)); con.position.set(-q[3] / 2 - 0.008, 0, 0); g.add(con);
+    if (k === "ecm") for (let i = 0; i < 6; i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.018, 0.008), mat(0x8d949b)); r.position.set(0, 0.033, -0.07 + i * 0.028); g.add(r); }
+    if (k === "gw") for (let i = 0; i < 5; i++) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.018), mat([0xffc04d, 0xf39a2b, 0xe8503a, 0x5cbf5a, 0x9b6ad6][i])); c.position.set(-0.09, 0, -0.045 + i * 0.022); g.add(c); }
+    const a = new THREE.Object3D(); a.position.y = q[4] / 2 + 0.02; g.add(a); ancore[k] = a;
+    et.push({ obj: a, text: k === "obd" ? "Priza OBD" : NUME[k], k, filtru: () => vizibilEt(k) });
   });
-  // traseul magistralei (trunchi) de la ECM (R₁) la ESP (R₂), cu derivații
-  const TR = [V(1.95, 0.70, -0.42), V(1.62, 0.6, -0.44), V(1.28, 0.62, -0.42), V(0.95, 0.6, -0.3), V(0.6, 0.45, -0.1), V(0.42, 0.42, 0.12), V(0.8, 0.5, 0.42), V(1.25, 0.6, 0.5), V(1.68, 0.68, 0.58)];
-  const trunchi = new THREE.CatmullRomCurve3(TR, false, "catmullrom", 0.3), Ltr = trunchi.getLength();
-  const DER = { tcu: [V(1.25, 0.6, 0.5), V(1.4, 0.45, 0.46), V(1.5, 0.38, 0.42)], eps: [V(1.28, 0.62, -0.42), V(1.12, 0.6, -0.42)],
-    ki: [V(0.95, 0.6, -0.3), V(0.88, 0.85, -0.33), V(0.82, 0.92, -0.36)], srs: [V(0.42, 0.42, 0.12), V(0.3, 0.42, 0.02)], obd: [V(0.95, 0.6, -0.3), V(0.88, 0.57, -0.24), V(0.86, 0.56, -0.2)] };
-  const mH = new THREE.MeshStandardMaterial({ color: 0xf39a2b, roughness: 0.6, emissive: 0x000000 }), mL = new THREE.MeshStandardMaterial({ color: 0x3f8fe0, roughness: 0.6, emissive: 0x000000 });
-  const torsadat = (curba, r = 0.0045) => {
-    const L = curba.getLength(), n = Math.max(40, Math.round(L / 0.004)), fr = curba.computeFrenetFrames(n, false), a = [], b = [];
+  // traseele magistralelor (trunchiul fiecărei magistrale pleacă din gateway și se termină în modulul de capăt)
+  const GWp = V(0.85, 0.6, 0.36);
+  const TR = {
+    diag: [GWp, V(0.86, 0.5, 0.0), V(0.86, 0.48, -0.25)],
+    motor: [GWp, V(1.22, 0.58, 0.3), V(1.55, 0.44, 0.3), V(1.86, 0.4, 0.05), V(1.95, 0.72, -0.4)],
+    sasiu: [GWp, V(0.7, 0.48, 0.12), V(0.4, 0.42, 0.06), V(0.8, 0.58, -0.32), V(1.3, 0.6, -0.48), V(1.56, 0.68, -0.6)],
+    confort: [GWp, V(0.45, 0.33, 0.64), V(-0.7, 0.33, 0.64), V(-2.05, 0.45, 0.22), V(-0.7, 0.33, -0.64), V(0.4, 0.33, -0.64), V(0.9, 0.58, -0.58)],
+    info: [GWp, V(0.82, 0.8, 0.2), V(0.84, 0.88, 0.09)]
+  };
+  const CUL_H = { diag: 0xffc04d, motor: 0xf39a2b, sasiu: 0xe8503a, confort: 0x5cbf5a, info: 0x9b6ad6 }, CUL_L = 0x8a5a2b;
+  const curbe = {}, tub = {}, matB = {};
+  const torsadat = (curba, b, r = 0.004) => {
+    const L = curba.getLength(), n = Math.max(30, Math.round(L / 0.005)), fr = curba.computeFrenetFrames(n, false), a = [], c = [];
     for (let i = 0; i <= n; i++) { const u = i / n, p = curba.getPointAt(u), th = u * L / 0.03 * 2 * Math.PI, N = fr.normals[i], B = fr.binormals[i];
-      a.push(p.clone().addScaledVector(N, Math.cos(th) * 0.006).addScaledVector(B, Math.sin(th) * 0.006));
-      b.push(p.clone().addScaledVector(N, -Math.cos(th) * 0.006).addScaledVector(B, -Math.sin(th) * 0.006)); }
+      a.push(p.clone().addScaledVector(N, Math.cos(th) * 0.0055).addScaledVector(B, Math.sin(th) * 0.0055));
+      c.push(p.clone().addScaledVector(N, -Math.cos(th) * 0.0055).addScaledVector(B, -Math.sin(th) * 0.0055)); }
     const g = new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(a), n, r, 6), mH));
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(b), n, r, 6), mL));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(a), n, r, 5), matB[b].H));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(c), n, r, 5), matB[b].L));
     G.add(g); return g;
   };
-  const tTr = torsadat(trunchi), tDer = {};
-  Object.entries(DER).forEach(([k, pts]) => { tDer[k] = torsadat(new THREE.CatmullRomCurve3(pts)); });
-  // rezistențele de terminare
-  const rez = (p, nume) => { const g = new THREE.Group(); g.position.copy(p); G.add(g);
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 16), new THREE.MeshStandardMaterial({ color: 0xd8c08a, roughness: 0.6 })); c.rotation.z = Math.PI / 2; g.add(c);
-    [-0.012, 0, 0.012].forEach((x, i) => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 0.004, 16), new THREE.MeshStandardMaterial({ color: [0x7a3b10, 0x111111, 0xc62828][i] })); r.rotation.z = Math.PI / 2; r.position.x = x; g.add(r); });
-    const a = new THREE.Object3D(); a.position.y = 0.03; g.add(a); et.push({ obj: a, text: nume, k: nume }); return g; };
-  const r1 = rez(V(2.02, 0.7, -0.42), "R₁ 120 Ω"), r2 = rez(V(1.76, 0.68, 0.58), "R₂ 120 Ω");
-  // marcajul defectului (demonstrație)
-  const mDef = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.75 })); mDef.visible = false; G.add(mDef);
-  const rSupl = rez(V(0.62, 0.46, -0.06), "120 Ω suplimentar"); rSupl.visible = false; et[et.length - 1].filtru = () => rSupl.visible;
-  // mesajele (puncte luminoase care parcurg magistrala)
-  const pach = []; for (let i = 0; i < 10; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff3a0 })); G.add(s); pach.push({ s, u: Math.random(), dir: i % 2 ? 1 : -1, v: 0.35 + Math.random() * 0.25 }); }
-  const DEF = { "": "fără defect", term_lipsa: "terminarea din ESP lipsă", term_supl: "terminare suplimentară 120 Ω", scurt_hl: "CAN-H în scurt cu CAN-L", canl_masa: "CAN-L la masă", intrerupt_esp: "magistrala întreruptă spre ESP", alim_esp: "ESP fără alimentare" };
+  Object.keys(TR).forEach(b => {
+    matB[b] = { H: new THREE.MeshStandardMaterial({ color: CUL_H[b], roughness: 0.6, transparent: true }), L: new THREE.MeshStandardMaterial({ color: CUL_L, roughness: 0.6, transparent: true }) };
+    curbe[b] = new THREE.CatmullRomCurve3(TR[b], false, "catmullrom", 0.3);
+    tub[b] = [torsadat(curbe[b], b)];
+    // derivațiile spre module (din cel mai apropiat punct al trunchiului)
+    (BUS_MOD[b] || []).forEach(k => {
+      if (k === M.MAG[b]?.capat || k === "obd") return;
+      const q = POZ[k], p = V(q[0], q[1], q[2]); let best = 0, dmin = 1e9;
+      for (let i = 0; i <= 60; i++) { const d = curbe[b].getPointAt(i / 60).distanceTo(p); if (d < dmin) { dmin = d; best = i / 60; } }
+      const a = curbe[b].getPointAt(best), mid = a.clone().lerp(p, 0.5); mid.y = Math.min(a.y, p.y) - 0.02;
+      tub[b].push(torsadat(new THREE.CatmullRomCurve3([a, mid, p.clone().add(V(-q[3] / 2 - 0.01, 0, 0))]), b, 0.0035));
+    });
+  });
+  // Ethernet auto (100BASE-T1, pereche verde) spre cameră, infotainment, bord, telematică și DoIP la priza OBD
+  const mEth = new THREE.MeshStandardMaterial({ color: 0x2fae5a, roughness: 0.6, transparent: true }), eth = new THREE.Group(); G.add(eth);
+  [["cam", [V(0.8, 0.95, 0.25), V(0.6, 1.25, 0.05)]], ["hu", [V(0.9, 0.75, 0.2)]], ["ki", [V(0.9, 0.8, -0.1)]], ["ocu", [V(0.55, 1.05, 0.5), V(0.3, 1.33, 0.2)]], ["obd", [V(0.86, 0.45, 0.0)]]].forEach(([k, via]) => {
+    const q = POZ[k]; eth.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([GWp.clone().add(V(0, -0.02, 0)), ...via, V(q[0], q[1], q[2])]), 60, 0.003, 5), mEth));
+  });
+  // rezistențele de terminare (în gateway – una pe fiecare magistrală – și în modulele de capăt / conectorul de diagnoză)
+  const rezist = [];
+  const rez = (p, b, k) => { const g = new THREE.Group(); g.position.copy(p); G.add(g);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.04, 14), new THREE.MeshStandardMaterial({ color: 0xd8c08a, roughness: 0.6 })); c.rotation.z = Math.PI / 2; g.add(c);
+    [-0.01, 0, 0.01].forEach((x, i) => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.004, 14), new THREE.MeshStandardMaterial({ color: [0x7a3b10, 0x111111, 0xc62828][i] })); r.rotation.z = Math.PI / 2; r.position.x = x; g.add(r); });
+    rezist.push({ g, b, k }); return g; };
+  Object.keys(TR).forEach(b => { const pts = TR[b]; rez(pts[pts.length - 1].clone().add(V(0, 0.035, 0)), b, "capat"); });
+  const rSupl = rez(V(0, 0, 0), "", "supl"); rSupl.visible = false;
+  // marcajul defectului
+  const mDef = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.75, depthTest: false })); mDef.visible = false; mDef.renderOrder = 5; G.add(mDef);
+  // mesajele: puncte luminoase pe fiecare magistrală
+  const pach = []; Object.keys(TR).forEach(b => { const n = b === "diag" ? 2 : b === "confort" ? 8 : 5; for (let i = 0; i < n; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff3a0 })); G.add(s); pach.push({ s, b, u: Math.random(), dir: i % 2 ? 1 : -1, v: 0.3 + Math.random() * 0.3 }); } });
+  // sondele aparatelor (în simulator): la priza OBD sau la conectorul gateway-ului al magistralei măsurate
+  const sonde = new THREE.Group(); G.add(sonde);
+  const mS1 = new THREE.MeshStandardMaterial({ color: 0xffd400 }), mS2 = new THREE.MeshStandardMaterial({ color: 0x4fd6ff });
+  [mS1, mS2].forEach((m, i) => { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.12, 10), m); t.position.set(0, 0.06, i ? 0.015 : -0.015); sonde.add(t); });
+  sonde.visible = false;
+
+  const DEF = Object.assign({ "": "fără defect" }, M.TIPURI_DEF);
+  const optMag = Object.entries(M.MAG).map(([k, m]) => `<option value="${k}">${m.n}</option>`).join("");
+  const optMod = ["gw", "obd"].concat(M.MODULE.filter(m => m.k !== "gw").map(m => m.k)).map(k => `<option value="${k}">${k === "obd" ? "Priza de diagnoză OBD (J1962)" : M.MK[k].nume}</option>`).join("");
   const html = `
     <div class="v3d-grup">
-      <button type="button" data-s-act="contact">Pune contactul</button>
-      <label>Modulul <select data-s="mod">${Object.entries(MOD).map(([k, m]) => `<option value="${k}">${m.n}</option>`).join("")}</select></label>
+      ${CTL ? "" : `<button type="button" data-s-act="contact">Decuplează contactul</button>`}
+      <label>Magistrala afișată <select data-s="fil"><option value="">toate magistralele</option>${optMag}</select></label>
+      <label>Modulul <select data-s="mod">${optMod}</select></label>
       <button type="button" data-s-act="vezi">Arată modulul</button>
       <span class="v3d-et">sau clic pe modul, în machetă</span>
     </div>
-    <div class="v3d-grup">
-      <label>Defect (demonstrație) <select data-s="def">${Object.entries(DEF).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
-    </div>`;
-  const stare = { contact: true, sel: "ecm", def: "", t: 0, tc: 0 };
+    ${CTL ? "" : `<div class="v3d-grup">
+      <label>Defect (demonstrație) pe <select data-s="dbus">${M.CHEI_MAG.map(k => `<option value="${k}">${M.MAG[k].n}</option>`).join("")}</select></label>
+      <select data-s="def">${Object.entries(DEF).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select>
+    </div>`}
+    <div class="v3d-grup v3d-legenda">${Object.entries(CUL_H).map(([b, c]) => `<span><i style="background:#${c.toString(16).padStart(6, "0")}"></i>${M.MAG[b].n.split(" (")[0]}</span>`).join("")}<span><i style="background:#8a5a2b"></i>CAN-L (toate)</span><span><i style="background:#2fae5a"></i>Ethernet 100BASE-T1</span></div>`;
+  const stare = { contact: true, sel: "gw", fil: "", defBus: "motor", def: "", t: 0, tc: 0, punct: "diag" };
   let API = null, S0 = null, cv = null;
   const v3 = new THREE.Vector3();
-  function arata(k) { const o = ancore[k]; if (!o || !API) return; o.getWorldPosition(v3); const d = V(0.8, 0.6, v3.z >= 0 ? 0.9 : -0.9).normalize().multiplyScalar(1.1); API.zboara([v3.x + d.x, v3.y + d.y, v3.z + d.z], [v3.x, v3.y, v3.z]); }
+  function st0() { return S0 || stare; }
+  function citesteCtl(st) { if (!CTL) return; const c = CTL.stare(); st.contact = c.contact; st.defBus = c.defBus; st.def = c.defTip || ""; st.arata = !!c.arataDefect; st.punct = c.punct || "diag"; st.sonde = !!c.sonde; }
+  function prFals(st) { return { T: { diag: [120, 120], motor: [120, 120], sasiu: [120, 120], confort: [120, 120], info: [120, 120] }, S: { diag: 3, motor: 40, sasiu: 35, confort: 30, info: 30 }, rec: 2.5, dH: 3.5, dL: 1.5, n10: 8, n20: 10, n100: 12, defBus: st.defBus, defect: st.def }; }
+  function raspunde(st, k) { if (k === "obd") return true; if (!st.contact) return false; return M.raspunde(prFals(st), !!st.def, k); }
+  function vizibilEt(k) { const st = st0(); return !st.fil || BUSOF[k] === st.fil || k === "gw" || (st.fil === "diag" && k === "obd"); }
+  function arata(k) { const o = ancore[k]; if (!o || !API) return; o.getWorldPosition(v3); const d = V(0.7, 0.75, v3.z >= 0 ? 0.9 : -0.9).normalize().multiplyScalar(1.05); API.zboara([v3.x + d.x, v3.y + d.y, v3.z + d.z], [v3.x, v3.y, v3.z]); }
   function aplica(st) {
-    const d = st.def;
-    rSupl.visible = d === "term_supl"; r2.visible = d !== "term_lipsa";
-    corpuri.esp.children[0].material.color.set(d === "alim_esp" ? 0x3a3d42 : 0x9aa2ab);
-    const P = { term_lipsa: V(1.76, 0.68, 0.58), scurt_hl: V(0.6, 0.45, -0.1), canl_masa: V(0.8, 0.5, 0.42), intrerupt_esp: V(1.5, 0.64, 0.55), alim_esp: V(1.68, 0.8, 0.58) }[d];
+    const vis = !CTL || st.arata, e = st.def, b = st.defBus, cap = M.MAG[b].capat;
+    rezist.forEach(r => { if (r.k === "capat") r.g.visible = !(vis && e === "term_lipsa" && r.b === b); });
+    rSupl.visible = vis && e === "term_supl"; if (rSupl.visible) rSupl.position.copy(curbe[b].getPointAt(0.55)).add(V(0, 0.03, 0));
+    let P = null;
+    if (vis && e) { const q = POZ[cap]; P = { term_lipsa: TR[b][TR[b].length - 1].clone().add(V(0, 0.035, 0)), term_supl: curbe[b].getPointAt(0.55), scurt_hl: curbe[b].getPointAt(0.3), canl_masa: curbe[b].getPointAt(0.45), intrerupt: curbe[b].getPointAt(0.88), alim: V(q[0], q[1] + 0.06, q[2]) }[e]; }
     mDef.visible = !!P; if (P) mDef.position.copy(P);
-    mL.color.set(d === "canl_masa" ? 0xff4040 : 0x3f8fe0);
   }
-  const com = st => st.contact && st.def !== "scurt_hl";
   function leaga(cmd, st) {
-    S0 = st;
-    const bc = cmd.querySelector('[data-s-act="contact"]'); const txt = () => bc.textContent = st.contact ? "Decuplează contactul" : "Pune contactul"; txt();
-    bc.addEventListener("click", () => { st.contact = !st.contact; txt(); });
-    const sm = cmd.querySelector('[data-s="mod"]'); sm.addEventListener("change", () => { st.sel = sm.value; });
+    S0 = st; citesteCtl(st);
+    const bc = cmd.querySelector('[data-s-act="contact"]');
+    if (bc) { const txt = () => bc.textContent = st.contact ? "Decuplează contactul" : "Pune contactul"; txt(); bc.addEventListener("click", () => { st.contact = !st.contact; txt(); }); }
+    const sm = cmd.querySelector('[data-s="mod"]'); sm.addEventListener("change", () => { st.sel = sm.value; if (CTL && CTL.onSelect) CTL.onSelect(st.sel); });
+    const sf = cmd.querySelector('[data-s="fil"]'); sf.addEventListener("change", () => { st.fil = sf.value; });
     cmd.querySelector('[data-s-act="vezi"]').addEventListener("click", () => arata(st.sel));
-    const sd = cmd.querySelector('[data-s="def"]'); sd.addEventListener("change", () => { st.def = sd.value; aplica(st); });
+    const sd = cmd.querySelector('[data-s="def"]'), sb = cmd.querySelector('[data-s="dbus"]');
+    if (sd) { sd.addEventListener("change", () => { st.def = sd.value; aplica(st); }); sb.addEventListener("change", () => { st.defBus = sb.value; st.punct = sb.value; aplica(st); }); }
     aplica(st);
   }
+  const tintaPunct = b => b === "diag" ? V(0.86, 0.5, -0.3) : GWp.clone().add(V(-0.02, 0.0, 0));
+  let ultimCtl = "";
   function pas(dt, st) {
-    st.t += dt; st.tc += dt * 2e-5;                                  // timpul semnalelor: 20 µs pe secundă reală
-    const c = com(st);
+    st.t += dt; st.tc += dt * 2e-5;
+    if (CTL) { citesteCtl(st); const ch = [st.def, st.defBus, st.arata].join("|"); if (ch !== ultimCtl) { ultimCtl = ch; aplica(st); } }
+    const busMort = b => !st.contact || (st.def === "scurt_hl" && b === st.defBus);
     pach.forEach(p => {
-      p.s.visible = c;
-      if (!c) return;
-      p.u += p.dir * p.v * dt / (Ltr / 2);
-      let lim = 1; if (st.def === "intrerupt_esp") lim = 0.86;
+      const ok = !busMort(p.b); p.s.visible = ok && (!st.fil || st.fil === p.b);
+      if (!ok) return;
+      p.u += p.dir * p.v * dt / Math.max(0.5, curbe[p.b].getLength() / 1.5);
+      let lim = 1; if (st.def === "intrerupt" && p.b === st.defBus) lim = 0.85;
       if (p.u > lim) { p.u = lim; p.dir = -1; } if (p.u < 0) { p.u = 0; p.dir = 1; }
-      p.s.position.copy(trunchi.getPointAt(clamp(p.u, 0, 1)));
-      p.s.material.color.set(st.def === "canl_masa" && Math.random() < 0.2 ? 0xff5050 : 0xfff3a0);
+      p.s.position.copy(curbe[p.b].getPointAt(clamp(p.u, 0, 1)));
+      p.s.material.color.set(st.def === "canl_masa" && p.b === st.defBus && Math.random() < 0.25 ? 0xff5050 : 0xfff3a0);
     });
     const pul = 0.5 + 0.5 * Math.sin(st.t * 6);
-    Object.entries(corpuri).forEach(([k, g]) => { const m = g.children[0].material; m.emissive.setRGB(k === st.sel ? 0.1 + 0.4 * pul : 0, k === st.sel ? 0.4 + 0.4 * pul : 0, k === st.sel ? 0.9 * pul : 0); });
+    Object.entries(corpuri).forEach(([k, g]) => {
+      const m = matMod[k], sel = k === st.sel, filtrat = st.fil && !vizibilEt(k);
+      m.opacity = filtrat ? 0.15 : 1; m.depthWrite = !filtrat;
+      const mut = st.contact && !raspunde(st, k) && (st.arata || !CTL);
+      m.emissive.setRGB(sel ? 0.1 + 0.4 * pul : mut ? 0.35 * pul : 0, sel ? 0.4 + 0.4 * pul : 0, sel ? 0.9 * pul : 0);
+    });
+    Object.entries(matB).forEach(([b, mm]) => { const o = st.fil && st.fil !== b ? 0.12 : 1; mm.H.opacity = mm.L.opacity = o; mm.H.depthWrite = mm.L.depthWrite = o === 1; });
+    mEth.opacity = st.fil ? 0.15 : 1;
+    rezist.forEach(r => { if (r.k === "capat") r.g.children.forEach(c => { c.material.transparent = true; c.material.opacity = st.fil && st.fil !== r.b ? 0.15 : 1; }); });
     mDef.material.opacity = 0.45 + 0.4 * pul;
+    sonde.visible = !!st.sonde; if (st.sonde) sonde.position.copy(tintaPunct(st.punct));
   }
-  // semnalele CAN la priza de diagnoză (500 kbit/s, cadre de 125 biți la încărcare ≈ 40 %)
+  // semnalele CAN la punctul de măsură (500 kbit/s; pe CAN FD faza de date la 2 Mbit/s)
   const h = n => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
   const bitD = b => { const Tf = 312, k = Math.floor(b / Tf), p = b - k * Tf; if (p >= 125) return 0; if (p === 0 || p === 115) return 1; if (p > 115) return 0; return h(k * 131 + p) < 0.5 ? 1 : 0; };
-  function niv(st) {
-    const d = st.def;
-    if (!st.contact) return { rH: 0, rL: 0, dH: 0, dL: 0 };
-    if (d === "scurt_hl") return { rH: 2.5, rL: 2.5, dH: 2.5, dL: 2.5 };
-    if (d === "canl_masa") return { rH: 0.04, rL: 0, dH: 1.8, dL: 0 };
-    if (d === "term_supl") return { rH: 2.5, rL: 2.5, dH: 3.3, dL: 1.7 };
-    if (d === "term_lipsa" || d === "intrerupt_esp") return { rH: 2.5, rL: 2.5, dH: 3.6, dL: 1.4 };
-    return { rH: 2.5, rL: 2.5, dH: 3.5, dL: 1.5 };
+  function niv(st, b) {
+    if (!st.contact) return { rH: 0, rL: 0, dH: 0, dL: 0, com: false };
+    const n = M.niveluri(prFals(st), !!st.def, b); return n;
   }
-  function sCan(t, st) {
-    if (!com(st)) return 0;
-    const b = Math.floor(t * 5e5), dtb = t * 5e5 - b, v = bitD(b), vp = bitD(b - 1);
+  function sCan(t, st, b) {
+    const n = niv(st, b); if (!n.com) return 0;
+    const bb = Math.floor(t * 5e5), dtb = t * 5e5 - bb; let v = bitD(bb), vp = bitD(bb - 1);
+    if (b === "sasiu") { const Tf = 312, p = bb - Math.floor(bb / Tf) * Tf; if (p > 30 && p < 50) { const sb = Math.floor(t * 2e6); v = h(sb * 7.1) < 0.5 ? 1 : 0; vp = h((sb - 1) * 7.1) < 0.5 ? 1 : 0; } }
     let s = v; if (v !== vp) s = vp + (v - vp) * (1 - Math.exp(-dtb / 0.015));
-    if ((st.def === "term_lipsa" || st.def === "intrerupt_esp") && v !== vp) s += (v - vp) * 0.28 * Math.exp(-dtb / 0.06) * Math.sin(2 * Math.PI * dtb / 0.05);
+    if ((st.def === "term_lipsa" || st.def === "intrerupt") && b === st.defBus && v !== vp) s += (v - vp) * 0.28 * Math.exp(-dtb / 0.06) * Math.sin(2 * Math.PI * dtb / 0.05);
     return s;
   }
   function api(a) {
     API = a;
-    cv = document.createElement("canvas"); cv.className = "v3d-osc"; a.scena.appendChild(cv);
+    if (!CTL) { cv = document.createElement("canvas"); cv.className = "v3d-osc"; a.scena.appendChild(cv); }
     const ray = new THREE.Raycaster(), m = new THREE.Vector2(); let jos = null;
     a.canvas.addEventListener("pointerdown", e => { jos = [e.clientX, e.clientY]; });
     a.canvas.addEventListener("pointerup", e => {
       if (!jos || Math.hypot(e.clientX - jos[0], e.clientY - jos[1]) > 5) return;
       const r = a.canvas.getBoundingClientRect(); m.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
-      ray.setFromCamera(m, a.camera); const hit = ray.intersectObjects(Object.values(corpuri), true)[0];
-      if (hit) { let o = hit.object; while (o && !o.userData.c) o = o.parent; if (o && S0) { S0.sel = o.userData.c; const s = a.scena.parentElement.querySelector('[data-s="mod"]'); if (s) s.value = S0.sel; } }
+      ray.setFromCamera(m, a.camera); const tinte = Object.entries(corpuri).filter(([k]) => vizibilEt(k)).map(([, g]) => g);
+      const hit = ray.intersectObjects(tinte, true)[0];
+      if (hit) { let o = hit.object; while (o && !o.userData.c) o = o.parent; if (o && S0) { S0.sel = o.userData.c; const s = a.scena.parentElement.querySelector('[data-s="mod"]'); if (s) s.value = S0.sel; if (CTL && CTL.onSelect) CTL.onSelect(S0.sel); } }
     });
   }
   function dupaRandare(st) {
     if (!cv) return;
-    const W = 330, H = 210, dpr = window.devicePixelRatio || 1, sc = (cv.clientWidth || W) / W;
+    const W = 330, H = 210, dpr = window.devicePixelRatio || 1, sc = (cv.clientWidth || W) / W, b = st.punct || "diag";
     const hcss = Math.round(H * sc) + "px"; if (cv.style.height !== hcss) cv.style.height = hcss;
     if (cv.width !== Math.round(W * sc * dpr) || cv.height !== Math.round(H * sc * dpr)) { cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); }
     const g = cv.getContext("2d"); g.setTransform(dpr * sc, 0, 0, dpr * sc, 0, 0);
@@ -1293,27 +1357,29 @@ function construiesteRetea({ caroserie }) {
     for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(10 + i * 31, top); g.lineTo(10 + i * 31, top + hz); g.stroke(); }
     for (let j = 0; j <= 8; j++) { const y = top + j * hz / 8; g.beginPath(); g.moveTo(10, y); g.lineTo(320, y); g.stroke(); }
     g.strokeStyle = "rgba(160,230,190,.6)"; g.beginPath(); g.moveTo(10, top + hz * 5 / 8); g.lineTo(320, top + hz * 5 / 8); g.stroke();
-    const n = niv(st), Tf = 40e-6, Tfr = 312 / 5e5, t0 = Math.floor(st.tc / Tfr) * Tfr - 2e-6;
+    const n = niv(st, b), Tf = b === "sasiu" ? 60e-6 : 40e-6, Tfr = 312 / 5e5, t0 = Math.floor(st.tc / Tfr) * Tfr - 2e-6;
     const Ysus = u => top + (1 - u / 4) * hz * 5 / 8, Yjos = u => top + hz * 5 / 8 + (1 - (u + 0.5) / 3) * hz * 3 / 8;
-    const urma = (f, Y, col) => { g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath(); for (let i = 0; i <= 500; i++) { const t = t0 + Tf * i / 500, y = Y(f(t)); i ? g.lineTo(10 + i / 500 * 310, y) : g.moveTo(10, y); } g.stroke(); };
-    const H_ = t => n.rH + (n.dH - n.rH) * sCan(t, st), L_ = t => n.rL + (n.dL - n.rL) * sCan(t, st);
+    const urma = (f, Y, col) => { g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath(); for (let i = 0; i <= 600; i++) { const t = t0 + Tf * i / 600, y = Y(f(t)); i ? g.lineTo(10 + i / 600 * 310, y) : g.moveTo(10, y); } g.stroke(); };
+    const H_ = t => n.rH + (n.dH - n.rH) * sCan(t, st, b), L_ = t => n.rL + (n.dL - n.rL) * sCan(t, st, b);
     urma(H_, Ysus, "#ffe14d"); urma(L_, Ysus, "#4fd6ff"); urma(t => H_(t) - L_(t), Yjos, "#ff6bd6");
-    g.font = "600 11px system-ui"; g.fillStyle = "#9fe6c0"; g.fillText("Priza OBD: CAN-H (pin 6), CAN-L (pin 14)", 10, 15);
-    g.textAlign = "right"; g.fillText("4 µs/div · 1 V/div", 320, 15); g.textAlign = "left";
+    g.font = "600 11px system-ui"; g.fillStyle = "#9fe6c0"; g.fillText(b === "diag" ? "Priza OBD – CAN diagnoză" : "Gateway – " + M.MAG[b].n.split(" (")[0], 10, 15);
+    g.textAlign = "right"; g.fillText(`${Tf * 1e5} µs/div · 1 V/div`, 320, 15); g.textAlign = "left";
     g.font = "10px system-ui"; g.fillStyle = "#ffe14d"; g.fillText("CAN-H", 14, top + 12); g.fillStyle = "#4fd6ff"; g.fillText("CAN-L", 54, top + 12); g.fillStyle = "#ff6bd6"; g.fillText("U_diff = H − L", 14, top + hz * 5 / 8 + 12);
-    g.fillStyle = "#9fe6c0"; g.fillText(!st.contact ? "rețea în repaus (contact decuplat)" : com(st) ? "trafic: 500 kbit/s" : "fără comunicare: ambele linii ≈ 2,5 V", 10, H - 5);
+    g.fillStyle = "#9fe6c0"; g.fillText(!st.contact ? "rețea în repaus (contact decuplat)" : n.com ? (b === "sasiu" ? "CAN FD: arbitrare 500 kbit/s, date 2 Mbit/s" : "trafic: 500 kbit/s") : "fără comunicare: ambele linii ≈ 2,5 V", 10, H - 5);
   }
-  const fR = d => ({ term_lipsa: "≈ 120 Ω", intrerupt_esp: "≈ 120 Ω", term_supl: "≈ 40 Ω", scurt_hl: "≈ 0 Ω" }[d] || "≈ 60 Ω");
+  const fR = (st, b) => { const e = st.def && st.defBus === b ? st.def : ""; return { term_lipsa: "≈ 120 Ω", intrerupt: "≈ 120 Ω", term_supl: "≈ 40 Ω", scurt_hl: "≈ 0 Ω" }[e] || "≈ 60 Ω"; };
   function hud(st) {
-    const m = MOD[st.sel], d = st.def, mut = (st.sel === "esp" && (d === "intrerupt_esp" || d === "alim_esp")) || (d === "scurt_hl" && st.sel !== "obd");
-    return `<div><b>${m.n}</b></div><div style="max-width:16rem;white-space:normal">${m.f}</div>
-      ${m.msg ? `<div>mesaje proprii: <b>${m.msg}</b> ID-uri</div>` : ""}
-      <div>comunicație: <b>${!st.contact ? "repaus" : mut ? "nu răspunde" : d === "canl_masa" ? "cu erori" : "normală"}</b></div>
-      <div>R pin 6 – 14 (repaus): <b>${fR(d)}</b></div>
-      ${d ? `<div class="v3d-blocare">${DEF[d]}</div>` : ""}`;
+    const k = st.sel, b = BUSOF[k], m = M.MK[k];
+    const r = raspunde(st, k), ascuns = CTL && !st.arata;
+    return `<div><b>${k === "obd" ? "Priza de diagnoză OBD (J1962)" : m.nume}</b></div>
+      <div>magistrala: <b>${b === "gw" ? "toate (gateway)" : M.MAG[b].n.split(" (")[0]}</b>${m ? ` · adresă ${m.adr}` : ""}</div>
+      ${k === "obd" ? `<div style="max-width:17rem;white-space:normal">pin 6/14 CAN diagnoză · 3/11 și 12/13 Ethernet DoIP · 8 activare DoIP · 4/5 masă · 16 +12 V</div>` : ""}
+      ${b !== "gw" && M.MAG[b] && M.MAG[b].capat === k ? `<div>conține terminarea de 120 Ω a magistralei</div>` : ""}
+      ${k !== "obd" ? `<div>comunicație: <b>${!st.contact ? "repaus" : ascuns ? "—" : r ? "răspunde" : "nu răspunde"}</b></div>` : ""}
+      ${!ascuns && st.def ? `<div class="v3d-blocare">${M.MAG[st.defBus].n.split(" (")[0]}: ${M.TIPURI_DEF[st.def]}</div>` : ""}`;
   }
   return { etichete: et, html, leaga, pas, hud, stare, api, dupaRandare,
-    camere: { retea: [[2.6, 2.4, 2.4], [1.1, 0.55, 0.05]], bord: [[0.2, 1.3, -1.3], [0.85, 0.7, -0.3]], motor: [[3.0, 1.6, 0.9], [1.75, 0.6, 0.05]] },
-    camereButoane: [["retea", "toată rețeaua"], ["motor", "compartimentul motor"], ["bord", "bord / priza OBD"]],
-    cameraInitiala: [[3.6, 2.6, 3.0], [1.0, 0.55, 0.05]] };
+    camere: { retea: [[3.2, 3.4, 3.0], [0.2, 0.55, 0.0]], motor: [[3.0, 1.6, 0.9], [1.75, 0.55, 0.0]], bord: [[0.1, 1.35, -1.2], [0.86, 0.72, -0.15]], spate: [[-4.0, 2.2, 2.0], [-1.6, 0.6, 0]] },
+    camereButoane: [["retea", "toată rețeaua"], ["motor", "compartimentul motor"], ["bord", "bord / gateway / OBD"], ["spate", "spate / portbagaj"]],
+    cameraInitiala: [[3.9, 3.0, 3.4], [0.3, 0.55, 0.0]] };
 }

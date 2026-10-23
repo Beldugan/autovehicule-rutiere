@@ -412,3 +412,26 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .nota-indrumar { border: 1px dashed var(--accent, #1f6fb2); border-radius: 10px; padding: .4rem .9rem .6rem; margin: 1rem 0; background: color-mix(in srgb, var(--accent, #1f6fb2) 6%, transparent); }
 .nota-indrumar h3 { margin: .4rem 0; }
 .comutator-aparat:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v3d-legenda { font-size: .78rem; gap: .3rem .9rem; }
+.v3d-legenda span { display: inline-flex; align-items: center; gap: .3rem; }
+.v3d-legenda i { display: inline-block; width: 18px; height: 5px; border-radius: 3px; }
+/* ---- DA L1 (2025): machetă / schemă, tester ca tabletă, multimetru desenat */
+.vedere-sim { position: relative; }
+.comutator-vedere { display: inline-flex; gap: .25rem; margin: 0 0 .4rem; }
+.comutator-vedere button { font-size: .8rem; padding: .25rem .7rem; }
+.comutator-vedere button[aria-pressed="true"] { background: var(--accent); color: var(--pe-accent); border-color: var(--accent); }
+.sim-scena > .btn-ecran + .vedere-sim .comutator-vedere { margin-left: 9.5rem; }
+.tableta { background: #15181c; border-radius: 16px; padding: 10px 10px 14px; box-shadow: inset 0 0 0 2px #2b3036, 0 6px 16px rgba(0, 0, 0, .25); margin: .5rem 0; }
+.tableta .ecran-tester { margin: 0; border-radius: 6px; }
+.tableta.telefon { border-radius: 22px; padding: 14px 10px 18px; }
+.tester-antet { display: flex; justify-content: space-between; gap: .5rem; background: #b3261e; color: #fff; font-size: .72rem; font-weight: 700; padding: .25rem .5rem; margin: -.5rem -.6rem .5rem; border-radius: 6px 6px 0 0; }
+.tester-antet.obd { background: #4a3a7a; }
+.ecran-tester tr.sep td { background: #1c2833; color: #ffd36b; font-size: .74rem; padding-top: .35rem; }
+.mm-aparat { display: flex; justify-content: center; margin: .3rem 0 .5rem; }
+.mm-aparat svg { width: 150px; height: auto; }
+.sim-grila:fullscreen .vedere-sim, .sim-grila.ecran-plin .vedere-sim { grid-row: 1 / span 2; }
+.sim-grila:fullscreen .vedere-sim .v3d-scena, .sim-grila.ecran-plin .vedere-sim .v3d-scena { height: calc(100vh - 14rem); }
+.vedere-sim .v3d-scena .btn-ecran { display: none; }
+.tester-antet { font-size: .66rem; flex-wrap: wrap; }
+.ecran-tester table.x431 { font-size: .74rem; }
+.ecran-tester table.x431 td:first-child { font-family: ui-monospace, monospace; font-size: .7rem; white-space: nowrap; }
