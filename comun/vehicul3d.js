@@ -953,6 +953,8 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     const ss = cmd.querySelector('[data-s="sist"]');
     ss.addEventListener("change", () => { st.sist = ss.value; sel.innerHTML = optiuniSist(st.sist); st.sel = sel.value; st.buf = []; aplicaSistem(st); });
     elSel = sel; elSist = ss; aplicaSistem(st);
+    if (optiuni.selInitial && DK[optiuni.selInitial]) { st.sel = optiuni.selInitial; st.sist = DK[st.sel].s; ss.value = st.sist; sel.innerHTML = optiuni.sistSel || optiuniSist(st.sist); sel.value = st.sel; aplicaSistem(st); }
+    (optiuni.canale || []).forEach((k, j) => { if (DK[k] && st.ch[j + 1]) { st.ch[j + 1].k = k; st.ch[j + 1].on = true; } });
     cmd.querySelector('[data-s-act="vezi"]').addEventListener("click", () => arata(st.sel));
     const td = cmd.querySelector('[data-s="tdiv"]'); td.addEventListener("change", () => { st.tdiv = td.value; st.buf = []; });
     [1, 2, 3].forEach(i => {

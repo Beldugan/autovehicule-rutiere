@@ -435,3 +435,10 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .tester-antet { font-size: .66rem; flex-wrap: wrap; }
 .ecran-tester table.x431 { font-size: .74rem; }
 .ecran-tester table.x431 td:first-child { font-family: ui-monospace, monospace; font-size: .7rem; white-space: nowrap; }
+/* ---- SAA L1 */
+.mini-grila { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .5rem; }
+.mini-grafic { width: 100%; height: auto; color: var(--text); }
+.cantar svg { width: 100%; height: auto; display: block; }
+.rand-butoane.regimuri button[aria-pressed="true"] { background: var(--accent); color: var(--pe-accent); border-color: var(--accent); }
+.rand-butoane.mic button { font-size: .76rem; padding: .3rem .4rem; }
+#cv-obd { width: 100%; display: block; border-radius: 6px; margin-top: .4rem; touch-action: none; }

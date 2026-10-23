@@ -44,6 +44,7 @@ const PORTAL = {
     SAA: {
       nume: "Sisteme auxiliare ale autovehiculelor", an: "anul IV", sem: 1, cod: "MR4104", tip: "Laborator", dosar: "saa",
       indrumar: "Îndrumar de laborator – Sisteme auxiliare ale autovehiculelor (A.-M. Beldugan, 2026)",
+      pdf: "saa/indrumar-sisteme-auxiliare.pdf",
       endpoint: "",
       lucrari: [
         "Sistemul de injecție de benzină multipunct – caracteristicile de funcționare (motorul 1.4 MPI)",
@@ -81,5 +82,5 @@ const PORTAL = {
     }
   },
   /** lucrările deja realizate în portal: cod → cale */
-  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "da-l1": "da/l1/", "da-l2": "da/l2/" }
+  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "da-l1": "da/l1/", "da-l2": "da/l2/", "saa-l1": "saa/l1/" }
 };
