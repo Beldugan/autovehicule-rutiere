@@ -128,10 +128,12 @@ export function creeaza(gazda, optiuni = {}) {
   gazda.innerHTML = `
     <div class="v3d-scena"><canvas></canvas><div class="v3d-etichete"></div>
       <div class="v3d-hud"></div>
+      <button type="button" class="btn-ecran">⛶ Ecran complet</button>
       <div class="v3d-ajutor">Trageți pentru rotire · rotița / ciupire pentru zoom · clic dreapta / 2 degete pentru deplasare</div>
     </div>
     <div class="v3d-comenzi"></div>`;
   const canvas = gazda.querySelector("canvas"), scena = gazda.querySelector(".v3d-scena");
+  if (typeof ecranComplet === "function") ecranComplet(gazda, scena.querySelector(".btn-ecran")); else scena.querySelector(".btn-ecran").remove();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1075,9 +1077,9 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   }
   function dupaRandare(st) {
     if (!cv) return;
-    const W = 330, H = 170, dpr = window.devicePixelRatio || 1;
-    if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
-    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const W = 330, H = 170, dpr = window.devicePixelRatio || 1, sc = (cv.clientWidth || W) / W;   // desenat în 330×170, scalat la mărimea afișată
+    if (cv.width !== Math.round(W * sc * dpr)) { cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); }
+    const g = cv.getContext("2d"); g.setTransform(dpr * sc, 0, 0, dpr * sc, 0, 0);
     g.fillStyle = "rgba(8,18,14,.92)"; g.fillRect(0, 0, W, H);
     g.strokeStyle = "rgba(120,200,160,.18)"; for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(10 + i * 31, 22); g.lineTo(10 + i * 31, H - 18); g.stroke(); } for (let j = 0; j <= 4; j++) { const y = 22 + j * (H - 40) / 4; g.beginPath(); g.moveTo(10, y); g.lineTo(320, y); g.stroke(); }
     const [Tf, [u0, u1]] = fereastra(st.sel, st), Y = u => 22 + (1 - (u - u0) / (u1 - u0)) * (H - 40);

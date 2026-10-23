@@ -365,3 +365,35 @@ table.x431 td:first-child { text-align: left; }
 @media (max-width: 640px) { .m3d-ajutor { display: none; } }
 .v3d-scena canvas.v3d-osc { position: absolute; right: .6rem; bottom: 2.2rem; width: 330px; height: 170px; border-radius: 8px; border: 1px solid rgba(160, 230, 190, .35); pointer-events: none; }
 @media (max-width: 640px) { .v3d-scena canvas.v3d-osc { width: 220px; height: 113px; } }
+
+/* ---- ecran complet (macheta 3D și osciloscopul) */
+.btn-ecran { position: absolute; z-index: 6; font-size: .78rem; padding: .25rem .6rem; background: rgba(14, 22, 32, .78); color: #fff; border: 1px solid rgba(255, 255, 255, .3); border-radius: 7px; cursor: pointer; }
+.btn-ecran:hover { background: rgba(14, 22, 32, .95); }
+.v3d-scena .btn-ecran { right: .6rem; top: .6rem; }
+.sim-scena { position: relative; }
+.sim-scena > .btn-ecran { left: 1.7rem; top: 1.6rem; }
+html.fara-derulare, html.fara-derulare body { overflow: hidden; }
+.v3d:fullscreen, .v3d.ecran-plin { position: fixed; inset: 0; z-index: 9999; margin: 0; background: var(--fundal); padding: .6rem; display: flex; flex-direction: column; gap: .5rem; overflow: auto; width: 100%; height: 100%; box-sizing: border-box; }
+.v3d:fullscreen .v3d-scena, .v3d.ecran-plin .v3d-scena { flex: 1 1 auto; height: auto; min-height: 55vh; }
+.v3d:fullscreen canvas.v3d-osc, .v3d.ecran-plin canvas.v3d-osc { width: min(560px, 44vw); height: calc(min(560px, 44vw) * .515); }
+.sim-grila:fullscreen, .sim-grila.ecran-plin { position: fixed; inset: 0; z-index: 9999; margin: 0; background: var(--fundal); padding: .6rem; width: 100%; height: 100%; box-sizing: border-box; grid-template-columns: minmax(0, 1fr) 330px; align-items: stretch; overflow: hidden; }
+.sim-grila:fullscreen > .card, .sim-grila.ecran-plin > .card { margin: 0; overflow: auto; }
+.sim-grila:fullscreen .sim-scena, .sim-grila.ecran-plin .sim-scena { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-template-rows: auto 1fr; gap: .6rem; align-content: start; }
+.sim-grila:fullscreen #motor3d, .sim-grila.ecran-plin #motor3d, .sim-grila:fullscreen #svg-motor, .sim-grila.ecran-plin #svg-motor { grid-row: 1 / span 2; }
+.sim-grila:fullscreen .m3d, .sim-grila.ecran-plin .m3d { height: calc(100vh - 3.6rem); }
+.sim-grila:fullscreen .afisaje, .sim-grila.ecran-plin .afisaje { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.sim-grila:fullscreen .osc-cutie, .sim-grila.ecran-plin .osc-cutie { margin: 0; }
+@media (max-width: 980px) {
+  .sim-grila:fullscreen, .sim-grila.ecran-plin { grid-template-columns: minmax(0, 1fr); overflow: auto; }
+  .sim-grila:fullscreen .sim-scena, .sim-grila.ecran-plin .sim-scena { display: block; }
+  .sim-grila:fullscreen .m3d, .sim-grila.ecran-plin .m3d { height: 60vh; }
+  .v3d:fullscreen canvas.v3d-osc, .v3d.ecran-plin canvas.v3d-osc { width: 300px; height: 155px; }
+}
+/* ---- osciloscopul cu 4 canale */
+.osc-canale { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .35rem .6rem; margin: 0 0 .45rem; font-size: .8rem; }
+.osc-canal { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; padding: .3rem .4rem; border-radius: 7px; background: rgba(255, 255, 255, .05); border-left: 4px solid var(--cc); }
+.osc-canal b { color: var(--cc); min-width: 2.2rem; }
+.osc-canal input { accent-color: var(--cc); }
+.osc-canal select { padding: .15rem .3rem; font-size: .78rem; color: #10161b; background: #e6ecf1; border: 1px solid #9aa6b1; border-radius: 6px; max-width: 100%; }
+.osc-canal select[data-ch-c] { flex: 1 1 9rem; min-width: 0; }
+.osc-canal.oprit { opacity: .55; }

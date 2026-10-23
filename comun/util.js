@@ -45,3 +45,21 @@ const Stocare = {
   scrie(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } },
   sterge(k) { try { localStorage.removeItem(k); } catch (e) { } }
 };
+
+/* Ecran complet pentru un element (machetă 3D + osciloscop). Unde API-ul Fullscreen lipsește (iPhone),
+   elementul se întinde peste toată fereastra prin clasa .ecran-plin. */
+function ecranComplet(el, btn) {
+  const nativ = () => (document.fullscreenElement || document.webkitFullscreenElement) === el;
+  const activ = () => nativ() || el.classList.contains("ecran-plin");
+  const eticheta = () => { btn.textContent = activ() ? "✕ Ieșire din ecran complet" : "⛶ Ecran complet"; btn.setAttribute("aria-pressed", activ() ? "true" : "false"); };
+  const plin = on => { el.classList.toggle("ecran-plin", on); document.documentElement.classList.toggle("fara-derulare", on); eticheta(); };
+  btn.addEventListener("click", () => {
+    if (activ()) { if (nativ()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else plin(false); return; }
+    const f = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!f) return plin(true);
+    try { const p = f.call(el); if (p && p.catch) p.catch(() => plin(true)); } catch (e) { plin(true); }
+  });
+  ["fullscreenchange", "webkitfullscreenchange"].forEach(ev => document.addEventListener(ev, eticheta));
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && el.classList.contains("ecran-plin")) plin(false); });
+  eticheta();
+}
