@@ -17,7 +17,9 @@ const COMP = {
   inj1: { nume: "Injectorul cilindrului 1", tip: "act", x: 336, y: 140 }, inj2: { nume: "Injectorul cilindrului 2", tip: "act", x: 406, y: 140 },
   inj3: { nume: "Injectorul cilindrului 3", tip: "act", x: 476, y: 140 }, inj4: { nume: "Injectorul cilindrului 4", tip: "act", x: 546, y: 140 },
   clap: { nume: "Corpul clapetei electronice (motor de acționare)", tip: "act", x: 236, y: 92 },
-  can: { nume: "Supapa de purjare a canistrei", tip: "act", x: 150, y: 178 }
+  can: { nume: "Supapa de purjare a canistrei", tip: "act", x: 150, y: 178 },
+  cmp: { nume: "Senzorul de fază CMP (Hall, arborele cu came)", tip: "senzor", x: 600, y: 120 },
+  knock: { nume: "Senzorul de detonație (piezoelectric)", tip: "senzor", x: 420, y: 260 }
 };
 const SENZ = ["ckp", "ect", "iat", "map", "tps", "l1", "l2"], ACT = ["inj1", "inj2", "inj3", "inj4", "clap", "can"];
 
@@ -61,6 +63,8 @@ function semnal(c, t) {
       const dt = ph - ti;
       return ub + 52 * Math.exp(-dt / 0.00012) - 2.5 * Math.exp(-dt / 0.0006) * Math.cos(dt * 2 * Math.PI * 1800);
     }
+    case "cmp": { if (!sim.merge || sim.rpm < 50) return 4.8; const ph = ((sim.rpm / 120) * t) % 1; return ph < 0.5 ? 0.25 : 4.85; }
+    case "knock": { if (!sim.merge) return 0; const T = 120 / sim.rpm, ph = ((t % (T / 4)) + T / 4) % (T / 4); return Math.exp(-ph / 0.0012) * (0.15 + sim.rpm / 6000) * Math.sin(2 * Math.PI * 7000 * ph) + (Math.random() - 0.5) * 0.02; }
     case "clap": return 6.5 + 1.5 * Math.sign(Math.sin(t * 2 * Math.PI * 2000)) * (sim.merge ? 1 : 0);
     case "can": return 12.6 - (sim.merge && sim.ect > 70 ? (Math.sin(t * 2 * Math.PI * 16) > 0.4 ? 12.4 : 0) : 0);
   }
@@ -126,7 +130,7 @@ function construiesteSVG() {
   mk("rect", { x: 252, y: 152, width: 380, height: 52, rx: 4, fill: "url(#gChiul)", stroke: "#5b6269" }, g);
   SV.capac = mk("rect", { x: 270, y: 112, width: 344, height: 42, rx: 12, fill: "url(#gNegru)", stroke: "#000" }, g);
   mk("circle", { cx: 588, cy: 124, r: 9, fill: "#c9a227" }, g);
-  // carterul volantei cu fereastra roții dințate 60−2
+  // carterul volantului cu fereastra roții dințate 60−2
   mk("path", { d: "M262 230 L 210 250 L 200 380 L 262 380 Z", fill: "url(#gFonta)", stroke: "#2c3035" }, g);
   SV.roata = mk("g", { transform: "translate(232,330)" }, g);
   mk("circle", { cx: 0, cy: 0, r: 34, fill: "#3b4046" }, SV.roata);
@@ -167,7 +171,7 @@ function construiesteSVG() {
   SV.selRect = mk("rect", { fill: "none", stroke: "#ffcf4d", "stroke-width": 2, "stroke-dasharray": "5 3", rx: 6 }, g);
   // etichete
   SV.et = mk("g", { "font-size": 10.5, fill: "#e6ebf0" }, g);
-  Object.entries(COMP).forEach(([k, c]) => { const t = mk("text", { x: c.x + 10, y: c.y - 10, "font-weight": 600 }, SV.et); t.textContent = { ckp: "CKP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", inj1: "", inj2: "", inj3: "", inj4: "", clap: "clapetă", can: "canistră" }[k]; });
+  Object.entries(COMP).forEach(([k, c]) => { const t = mk("text", { x: c.x + 10, y: c.y - 10, "font-weight": 600 }, SV.et); t.textContent = ({ ckp: "CKP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", clap: "clapetă", can: "canistră", cmp: "CMP", knock: "KS" })[k] || ""; });
   prefixeazaId(svg, "d2-");
   actualizeazaSVG(0);
 }
@@ -199,9 +203,24 @@ function actualizeazaSVG(dt) {
   SV.pompa.style.display = sim.pompaVid ? "" : "none";
   if (sim.pompaVid) SV.vacuum(sim.p);
   SV.et.style.display = $("#ck-et") && !$("#ck-et").checked ? "none" : "";
+  if (SV.m3d) {
+    SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.tps, selectat: sim.sel, decuplat: sim.decuplat, vent: sim.ventilator || sim.ect > 98, tEv: sim.tEv, eticheteVizibile: !($("#ck-et") && !$("#ck-et").checked) });
+    const cheieS = (sim.aparat !== "x431" || sim.pompaVid) ? sim.sel + "|" + sim.aparat : "";
+    if (cheieS !== SV.sondaK) { SV.sondaK = cheieS; SV.m3d.sonda(cheieS ? sim.sel : null, sim.aparat); }
+  }
 }
-function selecteaza(k) {
+/* motorul 3D realist pe stand (cu revenire la desenul 2D dacă WebGL lipsește) */
+function porneste3D() {
+  const el = $("#motor3d"); if (!el) return;
+  import(BAZA_COMUN + "motor3d.js?v=2").then(m => {
+    const ET = { ckp: "CKP", cmp: "CMP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", clap: "clapetă", can: "canistră", knock: "detonație" };
+    SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: k => { if (COMP[k]) selecteaza(k, false); } });
+    $("#svg-motor").style.display = "none";
+  }).catch(e => { el.remove(); console.warn("3D indisponibil:", e); });
+}
+function selecteaza(k, focus = true) {
   sim.sel = k; $("#sel-comp").value = k; actualizeazaPanou();
+  if (SV.m3d) SV.m3d.selecteaza(k, focus);
 }
 
 /* ------------------------------------------------------------------ osciloscopul */
@@ -256,7 +275,8 @@ function citireMultimetru() {
   if (sim.mm === "Ω") {
     if (sim.contact) return { txt: "oprit", msg: "Rezistența se măsoară numai cu contactul decuplat." };
     if (!sim.decuplat[c]) return { txt: "—", msg: "Decuplați conectorul componentei pentru a măsura rezistența." };
-    if (["map", "tps", "l1", "l2"].includes(c)) return { txt: "—", msg: "Pentru acest senzor se măsoară tensiunea de semnal (back-probe), nu rezistența." };
+    if (c === "cmp") return { txt: "—", msg: "Senzorul Hall are electronică internă: NU se verifică cu ohmmetrul (NSSM). Măsurați alimentarea, masa și semnalul." };
+    if (["map", "tps", "l1", "l2", "knock"].includes(c)) return { txt: "—", msg: "Pentru acest senzor se măsoară tensiunea de semnal (back-probe), nu rezistența." };
     const R = MD.rezistenta(c, { T: c === "iat" ? sim.iat : sim.ect }, pr());
     if (!isFinite(R)) return { txt: "OL", v: "OL", unit: "Ω" };
     const v = R >= 1000 ? Math.round(R) : Math.round(R * 100) / 100;
@@ -515,7 +535,13 @@ Cadru.porneste({
     Object.assign(t.t23.n, { Nc: "18", Umin: "0.08", Umax: "0.86", STFT: "4", LTFT: "9" });
     Object.assign(t.t23.a, { Nc: "16", Umin: "0.07", Umax: "0.84", STFT: "6", LTFT: "17" });
   },
-  vehicul3d: null,
+  vehicul3d: {
+    titluTab: "Pe autovehicul (3D)",
+    titlu: "Senzorii și actuatorii în mers – autoturism cu motor 1.4 MPI",
+    intro: `<p>Același motor, montat în autoturism. Porniți motorul, țineți apăsat <b>Accelerează</b> (↑ / W) sau <b>Frânează</b> (↓ / S / Spațiu) și urmăriți pe osciloscopul din colț semnalul senzorului ales: frecvența CKP crește cu turația, senzorii ABS ai roților dau o tensiune alternativă a cărei frecvență și amplitudine cresc cu viteza, MAP și TPS urmăresc pedala, sonda λ comută în buclă închisă, devine bogată (≈ 0,85 V) la sarcină plină și scade la ≈ 0,05 V când ECU întrerupe injecția la decelerare (frână de motor). Selectați un senzor din listă sau cu clic pe el; „Arată senzorul” mută camera lângă el.</p>`,
+    dupa: `<p class="nota">Modelele semnalelor: CKP f = n (roată 60−2), CMP un impuls la două rotații, ABS f = 48·v/(2πr), MAP 0,5…4,5 V, APP două piste, λ cu salt, injectorul cu vârful inductiv la închidere. Valorile sunt tipice, nu cele individuale de pe stand.</p>`,
+    optiuni: () => ({ sistem: "senzori" })
+  },
   referat: {
     scop: "Identificarea tipului de semnal al senzorilor, compararea datelor live cu măsurarea directă, verificarea actuatorilor și diagnosticarea unui defect introdus pe standul K7J.",
     relatii: "n = 60·f/z; &nbsp; R(T) = R₂₅·e<sup>B(1/T − 1/T₂₅)</sup>; &nbsp; U<sub>s</sub> = U<sub>ref</sub>·R/(R + R<sub>p</sub>); &nbsp; p = a·U + b; &nbsp; f<sub>λ</sub> = N<sub>c</sub>/(2Δt); &nbsp; k<sub>tot</sub> = (1 + STFT/100)(1 + LTFT/100).",
@@ -527,6 +553,7 @@ Cadru.porneste({
   sim: {
     html: `<div class="sim-grila">
     <div class="card sim-scena scena">
+      <div id="motor3d"></div>
       <svg id="svg-motor" viewBox="0 0 900 420" role="img" aria-label="Compartimentul motor al standului K7J cu senzorii și actuatorii selectabili"></svg>
       <div class="afisaje">
         <div class="afisaj"><span>Turație</span><b id="af-n">0</b><small>rot/min</small></div>
@@ -591,7 +618,7 @@ Cadru.porneste({
   </div>`,
     init(C) {
       sim.ect = sim.iat = P().Ta; sim.p = P().patm;
-      construiesteSVG(); legaOsc();
+      construiesteSVG(); legaOsc(); porneste3D();
       $("#osc-t").value = String(sim.osc.tdiv); $("#osc-v").value = String(sim.osc.vdiv);
       $("#osc-t").addEventListener("change", e => { sim.osc.tdiv = +e.target.value; });
       $("#osc-v").addEventListener("change", e => { sim.osc.vdiv = +e.target.value; deseneazaOsc(); });
@@ -646,6 +673,7 @@ Cadru.porneste({
       // temperaturi
       sim.ect += ((sim.merge ? 92 : pr0.Ta) - sim.ect) * (1 - Math.exp(-h / (sim.merge ? 150 : 900)));
       sim.iat += ((sim.merge ? pr0.Ta + 6 : pr0.Ta) - sim.iat) * (1 - Math.exp(-h / 60));
+      sim.tEv = (sim.tEv || pr0.Ta) + ((sim.merge ? 260 + sim.rpm * 0.11 + sim.ect * 1.6 + (sim.mod === "accel" ? 120 : 0) : pr0.Ta) - (sim.tEv || pr0.Ta)) * (1 - Math.exp(-h / (sim.merge ? 40 : 300)));
       if (sim.ect > 98 || sim.ventilator) sim.ventilator = sim.ventilator;
       // presiunea din colector și clapeta
       let pT = pr0.patm;
