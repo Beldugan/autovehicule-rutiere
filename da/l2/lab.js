@@ -21,6 +21,12 @@ const COMP = {
   cmp: { nume: "Senzorul de fază CMP (Hall, arborele cu came)", tip: "senzor", x: 600, y: 120 },
   knock: { nume: "Senzorul de detonație (piezoelectric)", tip: "senzor", x: 420, y: 260 }
 };
+const NUME_SCURT = {
+  ckp: "Senzor turație CKP", cmp: "Senzor fază CMP", ect: "Senzor temperatură lichid CTS", iat: "Senzor temperatură aer IAT",
+  map: "Senzor presiune MAP", tps: "Potențiometru clapetă TPS", l1: "Sonda lambda 1 (amonte)", l2: "Sonda lambda 2 (aval)",
+  inj1: "Injector 1", inj2: "Injector 2", inj3: "Injector 3", inj4: "Injector 4", clap: "Clapetă electronică",
+  can: "Supapă canistră", knock: "Senzor detonație"
+};
 const SENZ = ["ckp", "ect", "iat", "map", "tps", "l1", "l2"], ACT = ["inj1", "inj2", "inj3", "inj4", "clap", "can"];
 
 /* ------------------------------------------------------------------ starea motorului */
@@ -559,7 +565,7 @@ Cadru.porneste({
         <div class="afisaj"><span>Turație</span><b id="af-n">0</b><small>rot/min</small></div>
         <div class="afisaj"><span>Temp. lichid (termometru)</span><b id="af-T">—</b><small>°C</small></div>
         <div class="afisaj"><span>Multimetru</span><b id="af-mm">—</b><small id="af-mm-mod">V DC</small></div>
-        <div class="afisaj"><span>Componenta selectată</span><b id="af-sel" style="font-size:1rem">CKP</b><small id="af-con">conector cuplat</small></div>
+        <div class="afisaj"><span>Componenta selectată</span><b id="af-sel" style="font-size:1rem">Senzor turație CKP</b><small id="af-con">conector cuplat</small></div>
       </div>
       <div class="osc-cutie">
         <div class="osc-bara">
@@ -707,7 +713,7 @@ Cadru.porneste({
         const r = citireMultimetru();
         $("#af-n").textContent = fmt(sim.rpm, 0); $("#af-T").textContent = fmt(sim.ect, 1);
         $("#af-mm").textContent = sim.aparat === "mm" ? r.txt : "—"; $("#af-mm-mod").textContent = sim.mm === "Ω" ? "Ω" : "V DC";
-        $("#af-sel").textContent = sim.sel.toUpperCase(); $("#af-con").textContent = sim.decuplat[sim.sel] ? "conector DECUPLAT" : "conector cuplat";
+        $("#af-sel").textContent = NUME_SCURT[sim.sel] || sim.sel; $("#af-con").textContent = sim.decuplat[sim.sel] ? "conector DECUPLAT" : "conector cuplat";
         C.stare(1, sim.merge ? `motor pornit – ${sim.mod === "2000" ? "2000 rot/min" : sim.mod === "accel" ? "accelerare" : "ralanti"}${buclaInchisa() ? " · buclă închisă" : ""}` : sim.contact ? "contact pus, motor oprit" : "contact decuplat", sim.merge ? "inc" : "");
         C.stare(2, sim.furtun ? "aer fals provocat (furtun desprins)" : `T lichid ${fmt(sim.ect, 0)} °C`);
         if (sim.aparat === "mm" && r.msg) C.mesajAuto(r.msg, "atentie"); else if (sim.merge && !$("#ck-exhaust").checked) C.mesajAuto("Exhaustarea nu este conectată!", "pericol"); else C.mesajAuto("");
