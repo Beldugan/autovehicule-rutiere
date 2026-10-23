@@ -328,7 +328,7 @@ export function creeaza(gazda, optiuni = {}) {
     st.Fact += clamp((st.apasat ? st.F : 0) - st.Fact, -2500 * dt, 1800 * dt);
     const pDem = hidraulica(st.Fact);
     st.p = Math.max(0, st.p + (pDem - st.p) * (1 - Math.exp(-dt / 0.07)));
-    st.sMC = volum(st.p) / (AMC * 1e6) / 100; // m
+    st.sMC = volum(st.p) / (AMC * 1e4) / 100; // m (cm³ / cm² = cm)
     st.cursaP = (st.Fact > 1 ? 0.008 : 0) + st.sMC * RAP_PED;
     // presiunea în etriere: ABS (modulare) sau directă
     const aCer = (2 * (2 * MU_P * st.p * 1e5 * APF * RF) + 2 * (2 * MU_P * st.p * 1e5 * APS * RS)) / CAR.Rroata / MASA;
