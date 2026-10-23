@@ -712,13 +712,16 @@ function foaieLab_(lab, refaAntet) {
 function importaStudenti() {
   const ui = SpreadsheetApp.getUi();
   let cursuri = [];
-  try { cursuri = (Classroom.Courses.list({ teacherId: "me", courseStates: ["ACTIVE"] }).courses || []); }
-  catch (e) { ui.alert("Activați serviciul avansat: Editor Apps Script → Servicii (+) → Google Classroom API.\n\n" + e.message); return; }
-  if (!cursuri.length) { ui.alert("Nu am găsit cursuri active în care sunteți profesor."); return; }
-  const lista = cursuri.map((c, i) => `${i + 1}. ${c.name}${c.section ? " – " + c.section : ""}`).join("\n");
-  const r = ui.prompt("Alegeți cursul", lista + "\n\nNumărul cursului:", ui.ButtonSet.OK_CANCEL);
+  try { cursuri = (Classroom.Courses.list({ teacherId: "me", courseStates: ["ACTIVE", "PROVISIONED"], pageSize: 100 }).courses || []); }
+  catch (e) { cursuri = []; }
+  const lista = cursuri.map((c, i) => `${i + 1}. ${c.name}${c.section ? " – " + c.section : ""}${c.courseState === "PROVISIONED" ? " (invitație neacceptată)" : ""}`).join("\n");
+  const r = ui.prompt("Alegeți cursul",
+    (lista ? lista + "\n\n" : "Contul acestui script nu are cursuri Classroom ca profesor.\n\n") +
+    "0. Cursul nu este în listă (este pe alt cont Google): import din foaia „Import studenți”, în care lipiți lista exportată din Classroom (Nume, E-mail, Grupa).\n\nNumărul cursului:", ui.ButtonSet.OK_CANCEL);
   if (r.getSelectedButton() !== ui.Button.OK) return;
-  const c = cursuri[parseInt(r.getResponseText(), 10) - 1]; if (!c) return;
+  const k = parseInt(r.getResponseText(), 10);
+  if (k === 0 || !cursuri.length) return importDinFoaie_();
+  const c = cursuri[k - 1]; if (!c) return;
   props_().setProperty("COURSE_ID", c.id);
   let tok = null, n = 0;
   do {
@@ -726,9 +729,30 @@ function importaStudenti() {
     (res.students || []).forEach(s => { randStudent_(String(s.profile.emailAddress || "").toLowerCase(), s.profile.name.fullName, c.section || ""); n++; });
     tok = res.nextPageToken;
   } while (tok);
-  const sh = foaiePrezenta_(false);
-  if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, 5 + nrLab_()).sort(1);
+  sorteazaPrezenta_();
   ui.alert(`Importați/actualizați: ${n} studenți din „${c.name}”.`);
+}
+function sorteazaPrezenta_() { const sh = foaiePrezenta_(false); if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, 5 + nrLab_()).sort(1); }
+/** import din foaia „Import studenți” (coloanele: Nume și prenume | E-mail | Grupa) */
+function importDinFoaie_() {
+  const ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName("Import studenți");
+  if (!sh || sh.getLastRow() < 2) {
+    if (!sh) { sh = ss.insertSheet("Import studenți"); sh.getRange(1, 1, 1, 3).setValues([["Nume și prenume", "E-mail", "Grupa"]]).setFontWeight("bold").setBackground("#e8f0f9"); sh.setFrozenRows(1); sh.setColumnWidth(1, 240); sh.setColumnWidth(2, 260); }
+    ss.setActiveSheet(sh);
+    ui.alert("Am pregătit foaia „Import studenți”.\n\nLipiți de la rândul 2 lista studenților (Nume și prenume, E-mail, Grupa) – de exemplu din Classroom: cursul → Persoane, sau din lista primită de la secretariat – apoi rulați din nou Laborator → Importă studenții și alegeți 0.");
+    return;
+  }
+  const v = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
+  let n = 0, fara = 0;
+  v.forEach(([nume, email, grupa]) => {
+    email = String(email || "").toLowerCase().trim(); nume = String(nume || "").trim();
+    if (!nume) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { fara++; return; }
+    randStudent_(email, nume, String(grupa || "").trim()); n++;
+  });
+  sorteazaPrezenta_();
+  ui.alert(`Importați/actualizați: ${n} studenți din foaia „Import studenți”.` + (fara ? `\n${fara} rânduri fără e-mail valid au fost sărite.` : ""));
 }
 
 /* ============================== API */
