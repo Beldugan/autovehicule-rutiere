@@ -34,9 +34,9 @@ const sim = {
   contact: false, merge: false, mod: "ralanti", rpm: 0, rpmT: 0, ect: 20, iat: 20, p: 101, tps: 0, t: 0, tPorn: 0,
   phi: 0, lam1: 0.45, stft: 0, ltft: 0, furtun: false, sel: "ckp", decuplat: {}, aparat: "x431", mm: "V",
   testInj: 0, testT: 0, ventilator: false, coduri: [], vac: 0, pompaVid: false, defectDemo: "none", acc: 0,
-  osc: { tdiv: 2e-3, ruleaza: true, c1: 2, c2: 7, buf: [], t0: 0, perioade: 1,
+  osc: { tdiv: 2e-3, ruleaza: true, c1: 2, c2: 7, benzi: true, buf: [], t0: 0, perioade: 1,
     // 4 canale: CH1 = componenta selectată (pe ea se face declanșarea); poz = poziția nivelului de 0 V, în diviziuni față de centru
-    ch: [{ c: "ckp", on: true, vdiv: 2, poz: 0 }, { c: "cmp", on: false, vdiv: 2, poz: -3 }, { c: "l1", on: false, vdiv: 0.2, poz: 1 }, { c: "inj1", on: false, vdiv: 10, poz: -2 }] }
+    ch: [{ c: "ckp", on: true, vdiv: 2, poz: 0 }, { c: "cmp", on: false, vdiv: 2, poz: -2 }, { c: "l1", on: false, vdiv: 0.2, poz: -2 }, { c: "inj1", on: false, vdiv: 10, poz: -2 }] }
 };
 function P() { return Cadru.P; }
 function defect() { return MOD.eval ? P().defect : sim.defectDemo; }
@@ -228,7 +228,7 @@ function porneste3D() {
 }
 function selecteaza(k, focus = true) {
   sim.sel = k; $("#sel-comp").value = k;
-  const ch = sim.osc.ch[0]; if (ch.c !== k) { ch.c = k; ch.vdiv = VDEF[k] || 1; const s1 = $('[data-ch-c="0"]'); if (s1) { s1.value = k; $('[data-ch-v="0"]').value = String(ch.vdiv); } }
+  const ch = sim.osc.ch[0]; if (ch.c !== k) { ch.c = k; ch.vdiv = VDEF[k] || 1; ch.poz = k in POZDEF ? POZDEF[k] : -2; const s1 = $('[data-ch-c="0"]'); if (s1) { s1.value = k; $('[data-ch-v="0"]').value = String(ch.vdiv); $('[data-ch-p="0"]').value = String(ch.poz); } }
   actualizeazaPanou();
   if (SV.m3d) SV.m3d.selecteaza(k, focus);
 }
@@ -238,6 +238,7 @@ const TDIV = [0.5e-3, 1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 50e-3, 0.1, 0.2, 0.5, 1];
 const VDIV = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20];
 function fmtT(s) { return s >= 1 ? fmt(s, 2) + " s" : s >= 1e-3 ? fmt(s * 1000, s >= 0.1 ? 0 : 2) + " ms" : fmt(s * 1e6, 0) + " µs"; }
 const CULORI_CH = ["#ffe14d", "#4fd6ff", "#ff6bd6", "#6dff8e"];
+const POZDEF = { ckp: 0, knock: 0, clap: -1 };       // poziția implicită a nivelului de 0 V (semnalele alternative la mijloc)
 const VDEF = { ckp: 2, cmp: 2, ect: 1, iat: 1, map: 1, tps: 1, l1: 0.2, l2: 0.2, inj1: 10, inj2: 10, inj3: 10, inj4: 10, clap: 2, can: 5, knock: 0.5 };
 function achizitie() {
   const o = sim.osc, N = 1200, T = o.tdiv * 10;
@@ -253,32 +254,46 @@ function oscPeEcran(cv) { const fe = document.fullscreenElement || document.webk
 function deseneazaOsc() {
   const cv = $("#cv-osc"); if (!cv || !cv.offsetParent) return;
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth;
-  const H = oscPeEcran(cv) ? clamp(Math.round(window.innerHeight - cv.getBoundingClientRect().top - 110 + (cv.closest(".card") || cv).scrollTop), 300, 900) : (+cv.dataset.h || 320);
+  const o0 = sim.osc, nAct = o0.ch.filter(c => c.on).length, benzi = o0.benzi && nAct > 1;
+  const Hmin = benzi ? 60 + 135 * nAct : (+cv.dataset.h || 320);       // canale separate: fiecare canal are banda lui (≈ 135 px)
+  const H = oscPeEcran(cv) ? clamp(Math.round(window.innerHeight - cv.getBoundingClientRect().top - 110 + (cv.closest(".card") || cv).scrollTop), Hmin, 1400) : Hmin;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px"; }
   const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const o = sim.osc, m = { l: 22, r: 8, t: 8, b: 8 }, w = W - m.l - m.r, h = H - m.t - m.b;
   g.fillStyle = "#0b1410"; g.fillRect(0, 0, W, H);
   g.strokeStyle = "rgba(120,200,160,.18)"; g.lineWidth = 1;
   for (let i = 0; i <= 10; i++) { const x = m.l + w * i / 10; g.beginPath(); g.moveTo(x, m.t); g.lineTo(x, m.t + h); g.stroke(); }
-  for (let j = 0; j <= 8; j++) { const y = m.t + h * j / 8; g.beginPath(); g.moveTo(m.l, y); g.lineTo(m.l + w, y); g.stroke(); }
-  g.strokeStyle = "rgba(120,200,160,.4)"; for (let i = 0; i <= 50; i++) { const x = m.l + w * i / 50; g.beginPath(); g.moveTo(x, m.t + h / 2 - 3); g.lineTo(x, m.t + h / 2 + 3); g.stroke(); }
-  const y0 = ch => m.t + h / 2 - ch.poz * h / 8, Y = (ch, v) => y0(ch) - v / ch.vdiv * h / 8;
+  // benzile: în modul „canale separate” fiecare canal activ are banda lui, cu 8 diviziuni proprii
+  const activ = o.ch.map((c, k) => c.on ? k : -1).filter(k => k >= 0), nb = benzi ? activ.length : 1;
+  const banda = k => { const b = benzi ? activ.indexOf(k) : 0, hb = h / nb; return { y: m.t + b * hb, h: hb }; };
+  for (let b = 0; b < nb; b++) {
+    const y1 = m.t + b * h / nb, hb = h / nb;
+    g.strokeStyle = "rgba(120,200,160,.18)"; for (let j = 0; j <= 8; j++) { const y = y1 + hb * j / 8; g.beginPath(); g.moveTo(m.l, y); g.lineTo(m.l + w, y); g.stroke(); }
+    g.strokeStyle = "rgba(120,200,160,.4)"; for (let i = 0; i <= 50; i++) { const x = m.l + w * i / 50; g.beginPath(); g.moveTo(x, y1 + hb / 2 - 3); g.lineTo(x, y1 + hb / 2 + 3); g.stroke(); }
+    if (b) { g.strokeStyle = "rgba(160,230,190,.65)"; g.lineWidth = 2; g.beginPath(); g.moveTo(m.l, y1); g.lineTo(m.l + w, y1); g.stroke(); g.lineWidth = 1; }
+  }
+  const y0 = (ch, k) => { const B = banda(k); return B.y + B.h / 2 - ch.poz * B.h / 8; }, Y = (ch, v, k) => y0(ch, k) - v / ch.vdiv * banda(k).h / 8;
   // canalele (în ordine inversă, CH1 deasupra)
   for (let k = 3; k >= 0; k--) {
     const ch = o.ch[k], b = o.buf[k], col = CULORI_CH[k]; if (!ch.on) continue;
-    const yz = clamp(y0(ch), m.t + 6, m.t + h - 6);
+    const B = banda(k), yz = clamp(y0(ch, k), B.y + 6, B.y + B.h - 6);
+    if (benzi) { g.fillStyle = col; g.font = "700 11px system-ui"; g.fillText(`CH${k + 1} · ${NUME_SCURT[ch.c] || ch.c} · ${fmt(ch.vdiv, ch.vdiv < 1 ? 2 : 0)} V/div`, m.l + 6, B.y + 14); }
     g.fillStyle = col; g.beginPath(); g.moveTo(m.l - 2, yz); g.lineTo(m.l - 13, yz - 7); g.lineTo(m.l - 13, yz + 7); g.fill();
     g.fillStyle = "#0b1410"; g.font = "700 9px system-ui"; g.fillText(String(k + 1), m.l - 12, yz + 3);
     if (!b) continue;
     g.strokeStyle = col; g.lineWidth = 1.5; g.shadowColor = col; g.shadowBlur = 3; g.beginPath();
-    b.forEach((v, i) => { const x = m.l + w * i / (b.length - 1), y = clamp(Y(ch, v), m.t - 2, m.t + h + 2); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.shadowBlur = 0;
+    b.forEach((v, i) => { const x = m.l + w * i / (b.length - 1), y = clamp(Y(ch, v, k), B.y + 1, B.y + B.h - 1); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.shadowBlur = 0;
   }
   // cursoarele
   [o.c1, o.c2].forEach((c, k) => { const x = m.l + w * c / 10; g.strokeStyle = k ? "#c9b6ff" : "#ff8a5a"; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(x, m.t); g.lineTo(x, m.t + h); g.stroke(); g.setLineDash([]); g.fillStyle = g.strokeStyle; g.font = "11px system-ui"; g.fillText(k ? "B" : "A", x + 3, m.t + 12); });
   // scalele canalelor
-  g.font = "12px system-ui"; let xx = m.l + 8;
-  g.fillStyle = "#9fe6c0"; const tt = `${fmtT(o.tdiv)}/div  ${o.ruleaza ? "RUN" : "STOP"}  `; g.fillText(tt, xx, m.t + h - 8); xx += g.measureText(tt).width + 6;
-  o.ch.forEach((ch, k) => { if (!ch.on) return; const tx = `CH${k + 1} ${fmt(ch.vdiv, ch.vdiv < 1 ? 2 : 0)} V/div`; g.fillStyle = CULORI_CH[k]; g.fillText(tx, xx, m.t + h - 8); xx += g.measureText(tx).width + 12; });
+  g.font = "12px system-ui";
+  if (benzi) { g.fillStyle = "#9fe6c0"; g.textAlign = "right"; g.fillText(`${fmtT(o.tdiv)}/div  ${o.ruleaza ? "RUN" : "STOP"}`, m.l + w - 6, m.t + 14); g.textAlign = "left"; }
+  else {
+    let xx = m.l + 8;
+    g.fillStyle = "#9fe6c0"; const tt = `${fmtT(o.tdiv)}/div  ${o.ruleaza ? "RUN" : "STOP"}  `; g.fillText(tt, xx, m.t + h - 8); xx += g.measureText(tt).width + 6;
+    o.ch.forEach((ch, k) => { if (!ch.on) return; const tx = `CH${k + 1} ${fmt(ch.vdiv, ch.vdiv < 1 ? 2 : 0)} V/div`; g.fillStyle = CULORI_CH[k]; g.fillText(tx, xx, m.t + h - 8); xx += g.measureText(tx).width + 12; });
+  }
   // citirile cursoarelor
   const dt = (o.c2 - o.c1) * o.tdiv, val = (k, c) => o.buf[k] ? o.buf[k][Math.round(c / 10 * (o.buf[k].length - 1))] : NaN;
   let txt = `Δt = <b>${fmtT(Math.abs(dt))}</b> · 1/Δt = <b>${Math.abs(dt) > 0 ? fmt(1 / Math.abs(dt), 1) : "—"} Hz</b>`;
@@ -296,7 +311,7 @@ function legaOsc() {
     const stil = () => el.classList.toggle("oprit", !ch.on);
     sc.value = ch.c; sv.value = String(ch.vdiv); sp.value = String(ch.poz); on.checked = ch.on; stil();
     on.addEventListener("change", () => { ch.on = on.checked; stil(); if (sim.osc.ruleaza) achizitie(); deseneazaOsc(); });
-    sc.addEventListener("change", () => { if (k === 0) return selecteaza(sc.value); ch.c = sc.value; ch.vdiv = VDEF[ch.c] || 1; sv.value = String(ch.vdiv); if (!ch.on) { ch.on = on.checked = true; stil(); } if (sim.osc.ruleaza) achizitie(); deseneazaOsc(); });
+    sc.addEventListener("change", () => { if (k === 0) return selecteaza(sc.value); ch.c = sc.value; ch.vdiv = VDEF[ch.c] || 1; sv.value = String(ch.vdiv); ch.poz = ch.c in POZDEF ? POZDEF[ch.c] : -2; sp.value = String(ch.poz); if (!ch.on) { ch.on = on.checked = true; stil(); } if (sim.osc.ruleaza) achizitie(); deseneazaOsc(); });
     sv.addEventListener("change", () => { ch.vdiv = +sv.value; deseneazaOsc(); });
     sp.addEventListener("change", () => { ch.poz = +sp.value; deseneazaOsc(); });
   });
@@ -600,6 +615,7 @@ Cadru.porneste({
           <b>Osciloscop – 4 canale</b>
           <label>Timp/div <select id="osc-t">${TDIV.map(v => `<option value="${v}">${fmtT(v)}</option>`).join("")}</select></label>
           <button type="button" id="osc-run">STOP</button>
+          <label>Afișare <select id="osc-mod"><option value="benzi">canale separate</option><option value="supr">canale suprapuse</option></select></label>
           <span class="nota" style="margin:0">CH1 = componenta selectată (declanșare)</span>
         </div>
         <div class="osc-canale">${[0, 1, 2, 3].map(k => `<div class="osc-canal" style="--cc:${CULORI_CH[k]}">
@@ -660,6 +676,7 @@ Cadru.porneste({
       construiesteSVG(); legaOsc(); porneste3D();
       $("#osc-t").value = String(sim.osc.tdiv);
       $("#osc-t").addEventListener("change", e => { sim.osc.tdiv = +e.target.value; });
+      $("#osc-mod").addEventListener("change", e => { sim.osc.benzi = e.target.value === "benzi"; deseneazaOsc(); });
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       ["fullscreenchange", "webkitfullscreenchange"].forEach(ev => document.addEventListener(ev, () => setTimeout(deseneazaOsc, 120)));
       $("#btn-ecran").addEventListener("click", () => setTimeout(deseneazaOsc, 150));
