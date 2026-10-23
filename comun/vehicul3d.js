@@ -408,7 +408,7 @@ export function creeaza(gazda, optiuni = {}) {
     const vizibile = [];
     etichete.forEach(e => {
       e.obj.getWorldPosition(v3); v3.project(camera);
-      const vis = v3.z < 1 && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
+      const vis = (!e.filtru || e.filtru()) && v3.z < 1 && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
       e.el.style.display = vis ? "" : "none";
       if (vis) { e.sx = (v3.x * 0.5 + 0.5) * w; e.sy = (-v3.y * 0.5 + 0.5) * h; e.ly = e.sy; e.lw = e.el.offsetWidth || e.text.length * 6.5; vizibile.push(e); }
     });
@@ -790,28 +790,128 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   const mot = construiesteMotor({ stand: false, filtruAer: false });
   mot.grup.rotation.y = -Math.PI / 2; mot.grup.position.set(1.78, 0.42, 0.02); mot.grup.scale.setScalar(0.98);
   caroserie.add(mot.grup);
-  const et = [], ancoraObj = {};
-  const NUME = { ckp: "CKP turație", cmp: "CMP fază", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ amonte", l2: "λ aval", inj1: "injector 1", knock: "detonație" };
-  Object.entries(mot.ancore).forEach(([k, v]) => { const o = new THREE.Object3D(); o.position.copy(v); mot.grup.add(o); ancoraObj[k] = o; if (NUME[k]) et.push({ obj: o, text: NUME[k], k }); });
-  // senzorii de turație a roților (ABS): roata de impulsuri cu 48 de dinți pe butuc + senzorul fix pe fuzetă
+  const et = [], ancoraObj = {}, grupuri = {};
   const mS = new THREE.MeshStandardMaterial({ color: 0x1c1e21, roughness: 0.5 }), mI = new THREE.MeshStandardMaterial({ color: 0x9aa2ab, metalness: 0.9, roughness: 0.3 });
-  const vss = [];
+  /* ---- sistemele autovehiculului și senzorii lor (autoturism 2025, motor pe benzină cu injecție, ESC, ADAS) */
+  const SISTEME = {
+    motor: "Gestiunea motorului (admisie, injecție, aprindere)",
+    evac: "Evacuare și controlul emisiilor",
+    racire: "Răcire, ungere și climatizare",
+    frana: "Frânare, ABS / ESC și direcție",
+    susp: "Suspensie și pneuri (TPMS)",
+    adas: "Sisteme de asistență ADAS",
+    car: "Caroserie, siguranță pasivă și alimentare"
+  };
+  // tip: ind = inductiv, hall = Hall activ (curent 7/14 mA pe 115 Ω), dig = ieșire în frecvență, dc = analogic 0…5 V, sw = contact 12 V,
+  //      can = magistrală CAN, lin = magistrală LIN, eth = Ethernet auto, rf = radio (TPMS), us = ultrasunete, psi5 = interfață airbag
+  const D = [
+    { k: "ckp", s: "motor", n: "Senzorul de turație CKP (inductiv, roata 60−2)", e: "CKP turație" },
+    { k: "cmp", s: "motor", n: "Senzorul de fază CMP (Hall)", e: "CMP fază" },
+    { k: "maf", s: "motor", n: "Debitmetrul de aer cu film cald HFM (ieșire în frecvență)", e: "MAF debitmetru", mot: [-0.47, 0.44, 0.28], forma: ["cyl", 0.05, 0.05, 0x2b2f35], tip: "dig", f: st => 1800 + st.maf * 160, info: st => `f = ${fx(1800 + st.maf * 160, 0)} Hz → ṁ = ${fx(st.maf, 1)} g/s` },
+    { k: "map", s: "motor", n: "Senzorul de presiune absolută MAP", e: "MAP" },
+    { k: "iat", s: "motor", n: "Senzorul de temperatură a aerului IAT (NTC)", e: "IAT" },
+    { k: "tps", s: "motor", n: "Clapeta electronică – senzorul de poziție TPS (2 piste)", e: "TPS" },
+    { k: "app", s: "motor", n: "Pedala de accelerație APP (2 piste)", e: "APP pedală" },
+    { k: "knock", s: "motor", n: "Senzorul de detonație (piezoelectric)", e: "detonație" },
+    { k: "inj1", s: "motor", n: "Injectorul cilindrului 1 (comanda ECU)", e: "injector 1" },
+    { k: "l1", s: "evac", n: "Sonda λ amonte (bandă largă LSU)", e: "λ amonte" },
+    { k: "l2", s: "evac", n: "Sonda λ aval (cu salt, după catalizator)", e: "λ aval" },
+    { k: "egt", s: "evac", n: "Senzorul de temperatură a gazelor de evacuare (PT200)", e: "temp. gaze evac.", mot: [0.05, -0.05, -0.33], forma: ["cyl", 0.008, 0.05, 0xd0d4d8], tip: "dc", u: st => 0.6 + st.tEvac / 400, info: st => `T = ${fx(st.tEvac, 0)} °C` },
+    { k: "gpf", s: "evac", n: "Senzorul de presiune diferențială al filtrului de particule GPF", e: "Δp filtru GPF", mot: [0.15, -0.12, -0.2], forma: ["box", 0.05, 0.035, 0.04, 0x2b2f35], tip: "dc", u: st => 0.5 + st.dpGpf / 10, info: st => `Δp = ${fx(st.dpGpf, 1)} kPa (încărcarea filtrului)` },
+    { k: "evap", s: "evac", n: "Senzorul de presiune din rezervor (sistemul EVAP)", e: "presiune rezervor", car: [-1.15, 0.32, 0.35], forma: ["box", 0.04, 0.03, 0.04, 0x2b2f35], tip: "dc", u: st => 2.5 + 0.05 * Math.sin(st.t * 0.2), info: () => "p = −0,2 kPa (rel.)" },
+    { k: "ect", s: "racire", n: "Senzorul de temperatură a lichidului de răcire CTS (NTC)", e: "CTS" },
+    { k: "nivRacire", s: "racire", n: "Senzorul de nivel al lichidului de răcire (vas de expansiune)", e: "nivel lichid răcire", car: [1.95, 0.78, 0.62], forma: ["box", 0.1, 0.12, 0.08, 0x9be36b], tip: "sw", u: () => 0, info: () => "nivel corect (contact deschis)" },
+    { k: "uleiP", s: "racire", n: "Senzorul de presiune a uleiului", e: "presiune ulei", mot: [0.12, 0.0, 0.16], forma: ["cyl", 0.013, 0.04, 0x2b2f35], tip: "dc", u: st => 0.5 + st.pUlei, info: st => `p = ${fx(st.pUlei, 1)} bar` },
+    { k: "uleiN", s: "racire", n: "Senzorul de nivel și temperatură a uleiului (ultrasonic)", e: "nivel ulei", mot: [0.05, -0.27, 0.0], forma: ["cyl", 0.025, 0.02, 0x2b2f35], tip: "pwm", f: () => 25, info: st => `T ulei ${fx(st.ect - 4, 0)} °C · nivel 74 %` },
+    { k: "ac", s: "racire", n: "Senzorul de presiune din circuitul de climatizare (A/C)", e: "presiune A/C", car: [2.12, 0.72, 0.45], forma: ["cyl", 0.012, 0.035, 0x2b2f35], tip: "dc", u: st => 0.5 + (st.motor ? 1.7 : 0.6), info: st => `p = ${st.motor ? "14" : "6"} bar` },
+    { k: "tExt", s: "racire", n: "Senzorul de temperatură exterioară (în bara față)", e: "temp. exterioară", car: [2.3, 0.3, 0.55], forma: ["cyl", 0.01, 0.03, 0x111111], tip: "dc", u: () => 2.6, info: () => "T = 18 °C" },
+    { k: "tHab", s: "racire", n: "Senzorul de temperatură din habitaclu (climatronic)", e: "temp. habitaclu", car: [0.82, 0.96, 0.05], forma: ["box", 0.03, 0.02, 0.04, 0x333333], tip: "dc", u: () => 2.4, info: () => "T = 22 °C" },
+    { k: "vssFD", s: "frana", n: "Senzorul de turație al roții față dreapta (Hall activ)", e: "ABS față dr." },
+    { k: "vssFS", s: "frana", n: "Senzorul de turație al roții față stânga (Hall activ)", e: "ABS față st." },
+    { k: "vssSD", s: "frana", n: "Senzorul de turație al roții spate dreapta (Hall activ)", e: "ABS spate dr." },
+    { k: "vssSS", s: "frana", n: "Senzorul de turație al roții spate stânga (Hall activ)", e: "ABS spate st." },
+    { k: "stop", s: "frana", n: "Contactul pedalei de frână (lămpile stop)", e: "contact stopuri" },
+    { k: "pFrana", s: "frana", n: "Senzorul de presiune a frânei din modulatorul ESC", e: "presiune frână ESC", car: [1.62, 0.66, 0.5], forma: ["box", 0.11, 0.09, 0.11, 0xb9c0c8], tip: "dc", u: st => 0.5 + st.brk * 4, info: st => `p = ${fx(st.brk * 120, 0)} bar` },
+    { k: "nivFrana", s: "frana", n: "Senzorul de nivel al lichidului de frână (rezervorul pompei centrale)", e: "nivel lichid frână", car: [1.57, 0.88, -0.38], forma: ["box", 0.12, 0.06, 0.08, 0xf1ead2], tip: "sw", u: () => 0, info: () => "nivel corect" },
+    { k: "uzura", s: "frana", n: "Senzorul de uzură a plăcuțelor (roata față stânga)", e: "uzură plăcuțe", roata: 1, local: [-0.12, 0.08, -0.04], forma: ["box", 0.012, 0.02, 0.012, 0x3366cc], tip: "sw", u: () => 0, info: () => "plăcuțe în regulă (circuit închis)" },
+    { k: "volan", s: "frana", n: "Senzorul unghiului de virare (pe coloana volanului, CAN)", e: "unghi volan", car: [0.74, 0.9, -0.4], forma: ["cyl", 0.045, 0.03, 0x2b2f35], tip: "can", info: () => "unghi = 0,0° · viteză de virare 0 °/s" },
+    { k: "esc", s: "frana", n: "Senzorul de girație și accelerații ESC (în consola centrală)", e: "girație / accelerații", car: [0.1, 0.32, 0.0], forma: ["box", 0.07, 0.03, 0.06, 0x2b2f35], tip: "can", info: st => `ψ̇ = 0,0 °/s · a_x = ${fx(-st.a, 2)} m/s² · a_y = 0,00` },
+    { k: "tpmsFS", s: "susp", n: "Senzorul de presiune în pneu TPMS – față stânga (în ventil)", e: "TPMS față st.", roata: 1, rotire: true, local: [0, 0.2, 0.05], forma: ["box", 0.02, 0.025, 0.012, 0x7a7f86], tip: "rf", info: () => "p = 2,4 bar · T = 21 °C (433 MHz)" },
+    { k: "tpmsFD", s: "susp", n: "Senzorul de presiune în pneu TPMS – față dreapta", e: "TPMS față dr.", roata: 0, rotire: true, local: [0, 0.2, 0.05], forma: ["box", 0.02, 0.025, 0.012, 0x7a7f86], tip: "rf", info: () => "p = 2,4 bar · T = 21 °C" },
+    { k: "tpmsSS", s: "susp", n: "Senzorul de presiune în pneu TPMS – spate stânga", e: "TPMS spate st.", roata: 3, rotire: true, local: [0, 0.2, 0.05], forma: ["box", 0.02, 0.025, 0.012, 0x7a7f86], tip: "rf", info: () => "p = 2,2 bar · T = 21 °C" },
+    { k: "tpmsSD", s: "susp", n: "Senzorul de presiune în pneu TPMS – spate dreapta", e: "TPMS spate dr.", roata: 2, rotire: true, local: [0, 0.2, 0.05], forma: ["box", 0.02, 0.025, 0.012, 0x7a7f86], tip: "rf", info: () => "p = 2,2 bar · T = 21 °C" },
+    { k: "nivel", s: "susp", n: "Senzorul de nivel al caroseriei (corectorul farurilor, puntea spate)", e: "nivel caroserie", car: [-1.3, 0.3, 0.5], forma: ["box", 0.05, 0.04, 0.03, 0x2b2f35], tip: "dc", u: st => 2.5 + (st.tangaj || 0) * 40, info: st => `înclinare ${fx((st.tangaj || 0) * 57.3, 2)}°` },
+    { k: "radar", s: "adas", n: "Radarul frontal 77 GHz (ACC, frânare automată AEB)", e: "radar 77 GHz", car: [2.4, 0.48, 0], forma: ["box", 0.03, 0.09, 0.12, 0x222222], tip: "can", info: st => `vehicul în față la ${fx(32 + 8 * Math.sin(st.t * 0.15), 1)} m · v_rel = ${fx(-3.6 * 1.2 * Math.cos(st.t * 0.15), 1)} km/h` },
+    { k: "camF", s: "adas", n: "Camera frontală (parbriz: menținerea benzii, indicatoare)", e: "cameră frontală", car: [0.6, 1.3, 0], forma: ["box", 0.06, 0.05, 0.1, 0x222222], tip: "eth", info: () => "Ethernet 100BASE-T1 · 30 cadre/s" },
+    { k: "pdcF1", s: "adas", n: "Senzorul de parcare față (ultrasunete 48 kHz)", e: "parcare față", car: [2.38, 0.42, 0.25], forma: ["cyl", 0.012, 0.012, 0x777777], tip: "us", dist: 1.2, info: () => "distanța măsurată 1,20 m" },
+    { k: "pdcS1", s: "adas", n: "Senzorul de parcare spate (ultrasunete 48 kHz)", e: "parcare spate", car: [-2.38, 0.5, -0.25], forma: ["cyl", 0.012, 0.012, 0x777777], tip: "us", dist: 0.6, info: () => "distanța măsurată 0,60 m" },
+    { k: "camS", s: "adas", n: "Camera de mers înapoi", e: "cameră spate", car: [-2.32, 0.86, 0], forma: ["box", 0.03, 0.03, 0.04, 0x222222], tip: "eth", info: () => "LVDS / Ethernet · imagine activă în marșarier" },
+    { k: "ploaie", s: "car", n: "Senzorul de ploaie și lumină (pe parbriz, LIN)", e: "ploaie / lumină", car: [0.62, 1.31, 0.09], forma: ["box", 0.04, 0.015, 0.05, 0x333333], tip: "lin", info: () => "fără ploaie · lumină 12 000 lx" },
+    { k: "ibs", s: "car", n: "Senzorul inteligent al bateriei IBS (borna negativă, LIN)", e: "senzor baterie IBS", car: [1.9, 0.82, -0.62], forma: ["box", 0.2, 0.17, 0.15, 0x24272b], tip: "lin", info: st => `U = ${st.motor ? "14,1" : "12,5"} V · I = ${st.motor ? "+12" : "−3"} A · SOC 82 %` },
+    { k: "comb", s: "car", n: "Traductorul de nivel al combustibilului (în rezervor)", e: "nivel combustibil", car: [-1.0, 0.28, 0.25], forma: ["box", 0.5, 0.18, 0.6, 0x3a3d42], tip: "dc", u: () => 1.7, info: () => "nivel 58 % (≈ 29 L)" },
+    { k: "ocupare", s: "car", n: "Senzorul de ocupare a scaunului pasagerului (airbag)", e: "ocupare scaun", car: [0.15, 0.53, 0.4], forma: ["box", 0.35, 0.01, 0.35, 0x444444], tip: "dc", u: () => 1.1, info: () => "scaun liber – airbag pasager dezactivat" },
+    { k: "crashF", s: "car", n: "Senzorul de impact frontal (airbag, PSI5)", e: "impact frontal", car: [2.22, 0.55, 0.0], forma: ["box", 0.04, 0.03, 0.03, 0x333333], tip: "psi5", info: st => `a = ${fx(-st.a / 9.81, 2)} g` },
+    { k: "crashL", s: "car", n: "Senzorul de impact lateral (stâlpul B, PSI5)", e: "impact lateral", car: [-0.1, 0.65, -0.9], forma: ["box", 0.03, 0.04, 0.02, 0x333333], tip: "psi5", info: () => "a = 0,00 g" }
+  ];
+  const DK = {}; D.forEach(d => DK[d.k] = d);
+  const fx = (v, n = 1) => Number(v).toFixed(n).replace(".", ",");
+  // obiectele senzorilor (corpul vizibil + ancora etichetei)
+  const corp = d => { const [tip, a, b, c, col] = d.forma; const m = new THREE.MeshStandardMaterial({ color: tip === "cyl" ? c : col, roughness: 0.5, metalness: 0.2 });
+    return tip === "cyl" ? new THREE.Mesh(new THREE.CylinderGeometry(a, a, b, 16), m) : new THREE.Mesh(new THREE.BoxGeometry(a, b, c), m); };
+  D.forEach(d => {
+    let gg = null, anc = null;
+    if (mot.comp[d.k]) { gg = mot.comp[d.k]; anc = new THREE.Object3D(); anc.position.copy(mot.ancore[d.k]); mot.grup.add(anc); }
+    else if (d.mot || d.car || d.roata != null) {
+      gg = new THREE.Group(); gg.userData.c = d.k;
+      const parinte = d.mot ? mot.grup : d.car ? caroserie : (d.rotire ? roti[d.roata].rot : roti[d.roata].grup);
+      if (d.local) gg.position.set(d.local[0], d.local[1], d.local[2] * roti[d.roata].sg); else gg.position.set(...(d.mot || d.car)); parinte.add(gg);
+      const m = corp(d); m.castShadow = true; gg.add(m);
+      anc = new THREE.Object3D(); anc.position.y = 0.04; gg.add(anc);
+    }
+    if (gg) grupuri[d.k] = gg;
+    if (anc) { ancoraObj[d.k] = anc; et.push({ obj: anc, text: d.e, k: d.k }); }
+  });
+  // senzorii de turație a roților (ABS): roata de impulsuri cu 48 de dinți pe butuc + senzorul fix pe fuzetă
   roti.forEach((r, i) => {
     const inel = new THREE.Group(); inel.position.z = -r.sg * 0.115; r.rot.add(inel);
     for (let k = 0; k < 48; k++) { const a = k / 48 * Math.PI * 2; const d = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.01, 0.012), mI); d.position.set(Math.cos(a) * 0.075, Math.sin(a) * 0.075, 0); d.rotation.z = a; inel.add(d); }
-    const s = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 12), mS); s.position.set(0, 0.105, -r.sg * 0.115); r.grup.add(s);
-    const o = new THREE.Object3D(); o.position.set(0, 0.13, -r.sg * 0.115); r.grup.add(o);
-    const k = ["vssFD", "vssFS", "vssSD", "vssSS"][i]; ancoraObj[k] = o; vss.push(k);
-    et.push({ obj: o, text: { vssFD: "ABS față dr.", vssFS: "ABS față st.", vssSD: "ABS spate dr.", vssSS: "ABS spate st." }[k], k });
+    const k = ["vssFD", "vssFS", "vssSD", "vssSS"][i];
+    const gg = new THREE.Group(); gg.userData.c = k; gg.position.set(0, 0.105, -r.sg * 0.115); r.grup.add(gg); grupuri[k] = gg;
+    gg.add(new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.05, 12), mS.clone()));
+    const o = new THREE.Object3D(); o.position.y = 0.03; gg.add(o); ancoraObj[k] = o; et.push({ obj: o, text: DK[k].e, k });
   });
-  // pedalele: senzorul de poziție a pedalei de accelerație (APP) și contactul stopurilor
+  // pedalele: senzorul pedalei de accelerație (APP) și contactul stopurilor
   const ped = new THREE.Group(); ped.position.set(1.08, 0.5, -0.24); caroserie.add(ped);
   const brat = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.015), mS); brat.position.y = -0.12; ped.add(brat);
   const talpa = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.09, 0.06), mS); talpa.position.set(-0.04, -0.28, 0); talpa.rotation.z = 0.5; ped.add(talpa);
-  const app = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.05), new THREE.MeshStandardMaterial({ color: 0x2b2f35 })); app.position.set(0.02, 0.02, 0); ped.add(app);
-  const oApp = new THREE.Object3D(); oApp.position.set(0.02, 0.05, 0); ped.add(oApp); ancoraObj.app = oApp; et.push({ obj: oApp, text: "APP pedală", k: "app" });
-  const oStop = new THREE.Object3D(); oStop.position.set(1.1, 0.88, -0.38); caroserie.add(oStop); ancoraObj.stop = oStop; et.push({ obj: oStop, text: "contact stopuri", k: "stop" });
-  const LISTA = { ckp: "Senzorul de turație CKP (inductiv)", cmp: "Senzorul de fază CMP (Hall)", map: "Senzorul MAP", tps: "Potențiometrul clapetei TPS", app: "Pedala de accelerație APP (2 piste)", l1: "Sonda λ amonte", l2: "Sonda λ aval", inj1: "Injectorul cilindrului 1 (comandă)", knock: "Senzorul de detonație", ect: "Temperatura lichidului CTS", iat: "Temperatura aerului IAT", vssFS: "Senzor ABS roata față stânga", vssSD: "Senzor ABS roata spate dreapta", stop: "Contactul stopurilor" };
+  { const gg = new THREE.Group(); gg.userData.c = "app"; gg.position.set(0.02, 0.02, 0); ped.add(gg); gg.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.05), new THREE.MeshStandardMaterial({ color: 0x2b2f35 }))); grupuri.app = gg;
+    const o = new THREE.Object3D(); o.position.y = 0.03; gg.add(o); ancoraObj.app = o; et.push({ obj: o, text: DK.app.e, k: "app" }); }
+  { const gg = new THREE.Group(); gg.userData.c = "stop"; gg.position.set(1.1, 0.86, -0.38); caroserie.add(gg); gg.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.04, 12), new THREE.MeshStandardMaterial({ color: 0xd8d8d8 }))); grupuri.stop = gg;
+    const o = new THREE.Object3D(); o.position.y = 0.03; gg.add(o); ancoraObj.stop = o; et.push({ obj: o, text: DK.stop.e, k: "stop" }); }
+  const LISTA = {}; D.forEach(d => LISTA[d.k] = d.n);
+  // doar etichetele sistemului ales
+  et.forEach(e => { const d = DK[e.k]; e.filtru = () => (S0 || stare).sist === d.s; });
+  // sfere invizibile de „prindere”, ca senzorii mici să poată fi selectați ușor cu mouse-ul
+  const mPrins = new THREE.MeshBasicMaterial({ visible: false }), prinderi = [];
+  Object.entries(ancoraObj).forEach(([k, o]) => { const sf = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), mPrins); sf.userData.c = k; sf.position.y = -0.03; o.add(sf); prinderi.push(sf); });
+  // componentele motorului care sunt doar senzori se ascund când e ales alt sistem (injectorul și clapeta rămân, fac parte din motor)
+  const ASCUNDE = ["ckp", "cmp", "map", "iat", "knock", "ect", "l1", "l2"];
+  let elSel = null, elSist = null;
+  function aplicaSistem(st) {
+    D.forEach(d => {
+      const vis = d.s === st.sist;
+      if (mot.comp[d.k]) { if (ASCUNDE.includes(d.k)) mot.comp[d.k].visible = vis; }
+      else if (grupuri[d.k]) grupuri[d.k].visible = vis;
+    });
+  }
+  // evidențierea senzorului selectat (pulsație)
+  const mats = {};
+  Object.entries(grupuri).forEach(([k, g]) => { if (mot.comp[k]) return; mats[k] = []; g.traverse(o => { if (o.isMesh && o.material && o.material.emissive) mats[k].push(o.material); }); });
+  function evidentiaza(st) {
+    const p = 0.5 + 0.5 * Math.sin(st.t * 6);
+    Object.entries(mats).forEach(([k, l]) => l.forEach(m => m.emissive.setRGB(k === st.sel ? 0.1 + 0.5 * p : 0, k === st.sel ? 0.45 + 0.4 * p : 0, k === st.sel ? 0.9 * p + 0.1 : 0)));
+  }
+  const optiuniSist = s0 => D.filter(d => d.s === s0).map(d => `<option value="${d.k}">${d.n}</option>`).join("");
   const html = `
     <div class="v3d-grup">
       <button type="button" data-s-act="motor">Pornește motorul</button>
@@ -819,11 +919,13 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       <button type="button" class="v3d-fr" title="Țineți apăsat (sau ↓ / S)">Frânează</button>
       <label>Pedala de accelerație max. <input type="range" data-s="pmax" min="10" max="100" step="5" value="60"> <output>60 %</output></label>
     </div>
-    <div class="v3d-grup">
-      <label>Senzorul afișat <select data-s="sel">${Object.entries(LISTA).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
+    <div class="v3d-grup v3d-senzori">
+      <label>Sistemul <select data-s="sist">${Object.entries(SISTEME).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
+      <label>Senzorul afișat <select data-s="sel">${optiuniSist("motor")}</select></label>
       <button type="button" data-s-act="vezi">Arată senzorul</button>
+      <span class="v3d-et">sau clic stânga pe senzor, în machetă</span>
     </div>`;
-  const stare = { motor: false, rpm: 0, v: 0, a: 0, thr: 0, brk: 0, gear: 1, sel: "ckp", pmax: 0.6, ect: 88, tEv: 300, t: 0, phi: 0, ltft: 4, stft: 0, accApasat: false, frApasat: false, buf: [] };
+  const stare = { motor: false, rpm: 0, v: 0, a: 0, thr: 0, brk: 0, gear: 1, sel: "ckp", sist: "motor", maf: 0, pUlei: 0, tEvac: 20, dpGpf: 0, tangajV: 0, pmax: 0.6, ect: 88, tEv: 300, t: 0, phi: 0, ltft: 4, stft: 0, accApasat: false, frApasat: false, buf: [] };
   let API = null, S0 = null;
   const ig = [0, 3.73, 2.05, 1.32, 0.97, 0.76], i0 = 4.21, R = 0.3, MASA = 1150;
   function leaga(cmd, st) {
@@ -835,6 +937,9 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     bm.addEventListener("click", () => { st.motor = !st.motor; bm.textContent = st.motor ? "Oprește motorul" : "Pornește motorul"; if (!st.motor) st.v = st.v; });
     const pm = cmd.querySelector('[data-s="pmax"]'); pm.addEventListener("input", () => { st.pmax = pm.value / 100; pm.nextElementSibling.textContent = pm.value + " %"; });
     const sel = cmd.querySelector('[data-s="sel"]'); sel.addEventListener("change", () => { st.sel = sel.value; st.buf = []; });
+    const ss = cmd.querySelector('[data-s="sist"]');
+    ss.addEventListener("change", () => { st.sist = ss.value; sel.innerHTML = optiuniSist(st.sist); st.sel = sel.value; st.buf = []; aplicaSistem(st); });
+    elSel = sel; elSist = ss; aplicaSistem(st);
     cmd.querySelector('[data-s-act="vezi"]').addEventListener("click", () => arata(st.sel));
     window.addEventListener("keydown", e => { if (!API || !API.scena.offsetParent || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; if (["ArrowUp", "KeyW"].includes(e.code)) { st.accApasat = true; e.preventDefault(); } if (["ArrowDown", "KeyS", "Space"].includes(e.code)) { st.frApasat = true; e.preventDefault(); } });
     window.addEventListener("keyup", e => { if (["ArrowUp", "KeyW"].includes(e.code)) st.accApasat = false; if (["ArrowDown", "KeyS", "Space"].includes(e.code)) st.frApasat = false; });
@@ -843,7 +948,9 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   function arata(k) {
     const o = ancoraObj[k]; if (!o || !API) return;
     o.getWorldPosition(v3);
-    const dir = new THREE.Vector3(0.9, 0.55, k.startsWith("vss") ? (k.endsWith("S") ? -1.2 : 1.2) : 0.9).normalize().multiplyScalar(k.startsWith("vss") ? 1.4 : 1.1);
+    const dx = v3.x > 2 ? 1.0 : v3.x < -1.8 ? -1.0 : 0.6, dz = v3.z > 0.5 ? 1.2 : v3.z < -0.5 ? -1.2 : 0.9;
+    const mare = k.startsWith("vss") || k.startsWith("tpms") || k === "uzura";
+    const dir = new THREE.Vector3(dx, 0.55, dz).normalize().multiplyScalar(mare ? 1.4 : 1.15);
     API.zboara([v3.x + dir.x, v3.y + dir.y, v3.z + dir.z], [v3.x, v3.y, v3.z]);
   }
   // semnalele (modele simplificate ale senzorilor reali)
@@ -868,7 +975,24 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       case "inj1": { const ub = 13.9; if (rpm < 50 || st.fuelCut) return ub; const T = 120 / rpm, ti = st.ti / 1000, ph = ((t % T) + T) % T; if (ph < ti) return 0.15; const d = ph - ti; return ub + 52 * Math.exp(-d / 0.00012); }
       case "knock": { if (rpm < 50) return 0; const T = 30 / rpm, ph = ((t % T) + T) % T; return Math.exp(-ph / 0.0012) * (0.1 + 1.4 * st.thr * rpm / 6000) * Math.sin(2 * Math.PI * 7000 * ph); }
       case "stop": return st.brk > 0.02 ? 12.6 : 0;
+      case "esc": case "volan": case "radar": case "crashF": case "crashL": break;
       default: if (k.startsWith("vss")) { const f = 48 * st.v / (2 * Math.PI * R); const A = Math.min(4, 0.4 + st.v * 0.12); return st.v < 0.05 ? 0 : A * Math.sin(2 * Math.PI * f * t); }
+    }
+    return semnalTip(DK[k], st, t);
+  }
+  const bit = n => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x) > 0.5; };
+  function semnalTip(d, st, t) {
+    if (!d || !d.tip) return 0;
+    switch (d.tip) {
+      case "dc": case "sw": return d.u ? d.u(st) : 0;
+      case "dig": { const f = d.f(st); return (t * f) % 1 < 0.5 ? 4.8 : 0.2; }
+      case "pwm": return (t * 25) % 1 < 0.42 ? 12 : 0.3;
+      case "can": { const b = Math.floor(t * 500000), cadru = b % 130; return cadru > 110 || !bit(b) ? 2.5 : 3.5; }        // CAN-H; CAN-L = 5 − CAN-H
+      case "lin": { const b = Math.floor(t * 19200), c = b % 70; if (c < 13) return 0.2; if (c > 60) return 12; return bit(b) ? 12 : 0.2; }
+      case "eth": { const n = Math.floor(t * 66.6e6); const x = Math.sin(n * 7.31 + 1.7) * 9301.13; const r = x - Math.floor(x); return r < 0.33 ? -1 : r < 0.66 ? 0 : 1; }
+      case "rf": return st.v > 0.5 && ((t % 3) + 3) % 3 < 0.06 ? 3 : 0;
+      case "us": { const T = 0.012, ph = ((t % T) + T) % T, te = 2 * d.dist / 343; if (ph < 0.0003) return 4.5; const e = ph - te; return e > 0 && e < 0.0004 ? 1.4 * Math.sin(Math.PI * e / 0.0004) : 0.05; }
+      case "psi5": { const T = 0.0005, ph = ((t % T) + T) % T, b = Math.floor(ph / 8e-6); if (b >= 12) return 10; const n = Math.floor(t / T) * 12 + b, h = (ph % 8e-6) < 4e-6; return (bit(n) ? h : !h) ? 36 : 10; }
     }
     return 0;
   }
@@ -876,6 +1000,18 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     if (k === "ckp") return [0.012, [-8, 8]]; if (k === "cmp") return [st.rpm > 50 ? 240 / st.rpm : 0.2, [-0.5, 5.5]];
     if (k === "inj1") return [st.rpm > 50 ? 240 / st.rpm : 0.1, [-5, 70]]; if (k === "knock") return [st.rpm > 50 ? 60 / st.rpm : 0.02, [-2, 2]];
     if (k.startsWith("vss")) return [0.04, [-4.5, 4.5]];
+    const d = DK[k];
+    if (d && d.tip) switch (d.tip) {
+      case "dig": return [3 / d.f(st), [-0.5, 5.5]];
+      case "pwm": return [0.12, [-1, 14]];
+      case "can": return [0.0002, [0, 5]];
+      case "lin": return [0.004, [-1, 14]];
+      case "eth": return [1.5e-7, [-1.5, 1.5]];
+      case "rf": return [6, [-0.5, 4]];
+      case "us": return [0.012, [0, 5]];
+      case "psi5": return [0.001, [0, 45]];
+      case "sw": return [6, [-1, 14]];
+    }
     return [6, k === "stop" ? [-1, 14] : [0, 5]];
   }
   function pas(dt, st) {
@@ -908,6 +1044,11 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     st.map = (st.map || 101) + (mapT - (st.map || 101)) * (1 - Math.exp(-dt / 0.08));
     st.ti = st.fuelCut || !st.motor ? 0 : 2.4 * st.map / 34 * (st.thr > 0.85 ? 1.12 : 1);
     if (st.motor) st.phi = (st.phi + 2 * Math.PI * (st.rpm < 1000 ? 0.6 : 1.1) * dt) % (2 * Math.PI);
+    st.maf = st.motor ? st.rpm / 120 * 1.39 * 1.2 * st.map / 101 * 0.85 : 0;
+    st.pUlei += ((st.motor ? Math.min(4.6, 1.1 + st.rpm / 1500) : 0) - st.pUlei) * (1 - Math.exp(-dt / 0.3));
+    st.tEvac += ((st.motor ? 380 + st.rpm * 0.09 + 150 * st.thr : 20) - st.tEvac) * (1 - Math.exp(-dt / 8));
+    st.dpGpf = st.motor ? 0.2 + st.maf * 0.07 : 0;
+    evidentiaza(st);
     // tampon pentru semnalele lente (6 s)
     const [Tf] = fereastra(st.sel, st);
     if (Tf >= 1) { st.buf.push([st.t, semnal(st.sel, st, st.t)]); while (st.buf.length && st.buf[0][0] < st.t - Tf) st.buf.shift(); }
@@ -925,8 +1066,11 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     a.canvas.addEventListener("pointerup", e => {
       if (!jos || Math.hypot(e.clientX - jos[0], e.clientY - jos[1]) > 5) return;
       const r = a.canvas.getBoundingClientRect(); m.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
-      ray.setFromCamera(m, a.camera); const hit = ray.intersectObjects(Object.values(mot.comp), true)[0];
-      if (hit) { let o = hit.object; while (o && !o.userData.c) o = o.parent; if (o && LISTA[o.userData.c] && S0) { S0.sel = o.userData.c; S0.buf = []; const s = a.scena.parentElement.querySelector('[data-s="sel"]'); if (s) s.value = S0.sel; } }
+      ray.setFromCamera(m, a.camera);
+      const sist = (S0 || stare).sist, ale = k => DK[k] && DK[k].s === sist;
+      const tinte = prinderi.filter(o => ale(o.userData.c)).concat(Object.entries(grupuri).filter(([k]) => ale(k)).map(([, g]) => g));
+      const hit = ray.intersectObjects(tinte, true)[0];
+      if (hit) { let o = hit.object; while (o && !o.userData.c) o = o.parent; if (o && LISTA[o.userData.c] && S0) { S0.sel = o.userData.c; S0.buf = []; if (elSel) elSel.value = S0.sel; } }
     });
   }
   function dupaRandare(st) {
@@ -941,6 +1085,11 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     if (Tf >= 1) st.buf.forEach(([t, u], i) => { const x = 10 + (t - (st.t - Tf)) / Tf * 310; i ? g.lineTo(x, Y(u)) : g.moveTo(x, Y(u)); });
     else { let t0 = st.t - Tf; if (st.sel === "ckp" && st.rpm > 50) { const p = 1 / st.rpm; t0 = Math.floor(t0 / p) * p; } if (st.sel === "inj1" && st.rpm > 50) { const p = 120 / st.rpm; t0 = Math.floor(t0 / p) * p - p * 0.1; } for (let i = 0; i <= 400; i++) { const t = t0 + Tf * i / 400, x = 10 + i / 400 * 310, y = Y(semnal(st.sel, st, t)); i ? g.lineTo(x, y) : g.moveTo(x, y); } }
     g.stroke();
+    if (DK[st.sel] && DK[st.sel].tip === "can") {            // a doua linie a magistralei: CAN-L
+      let t0 = st.t - Tf; g.strokeStyle = "#5fd0ff"; g.beginPath();
+      for (let i = 0; i <= 400; i++) { const t = t0 + Tf * i / 400, x = 10 + i / 400 * 310, y = Y(5 - semnal(st.sel, st, t)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke();
+    }
     const f = (v, n = 1) => v.toFixed(n).replace(".", ",");
     g.fillStyle = "#9fe6c0"; g.font = "600 11px system-ui"; g.fillText(LISTA[st.sel], 10, 15);
     let info = "";
@@ -948,9 +1097,10 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     else if (st.sel === "cmp") info = `f = ${f(st.rpm / 120, 1)} Hz (1 impuls / 2 rotații)`;
     else if (st.sel.startsWith("vss")) info = `f = ${f(48 * st.v / (2 * Math.PI * R), 0)} Hz → v = ${f(st.v * 3.6, 0)} km/h`;
     else if (st.sel === "inj1") info = st.fuelCut ? "întreruperea injecției (decelerare)" : `t_i = ${f(st.ti, 2)} ms`;
+    else if (DK[st.sel] && DK[st.sel].info) info = DK[st.sel].info(st);
     else info = `U = ${f(semnal(st.sel, st, st.t), 2)} V`;
     g.fillText(info, 10, H - 5);
-    g.fillStyle = "#9fe6c0"; g.textAlign = "right"; g.fillText(Tf >= 1 ? `${Tf} s` : `${f(Tf * 1000, 1)} ms`, 320, H - 5); g.textAlign = "left";
+    g.fillStyle = "#9fe6c0"; g.textAlign = "right"; g.fillText(Tf >= 1 ? `${Tf} s` : Tf >= 1e-3 ? `${f(Tf * 1000, 1)} ms` : Tf >= 1e-6 ? `${f(Tf * 1e6, 0)} µs` : `${f(Tf * 1e9, 0)} ns`, 320, H - 5); g.textAlign = "left";
   }
   const f = (v, n = 1) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n).replace(".", ",");
   function hud(st) {
