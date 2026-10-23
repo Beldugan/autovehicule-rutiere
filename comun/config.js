@@ -80,5 +80,5 @@ const PORTAL = {
     }
   },
   /** lucrările deja realizate în portal: cod → cale */
-  realizate: { "mf-l2": "mf/l2/" }
+  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/" }
 };

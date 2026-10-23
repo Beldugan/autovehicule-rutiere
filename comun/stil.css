@@ -334,3 +334,4 @@ div.lucrare { opacity: .75; }
 .v3d-frana { user-select: none; -webkit-user-select: none; touch-action: none; min-width: 9rem; }
 .v3d-frana.activ { filter: brightness(.85); transform: translateY(1px); }
 @media (max-width: 640px) { .v3d-ajutor { display: none; } .v3d-hud { font-size: .74rem; } }
+.v3d-toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: #1d2733; color: #fff; padding: .6rem 1rem; border-radius: 10px; z-index: 50; max-width: 90vw; font-size: .9rem; }

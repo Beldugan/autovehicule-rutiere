@@ -229,7 +229,7 @@ export function creeaza(gazda, optiuni = {}) {
   }
 
   /* --- sistemul de frânare */
-  const S = construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
+  const S = sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
 
   /* --- etichete HTML */
   const elEt = gazda.querySelector(".v3d-etichete");
@@ -237,7 +237,7 @@ export function creeaza(gazda, optiuni = {}) {
 
   /* --- comenzi */
   const cmd = gazda.querySelector(".v3d-comenzi");
-  cmd.innerHTML = `
+  cmd.innerHTML = (sistem !== "frana" ? S.html : `
     <div class="v3d-grup">
       <button type="button" class="primar v3d-frana" title="Țineți apăsat (sau tasta Spațiu)">Apasă frâna</button>
       <button type="button" data-v="50">Pornește la 50 km/h</button><button type="button" data-v="90">90 km/h</button><button type="button" data-v="130">130 km/h</button>
@@ -251,36 +251,41 @@ export function creeaza(gazda, optiuni = {}) {
       <label><input type="checkbox" data-k="servo" checked> Servofrână</label>
       <label><input type="checkbox" data-k="abs" checked> ABS</label>
       <label>Aderență <select data-k="mu"><option value="0.9">asfalt uscat</option><option value="0.6">asfalt ud</option><option value="0.25">zăpadă</option></select></label>
-    </div>
+    </div>`) + `
     <div class="v3d-grup">
       <span class="v3d-et">Vedere</span>
       <select data-k="viz"><option value="mixt">mixt (față vopsită)</option><option value="xray" selected>raze X</option><option value="vopsit">vopsit</option><option value="sistem">doar sistemul</option></select>
-      <button type="button" data-cam="34">3/4 față</button><button type="button" data-cam="lat">lateral</button><button type="button" data-cam="sus">de sus</button><button type="button" data-cam="jos">de dedesubt</button><button type="button" data-cam="roata">roata față</button><button type="button" data-cam="pedala">pedalier</button>
+      <button type="button" data-cam="34">3/4 față</button><button type="button" data-cam="lat">lateral</button><button type="button" data-cam="sus">de sus</button><button type="button" data-cam="jos">de dedesubt</button>${(S.camereButoane || [["roata", "roata față"], ["pedala", "pedalier"]]).map(([k, t]) => `<button type="button" data-cam="${k}">${t}</button>`).join("")}
       <label><input type="checkbox" data-k="et" checked> Etichete</label>
     </div>`;
   const st = { F: 250, aer: 0, servo: true, abs: true, mu: 0.9, viz: "xray", et: true, apasat: false, Fact: 0, v: 0, x: 0, p: 0, pRoti: [0, 0, 0, 0], cursaP: 0, sMC: 0, a: 0, dist: 0, xStart: null, vStart: 0, blocat: false, absAct: false, unghi: [0, 0, 0, 0], caldura: [0, 0, 0, 0], tangaj: 0, tAbs: 0, vTinta: 0 };
+  if (S.stare) Object.assign(st, S.stare);
   if (optiuni.stareInitiala) Object.assign(st, optiuni.stareInitiala);
   const out = el => el.parentElement.querySelector("output");
-  cmd.querySelectorAll("input[type=range]").forEach(i => {
+  cmd.querySelectorAll(".v3d-grup input[type=range]:not([data-s])").forEach(i => {
     const fmtV = () => out(i).textContent = i.dataset.k === "F" ? `${i.value} N` : `${(+i.value).toFixed(1).replace(".", ",")} cm³`;
     i.value = st[i.dataset.k]; fmtV();
     i.addEventListener("input", () => { st[i.dataset.k] = +i.value; fmtV(); });
   });
-  cmd.querySelectorAll("input[type=checkbox]").forEach(i => i.addEventListener("change", () => { st[i.dataset.k] = i.checked; aplicaViz(); }));
-  cmd.querySelectorAll("select").forEach(s => { s.value = String(st[s.dataset.k]); s.addEventListener("change", () => { st[s.dataset.k] = s.dataset.k === "mu" ? +s.value : s.value; aplicaViz(); }); });
+  cmd.querySelectorAll("input[type=checkbox]:not([data-s])").forEach(i => i.addEventListener("change", () => { st[i.dataset.k] = i.checked; aplicaViz(); }));
+  cmd.querySelectorAll("select:not([data-s])").forEach(s => { s.value = String(st[s.dataset.k]); s.addEventListener("change", () => { st[s.dataset.k] = s.dataset.k === "mu" ? +s.value : s.value; aplicaViz(); }); });
   cmd.querySelectorAll("[data-v]").forEach(b => b.addEventListener("click", () => { st.vTinta = +b.dataset.v / 3.6; st.dist = 0; st.xStart = null; S.stergeUrme?.(); while (urme.children.length) urme.remove(urme.children[0]); }));
   const preia = cmd.querySelector(".v3d-preia");
   if (preia) preia.addEventListener("click", () => { const v = optiuni.aerDin.valoare(); if (isFinite(v)) { st.aer = clamp(v, 0, 8); const i = cmd.querySelector('[data-k="aer"]'); i.value = st.aer; i.dispatchEvent(new Event("input")); } });
+  let tasta = () => { };
+  if (sistem === "frana") {
   const bF = cmd.querySelector(".v3d-frana");
   const apasa = on => { st.apasat = on; bF.classList.toggle("activ", on); };
   bF.addEventListener("pointerdown", e => { e.preventDefault(); bF.setPointerCapture?.(e.pointerId); apasa(true); });
   ["pointerup", "pointercancel", "lostpointercapture"].forEach(ev => bF.addEventListener(ev, () => apasa(false)));
-  const tasta = e => { if (e.code === "Space" && gazda.offsetParent && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) { e.preventDefault(); apasa(e.type === "keydown"); } };
+  tasta = e => { if (e.code === "Space" && gazda.offsetParent && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) { e.preventDefault(); apasa(e.type === "keydown"); } };
   window.addEventListener("keydown", tasta); window.addEventListener("keyup", tasta);
+  } else S.leaga(cmd, st);
 
   /* --- vederi de cameră */
   const CAM = { "34": [[6.2, 2.6, 5.4], [0, 0.6, 0]], lat: [[0.2, 1.1, 8.6], [0, 0.65, 0]], sus: [[0.01, 9.5, 0.01], [0, 0.4, 0]], jos: [[1.5, -2.6, 2.2], [0, 0.25, 0]],
     roata: [[XF + 0.9, 0.6, ZR + 1.5], [XF, 0.33, ZR - 0.05]], pedala: [[0.2, 1.25, -1.6], [1.25, 0.72, -0.38]] };
+  Object.assign(CAM, S.camere || {});
   let zbor = null;
   cmd.querySelectorAll("[data-cam]").forEach(b => b.addEventListener("click", () => { const [p, t] = CAM[b.dataset.cam]; zbor = { p0: camera.position.clone(), t0: ctl.target.clone(), p1: new THREE.Vector3(...p), t1: new THREE.Vector3(...t), k: 0 }; }));
 
@@ -307,6 +312,7 @@ export function creeaza(gazda, optiuni = {}) {
     elEt.style.display = st.et ? "" : "none";
   }
   aplicaViz();
+  if (S.cameraInitiala) { camera.position.set(...S.cameraInitiala[0]); ctl.target.set(...S.cameraInitiala[1]); }
   const laTema = () => aplicaViz();
   window.addEventListener("schimbare-tema", laTema);
 
@@ -324,6 +330,7 @@ export function creeaza(gazda, optiuni = {}) {
   }
   let tPrec = performance.now(), activ = true, raf = 0;
   function pas(dt) {
+    if (sistem !== "frana") { S.pas(dt, st); return; }
     // forța pe pedală (rampă realistă)
     st.Fact += clamp((st.apasat ? st.F : 0) - st.Fact, -2500 * dt, 1800 * dt);
     const pDem = hidraulica(st.Fact);
@@ -373,6 +380,7 @@ export function creeaza(gazda, optiuni = {}) {
   }
   function hud() {
     const el = gazda.querySelector(".v3d-hud");
+    if (sistem !== "frana") { el.innerHTML = S.hud(st); return; }
     const f = (v, n = 1) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n).replace(".", ",");
     el.innerHTML = `<div><b>${f(st.v * 3.6, 0)}</b> km/h</div>
       <div>p<sub>pompă</sub> <b>${f(st.p, 1)}</b> bar</div>
@@ -553,4 +561,212 @@ function construiesteFrana({ THREE, sasiu, caroserie, roti }) {
     });
   }
   return { etichete: et, actualizeaza };
+}
+
+/* ================================================================== ungerea motorului (L1 – vâscozitatea uleiului) */
+const ULEIURI3D = {
+  "0W-20": { n40: 44.5, n100: 8.6, r15: 0.846 }, "5W-30": { n40: 65.3, n100: 11.0, r15: 0.855 },
+  "10W-40": { n40: 98.0, n100: 14.6, r15: 0.868 }, "15W-40": { n40: 108, n100: 14.8, r15: 0.880 }, "UZAT": { n40: 54.0, n100: 9.4, r15: 0.862 }
+};
+function waltherAB(n40, n100) { const lg = Math.log10, Y = n => lg(lg(n + 0.7)), x1 = lg(313.15), x2 = lg(373.15), B = (Y(n40) - Y(n100)) / (x2 - x1); return { A: Y(n40) + B * x1, B }; }
+function nuW(w, t) { return Math.pow(10, Math.pow(10, w.A - w.B * Math.log10(t + 273.15))) - 0.7; }
+
+function construiesteUngere({ THREE, caroserie, optiuni, ctxMotor }) {
+  const et = [];
+  // ascundem conturul simplu al motorului din interiorul de context
+  ctxMotor.children.forEach(l => { const p = l.position; if (Math.abs(p.x - 1.82) < 0.01 && Math.abs(p.y - 0.62) < 0.01) l.visible = false; });
+  const M = new THREE.Group(); caroserie.add(M);
+  const X0 = 1.86, YC = 0.44;                // axa arborelui cotit (motor transversal: axa pe z)
+  const ZC = [-0.21, -0.07, 0.07, 0.21];     // cilindrii
+  const ZL = [-0.28, -0.14, 0, 0.14, 0.28];  // lagărele paliere
+  const mBloc = new THREE.MeshPhysicalMaterial({ color: 0xc9ced4, metalness: 0.3, roughness: 0.4, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
+  const mLinii = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
+  const mOtel = new THREE.MeshStandardMaterial({ color: 0x9aa2ab, metalness: 0.9, roughness: 0.3 });
+  const mPiston = new THREE.MeshStandardMaterial({ color: 0xd2d6db, metalness: 0.7, roughness: 0.35 });
+  const mUlei = new THREE.MeshStandardMaterial({ color: 0xd9a03a, emissive: 0x6b3b00, emissiveIntensity: 0.4, roughness: 0.25, transparent: true, opacity: 0.92 });
+  const mTeava = new THREE.MeshStandardMaterial({ color: 0x8b939c, metalness: 0.5, roughness: 0.5, transparent: true, opacity: 0.35, depthWrite: false });
+  const mFiltru = new THREE.MeshStandardMaterial({ color: 0x1f5fb0, metalness: 0.3, roughness: 0.45 });
+  const cutie = (w, h, d, x, y, z, m = mBloc) => { const g = new THREE.BoxGeometry(w, h, d); const o = new THREE.Mesh(g, m); o.position.set(x, y, z); M.add(o); const l = new THREE.LineSegments(new THREE.EdgesGeometry(g), mLinii); l.position.copy(o.position); M.add(l); return o; };
+  const bloc = cutie(0.36, 0.42, 0.66, X0, 0.62, 0);
+  cutie(0.36, 0.13, 0.66, X0, 0.895, 0);                     // chiulasa
+  cutie(0.30, 0.05, 0.62, X0, 0.985, 0);                     // capacul culbutorilor
+  const baie = cutie(0.38, 0.16, 0.62, X0, 0.29, 0);         // baia de ulei (carterul inferior)
+  et.push({ obj: bloc, text: "Blocul motor (4 cilindri)" });
+  // uleiul din baie
+  const nivel = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.1, 0.6), mUlei); nivel.position.set(X0, 0.265, 0); M.add(nivel);
+  et.push({ obj: nivel, text: "Baia de ulei" });
+  // cilindri (cămăși) și pistoane cu biele
+  const piese = [];
+  ZC.forEach((z, i) => {
+    const cam = new THREE.Mesh(new THREE.CylinderGeometry(0.041, 0.041, 0.2, 24, 1, true), mTeava); cam.position.set(X0, 0.66, z); M.add(cam);
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.039, 0.039, 0.05, 24), mPiston); M.add(p);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.14, 0.012), mOtel); M.add(b);
+    piese.push({ p, b, z, faza: [0, Math.PI, Math.PI, 0][i] });
+  });
+  // arborele cotit (fusuri paliere + manetoane) – se rotește în jurul axei z
+  const cotit = new THREE.Group(); cotit.position.set(X0, YC, 0); M.add(cotit);
+  ZL.forEach(z => { const f = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.05, 20), mOtel); f.rotation.x = Math.PI / 2; f.position.z = z; cotit.add(f); });
+  piese.forEach(o => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.04, 16), mOtel); m.rotation.x = Math.PI / 2; m.position.set(Math.sin(o.faza) * 0.043, Math.cos(o.faza) * 0.043, o.z); cotit.add(m);
+    [-1, 1].forEach(s => { const w = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.014), mOtel); w.position.set(Math.sin(o.faza) * 0.02, Math.cos(o.faza) * 0.02, o.z + s * 0.03); w.rotation.z = -o.faza; cotit.add(w); }); });
+  et.push({ obj: cotit, text: "Arborele cotit" });
+  // cuzineții palieri: inele care se „umplu” cu ulei
+  const cuz = ZL.map(z => { const m = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: 0.6, roughness: 0.4, emissive: 0x000000 }); const r = new THREE.Mesh(new THREE.TorusGeometry(0.031, 0.007, 8, 24), m); r.position.set(X0, YC, z); M.add(r); return m; });
+  et.push({ obj: M.children[M.children.length - 1], text: "Lagăre paliere (cuzineți)" });
+  // arborele cu came în chiulasă
+  const came = new THREE.Group(); came.position.set(X0, 0.905, 0); M.add(came);
+  const ax = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.64, 12), mOtel); ax.rotation.x = Math.PI / 2; came.add(ax);
+  for (let k = 0; k < 8; k++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.016, 3), mOtel); l.rotation.x = Math.PI / 2; l.position.z = -0.245 + k * 0.07; l.rotation.y = k * 0.8; came.add(l); }
+  const cuzCame = ZL.map(z => { const m = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: 0.6, roughness: 0.4 }); const r = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.005, 8, 20), m); r.position.set(X0, 0.905, z); M.add(r); return m; });
+  et.push({ obj: came, text: "Arborele cu came" });
+  // pompa de ulei (pe capătul arborelui cotit), sorbul, filtrul
+  const pompa = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.04, 28), new THREE.MeshStandardMaterial({ color: 0x8f969e, metalness: 0.8, roughness: 0.35 }));
+  pompa.rotation.x = Math.PI / 2; pompa.position.set(X0, YC, -0.35); M.add(pompa);
+  const angr = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.006, 6, 16), mOtel); angr.position.set(X0, YC, -0.375); M.add(angr);
+  et.push({ obj: pompa, text: "Pompa de ulei" });
+  const filtru = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.1, 24), mFiltru); filtru.rotation.z = Math.PI / 2; filtru.position.set(1.63, 0.54, -0.22); M.add(filtru);
+  et.push({ obj: filtru, text: "Filtrul de ulei" });
+  const sorb = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.01, 16), mOtel); sorb.position.set(X0, 0.225, -0.1); M.add(sorb);
+  et.push({ obj: sorb, text: "Sorbul cu sită" });
+
+  // traseele de ulei: țeava (transparentă) + uleiul care o umple progresiv
+  const trasee = [];
+  const traseu = (pts, V, nume) => {
+    const c = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)), false, "catmullrom", 0.15);
+    const segs = Math.max(20, pts.length * 16);
+    M.add(new THREE.Mesh(new THREE.TubeGeometry(c, segs, 0.011, 8, false), mTeava));
+    const g = new THREE.TubeGeometry(c, segs, 0.0085, 8, false);
+    const u = new THREE.Mesh(g, mUlei); M.add(u);
+    g.setDrawRange(0, 0);
+    const bile = []; for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe3a0 })); b.visible = false; M.add(b); bile.push({ b, u: k / 6 }); }
+    const t = { c, g, V, plin: 0, bile, nume, nIdx: g.index.count }; trasee.push(t); return t;
+  };
+  const xG = 1.70, yG = 0.47;
+  traseu([[X0, 0.23, -0.1], [X0, 0.24, -0.25], [X0, 0.33, -0.33], [X0, YC - 0.03, -0.35]], 0.05, "sorb");
+  traseu([[X0, YC + 0.04, -0.37], [1.75, 0.52, -0.37], [1.66, 0.54, -0.30], [1.63, 0.54, -0.27]], 0.06, "refulare");
+  traseu([[1.63, 0.54, -0.17], [1.66, 0.52, -0.20], [xG, yG, -0.30]], 0.22, "filtru");               // include volumul filtrului golit
+  traseu([[xG, yG, -0.30], [xG, yG, 0], [xG, yG, 0.30]], 0.06, "galeria principală");
+  const ramuri = ZL.map(z => traseu([[xG, yG, z], [X0 - 0.06, YC + 0.02, z], [X0 - 0.03, YC, z]], 0.006, "ramificație"));
+  traseu([[xG, yG, 0.30], [xG, 0.70, 0.32], [X0 - 0.05, 0.88, 0.32], [X0, 0.89, 0.30]], 0.05, "coloana spre chiulasă");
+  traseu([[X0, 0.89, 0.30], [X0, 0.89, 0], [X0, 0.89, -0.30]], 0.06, "galeria din chiulasă");
+  et.push({ obj: trasee[3].bile[2].b, text: "Galeria principală de ulei" });
+  const Vtot = trasee.reduce((a, t) => a + t.V, 0);
+
+  // ---------------------------------------------------------- comenzi
+  const html = `
+    <div class="v3d-grup">
+      <button type="button" class="primar" data-u="porneste">Pornire la rece (motor oprit de 12 h)</button>
+      <button type="button" data-u="opreste">Oprește motorul</button>
+    </div>
+    <div class="v3d-grup">
+      <label>Uleiul <select data-s="ulei">${Object.keys(ULEIURI3D).map(k => `<option value="${k}">${k === "UZAT" ? "5W-30 uzat" : k}</option>`).join("")}<option value="PROPRIU">uleiul A – dreapta voastră</option></select></label>
+      <label>Temperatura uleiului <input type="range" data-s="T" min="-25" max="110" step="1" value="-5"> <output>−5 °C</output></label>
+      <label>Turația <input type="range" data-s="n" min="800" max="6000" step="100" value="1200"> <output>1200 rot/min</output></label>
+    </div>`;
+  const stare = { motor: false, n: 0, nTinta: 1200, T: -5, ulei: "5W-30", tPorn: 0, p: 0, Q: 0, Qp: 0, tLag: null, tCam: null, unghi: 0, nu: 0, eta: 0, wPropriu: null };
+  let S0 = null;
+  function vasc(st) {
+    let w;
+    if (st.ulei === "PROPRIU" && st.wPropriu) w = st.wPropriu;
+    else { const u = ULEIURI3D[st.ulei === "PROPRIU" ? "5W-30" : st.ulei]; w = waltherAB(u.n40, u.n100); }
+    const u = ULEIURI3D[st.ulei] || ULEIURI3D["5W-30"];
+    const nu = nuW(w, st.T), rho = u.r15 * (1 - 0.00065 * (st.T - 15));
+    return { nu, eta: nu * rho };
+  }
+  function leaga(cmd, st) {
+    S0 = st;
+    const outT = cmd.querySelector('[data-s="T"]'), outN = cmd.querySelector('[data-s="n"]'), sel = cmd.querySelector('[data-s="ulei"]');
+    outT.addEventListener("input", () => { st.T = +outT.value; outT.nextElementSibling.textContent = `${st.T < 0 ? "−" + (-st.T) : st.T} °C`; });
+    outN.addEventListener("input", () => { st.nTinta = +outN.value; outN.nextElementSibling.textContent = `${st.nTinta} rot/min`; });
+    sel.addEventListener("change", () => {
+      st.ulei = sel.value;
+      if (st.ulei === "PROPRIU") { const w = optiuni.walther && optiuni.walther(); if (w) st.wPropriu = w; else { st.wPropriu = null; alert_("Măsurați întâi uleiul A la 40 °C și 80 °C (Tabelul 1.2): dreapta voastră nu este încă disponibilă – se folosește 5W-30 din catalog."); } }
+    });
+    cmd.querySelector('[data-u="porneste"]').addEventListener("click", () => {
+      // motor oprit de mult: galeriile și filtrul s-au golit în baie
+      trasee.forEach((t, i) => { t.plin = i === 0 ? 0.5 : 0; }); st.motor = true; st.tPorn = 0; st.n = 0; st.tLag = null; st.tCam = null;
+    });
+    cmd.querySelector('[data-u="opreste"]').addEventListener("click", () => { st.motor = false; });
+  }
+  function alert_(t) { try { const d = document.createElement("div"); d.className = "v3d-toast"; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 5000); } catch (e) { } }
+
+  // ---------------------------------------------------------- fizica ungerii
+  const VG = 12e-3;            // cilindreea pompei [L/rot]
+  const RK = 0.0116;           // rezistența hidraulică a motorului [bar/(L/min·mPa·s)]
+  const P_SUP = 5.5;           // supapa de siguranță [bar]
+  function pas(dt, st) {
+    const v = vasc(st); st.nu = v.nu; st.eta = v.eta;
+    // turația: demaror 250 rot/min, apoi ralanti (mai mare la rece) sau turația cerută
+    if (st.motor) {
+      st.tPorn += dt;
+      const ral = st.T < 20 ? 1200 : 800, tinta = st.tPorn < 0.9 ? 250 : Math.max(ral, st.nTinta);
+      st.n += (tinta - st.n) * (1 - Math.exp(-dt / 0.35));
+    } else st.n += (0 - st.n) * (1 - Math.exp(-dt / 0.5));
+    // debitul pompei: teoretic, minus scăpări (mari la ulei subțire, cald), limitat la aspirație (ulei vâscos, rece)
+    const Qt = VG * st.n;                                         // L/min
+    const Qsuc = 3000 / st.eta;                                   // L/min, limita sorbului
+    const pUmplut = trasee.every(t => t.plin >= 1);
+    let Qp = Math.min(Qt, Qsuc);
+    let p;
+    if (!pUmplut) p = Math.min(P_SUP, 0.15 + Qp * RK * st.eta * 0.08);   // galerii parțial goale: presiune mică
+    else p = Math.min(P_SUP, Qp * RK * st.eta);
+    const scap = 0.04 * p * 9.4 / Math.max(st.eta, 1) * Qt / 10;  // scăpări interne ale pompei
+    Qp = Math.max(0, Qp - scap);
+    let Qm = Qp;                                                  // debit prin motor
+    if (pUmplut && Qp * RK * st.eta > P_SUP) Qm = P_SUP / (RK * st.eta);   // restul se întoarce prin supapă
+    st.Qp = Qp; st.Q = Qm;
+    st.p += (p - st.p) * (1 - Math.exp(-dt / 0.15));
+    // umplerea traseelor, în ordine (ramurile primesc în paralel după galeria principală)
+    let Vdisp = Qm / 60 * dt;                                     // L în pasul de timp
+    for (const t of trasee) {
+      if (Vdisp <= 0) break;
+      if (t.plin >= 1) continue;
+      const nevoie = (1 - t.plin) * t.V, dat = Math.min(nevoie, Vdisp);
+      t.plin += dat / t.V; Vdisp -= dat;
+      if (ramuri.includes(t)) { /* ramurile se umplu împreună */ ramuri.forEach(r => { if (r !== t) r.plin = Math.max(r.plin, t.plin); }); }
+      break;
+    }
+    if (st.motor && st.tLag === null && ramuri.every(r => r.plin >= 1)) st.tLag = st.tPorn;
+    if (st.motor && st.tCam === null && trasee[trasee.length - 1].plin >= 1) st.tCam = st.tPorn;
+    // rotirea pieselor (vizual încetinită de 40 de ori)
+    st.unghi += st.n / 60 * 2 * Math.PI * dt / 40;
+    cotit.rotation.z = -st.unghi; came.rotation.z = -st.unghi / 2;
+    piese.forEach(o => {
+      const a = st.unghi + o.faza, r = 0.043, L = 0.14;
+      const yp = YC + r * Math.cos(a) + Math.sqrt(L * L - (r * Math.sin(a)) ** 2);
+      o.p.position.set(X0, yp + 0.025, o.z);
+      const xm = X0 + r * Math.sin(a), ym = YC + r * Math.cos(a);
+      o.b.position.set((xm + X0) / 2, (ym + yp) / 2, o.z); o.b.rotation.z = Math.atan2(X0 - xm, yp - ym);
+    });
+    // afișarea uleiului din trasee și a particulelor
+    trasee.forEach(t => {
+      t.g.setDrawRange(0, Math.floor(t.nIdx * clamp(t.plin, 0, 1) / 6) * 6);
+      const vit = clamp(st.Q / 25, 0, 1.5);
+      t.bile.forEach(o => {
+        o.u = (o.u + vit * dt * 0.8) % 1;
+        o.b.visible = st.n > 50 && o.u < t.plin;
+        if (o.b.visible) t.c.getPointAt(o.u, o.b.position);
+      });
+    });
+    const okLag = ramuri.every(r => r.plin >= 1) && st.p > 0.5;
+    cuz.forEach(m => { m.emissive.set(okLag ? 0x2a7a3a : (st.n > 50 ? 0x7a1a10 : 0x000000)); m.emissiveIntensity = 0.8; });
+    cuzCame.forEach(m => { m.emissive.set(trasee[trasee.length - 1].plin >= 1 && st.p > 0.5 ? 0x2a7a3a : (st.n > 50 ? 0x7a1a10 : 0x000000)); m.emissiveIntensity = 0.8; });
+    nivel.scale.y = 1 - 0.35 * trasee.reduce((a, t) => a + t.plin * t.V, 0) / Vtot;
+    nivel.position.y = 0.215 + 0.05 * nivel.scale.y;
+    mUlei.color.setHSL(0.1, 0.75, clamp(0.38 + st.T / 400, 0.3, 0.6));
+    st.v = 0; st.a = 0;
+  }
+  const f = (v, n = 1) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n).replace(".", ",");
+  function hud(st) {
+    const lampa = st.n > 50 && st.p < 0.4;
+    return `<div><b>${f(st.n, 0)}</b> rot/min</div>
+      <div>ulei <b>${f(st.T, 0)}</b> °C · ν <b>${st.nu > 999 ? f(st.nu, 0) : f(st.nu, 1)}</b> mm²/s</div>
+      <div>p ulei <b>${f(st.p, 2)}</b> bar</div>
+      <div>debit motor <b>${f(st.Q, 1)}</b> L/min</div>
+      <div>ungere lagăre: <b>${st.tLag !== null ? f(st.tLag, 1) + " s" : (st.motor ? "…" : "–")}</b></div>
+      <div>ungere came: <b>${st.tCam !== null ? f(st.tCam, 1) + " s" : (st.motor ? "…" : "–")}</b></div>
+      ${lampa ? '<div class="v3d-blocare">● lampa presiunii uleiului</div>' : ""}
+      ${st.p >= P_SUP - 0.05 ? '<div class="v3d-abs">supapa de siguranță deschisă</div>' : ""}`;
+  }
+  return { etichete: et, html, leaga, pas, hud, stare, camere: { motor: [[3.5, 1.5, 1.9], [X0, 0.6, 0]], lateral: [[X0, 0.7, 2.2], [X0, 0.6, 0]] },
+    camereButoane: [["motor", "motorul"], ["lateral", "motor – lateral"]], cameraInitiala: [[3.9, 1.7, 2.6], [X0 - 0.2, 0.6, 0]] };
 }
