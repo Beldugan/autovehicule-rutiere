@@ -312,3 +312,25 @@ a.lucrare:hover { border-color: var(--accent); }
 .insigna.lucru { background: var(--atentie-fundal); color: var(--atentie); }
 div.lucrare { opacity: .75; }
 @media (max-width: 600px) { .lucrare { grid-template-columns: 2.2rem minmax(0, 1fr); } .lucrare .insigna { grid-column: 2; justify-self: start; } }
+
+/* ---------- vehicul 3D */
+.v3d-scena { position: relative; height: clamp(360px, 62vh, 640px); border-radius: 12px; overflow: hidden; background: #d9dfe5; touch-action: none; }
+.v3d-scena canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+.v3d-scena canvas:active { cursor: grabbing; }
+.v3d-etichete { position: absolute; inset: 0; pointer-events: none; }
+.v3d-eticheta { position: absolute; left: 0; top: 0; font-size: .74rem; font-weight: 600; color: #fff; background: rgba(14, 22, 32, .72); padding: .12rem .45rem; border-radius: 999px; white-space: nowrap; margin: -1.6rem 0 0 .4rem; border: 1px solid rgba(255, 255, 255, .25); }
+.v3d-eticheta::after { content: ""; position: absolute; left: -.25rem; top: 100%; width: 1px; height: max(0px, calc(var(--dy, 0px) + .25rem)); background: rgba(255, 207, 77, .8); }
+.v3d-eticheta::before { content: ""; position: absolute; left: -.42rem; bottom: calc(-.55rem - var(--dy, 0px)); width: .4rem; height: .4rem; border-radius: 50%; background: #ffcf4d; box-shadow: 0 0 0 2px rgba(14, 22, 32, .6); }
+.v3d-hud { position: absolute; left: .7rem; top: .7rem; background: rgba(14, 22, 32, .78); color: #e8eef5; border-radius: 10px; padding: .5rem .7rem; font-size: .82rem; line-height: 1.45; font-variant-numeric: tabular-nums; min-width: 9.5rem; pointer-events: none; }
+.v3d-hud b { font-size: 1.02rem; color: #fff; }
+.v3d-abs { color: #ffcf4d; font-weight: 700; } .v3d-blocare { color: #ff7a6b; font-weight: 700; }
+.v3d-ajutor { position: absolute; right: .7rem; bottom: .6rem; font-size: .72rem; color: #fff; background: rgba(14, 22, 32, .55); padding: .15rem .5rem; border-radius: 6px; pointer-events: none; }
+.v3d-comenzi { display: flex; flex-direction: column; gap: .5rem; margin-top: .7rem; }
+.v3d-grup { display: flex; flex-wrap: wrap; gap: .45rem .8rem; align-items: center; }
+.v3d-grup label { display: inline-flex; gap: .35rem; align-items: center; font-size: .88rem; }
+.v3d-grup input[type=range] { width: 9rem; }
+.v3d-grup output { min-width: 3.6rem; font-variant-numeric: tabular-nums; }
+.v3d-et { font-size: .85rem; color: var(--text-sec); }
+.v3d-frana { user-select: none; -webkit-user-select: none; touch-action: none; min-width: 9rem; }
+.v3d-frana.activ { filter: brightness(.85); transform: translateY(1px); }
+@media (max-width: 640px) { .v3d-ajutor { display: none; } .v3d-hud { font-size: .74rem; } }

@@ -1,6 +1,7 @@
 /* Cadrul comun al unei lucrări de laborator: pagina, simulatorul, determinările, teoria, verificarea și referatul.
    O lucrare se descrie printr-un obiect LAB și se pornește cu Cadru.porneste(LAB). */
 "use strict";
+const BAZA_COMUN = ((document.currentScript && document.currentScript.src) || "").replace(/[^/]*$/, "");
 
 let LAB = null;
 
@@ -53,7 +54,10 @@ const Cadru = {
   /* ---------------------------------------------------------------- DOM */
   construiesteDOM() {
     const d = PORTAL.discipline[LAB.disc];
-    const tabs = [["sim", "Simulator"], ["det", "Determinări"], ["teorie", "Teorie"], ["probleme", "Exemplu și probleme"]];
+    const tabs = [["sim", "Simulator"]];
+    if (LAB.vehicul3d) tabs.push(["v3d", LAB.vehicul3d.titluTab || "Pe autovehicul (3D)"]);
+    tabs.push(["det", "Determinări"]);
+    tabs.push(["teorie", "Teorie"], ["probleme", "Exemplu și probleme"]);
     if (LAB.continut.aplicatii) tabs.push(["aplicatii", LAB.continut.aplicatii.titluTab || "Aplicații la autovehicul"]);
     tabs.push(["verif", "Verificare"], ["referat", "Referat"]);
     document.body.innerHTML = `
@@ -78,6 +82,7 @@ const Cadru = {
     ${LAB.sim.html}
     <div class="card formule-vii" id="card-formule" hidden><h2>Calcul în timp real</h2><div id="formule-vii" class="formule-grila"></div></div>
   </section>
+  ${LAB.vehicul3d ? `<section id="tab-v3d" class="tab"><div class="card"><h2>${LAB.vehicul3d.titlu || "Sistemul pe autovehicul"}</h2>${LAB.vehicul3d.intro || ""}<div id="v3d-gazda"><p class="nota">Se încarcă modelul 3D…</p></div>${LAB.vehicul3d.dupa || ""}</div></section>` : ""}
   <section id="tab-det" class="tab">
     <div class="card">
       <h2>Date de lucru</h2>
@@ -353,6 +358,11 @@ const Cadru = {
     $$(".tab").forEach(t => t.classList.toggle("activ", t.id === "tab-" + id));
     Stocare.scrie("ar-tab-" + LAB.cod, id); this.tabActiv = id;
     if (id === "det") this.recalculeaza();
+    if (id === "v3d" && !this._v3d) {
+      this._v3d = true;
+      import(BAZA_COMUN + "vehicul3d.js?v=3").then(m => { this.v3d = m.creeaza($("#v3d-gazda"), LAB.vehicul3d.optiuni ? LAB.vehicul3d.optiuni(this) : {}); })
+        .catch(e => { $("#v3d-gazda").innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}). Este necesar un browser cu WebGL.</p>`; });
+    }
     if (id === "referat") this.genReferat();
     this.redeseneaza();
     window.scrollTo({ top: 0 });

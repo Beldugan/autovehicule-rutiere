@@ -31,5 +31,7 @@ out=tmpl.replace('/*@@SIM_HTML@@*/', '`'+simsec.replace('`','\\`').replace('${',
   .replace('/*@@CONTINUT@@*/', cont)\
   .replace('/*@@PED@@*/', ped)\
   .replace('/*@@CURBA@@*/', curba+dlive)
+import re
+out=re.sub(r'\bsim\.log\b','Cadru.D.log',out)
 open('/home/claude/ar/mf/l2/lab.js','w').write(out)
 print(len(out))

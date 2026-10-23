@@ -252,6 +252,13 @@ Cadru.porneste({
       id === "furtun" ? "Furtun racordat: modulul echivalent scade mult sub cel al lichidului." :
       "Scurgere la etanșare: țineți presiunea și urmăriți manometrul, apoi descărcați.", "");
   },
+  vehicul3d: {
+    titluTab: "Pe autovehicul (3D)",
+    titlu: "Circuitul de frânare pe autoturism – efectul aerului și al compresibilității",
+    intro: `<p>Același lichid de frână din piezometru lucrează în circuitul real: pedală → servofrână → pompa centrală tandem → modulatorul ABS → conducte → etriere. Țineți apăsat <b>Apasă frâna</b> (sau tasta Spațiu) la 90 km/h și urmăriți presiunea, cursa pedalei și distanța de oprire; apoi introduceți aer în circuit și repetați. Aerul se comprimă mult mai ușor decât lichidul (modulul lui de elasticitate este ≈ p, de mii de ori mai mic decât K), deci pompa centrală trebuie să dezlocuiască un volum suplimentar: pedala devine „moale”, iar dacă volumul pompei se epuizează, presiunea – și decelerația – nu mai cresc.</p>`,
+    dupa: `<p class="nota">Modelul: cursa pedalei = raport pedalier × V(p)/A<sub>pompă</sub>, cu V(p) = jocul plăcuțelor + elasticitatea conductelor și a lichidului + V<sub>aer</sub>·p/(p<sub>atm</sub>+p); decelerația este limitată de aderență (ABS menține roțile la limita alunecării).</p>`,
+    optiuni: C => ({ aerDin: { eticheta: "Preia aerul din piezometru", valoare: () => Number(C.D.date.Va0) || 0 } })
+  },
   referat: {
     scop: "Determinarea modulului de elasticitate al unui lichid de frână cu piezometrul cu piston filetat și evidențierea efectului aerului asupra volumului absorbit (cursa pedalei).",
     relatii: "ΔV = n·πd²/4·s; &nbsp; K<sub>m</sub> = V₀·Δp/ΔV; &nbsp; 1/K = 1/K<sub>m</sub> − D/(E·e); &nbsp; β = 1/K; &nbsp; V<sub>a0</sub> = n<sub>b</sub>·πd<sub>b</sub>³/6; &nbsp; ΔV<sub>a</sub> = V<sub>a0</sub>(1 − p₀/p); &nbsp; a = √(K/ρ).",
