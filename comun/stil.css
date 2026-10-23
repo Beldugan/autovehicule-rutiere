@@ -397,3 +397,18 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .osc-canal select { padding: .15rem .3rem; font-size: .78rem; color: #10161b; background: #e6ecf1; border: 1px solid #9aa6b1; border-radius: 6px; max-width: 100%; }
 .osc-canal select[data-ch-c] { flex: 1 1 9rem; min-width: 0; }
 .osc-canal.oprit { opacity: .55; }
+/* ---- DA L1: ecranele testerului */
+.ecran-tester { background: #0f1720; color: #dfe8ef; border-radius: 8px; padding: .5rem .6rem; margin: .5rem 0; font-size: .84rem; max-height: 420px; overflow: auto; }
+.ecran-tester .nota { color: #b9c7d2; }
+.ecran-tester table.x431 { color: #dfe8ef; }
+.ecran-tester table.x431 th { background: #1c2833; color: #fff; }
+.ecran-tester .camp select { color: #10161b; }
+.ecran-tester button { font-size: .78rem; padding: .2rem .5rem; margin-top: .25rem; }
+.rau-t { color: #ff8a7a; }
+.cod-dtc { border-left: 3px solid #f0a020; padding: .3rem .5rem; margin: .35rem 0; background: rgba(255, 255, 255, .04); border-radius: 4px; }
+.cod-dtc small { color: #b9c7d2; }
+.comutator-aparat.mic { margin: .4rem 0; }
+.comutator-aparat.mic button { font-size: .74rem; padding: .25rem .3rem; }
+.nota-indrumar { border: 1px dashed var(--accent, #1f6fb2); border-radius: 10px; padding: .4rem .9rem .6rem; margin: 1rem 0; background: color-mix(in srgb, var(--accent, #1f6fb2) 6%, transparent); }
+.nota-indrumar h3 { margin: .4rem 0; }
+.comutator-aparat:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
