@@ -47,12 +47,12 @@ function cadranFoto(parent, o) {
   for (let v = 0; v <= max + 1e-9; v += o.min) {
     const maj = Math.abs(v / o.maj - Math.round(v / o.maj)) < 1e-6, [x1, y1] = P(r - 2.5, v), [x2, y2] = P(r - (maj ? 9 : 5.5), v);
     mk("line", { x1, y1, x2, y2, stroke: "#151515", "stroke-width": maj ? 1.4 : 0.6 }, g);
-    if (maj) { const [xt, yt] = P(r * 0.6, v), t = mk("text", { x: xt, y: yt + r * 0.07, "font-size": r * 0.2, "text-anchor": "middle", fill: "#151515", "font-family": "Arial, sans-serif", "font-weight": 700 }, g); t.textContent = o.et ? o.et(v) : v; }
+    if (maj) { const [xt, yt] = P(r * 0.6, v), t = mk("text", { x: xt, y: yt + r * 0.07, "font-size": r * 0.27, "text-anchor": "middle", fill: "#151515", "font-family": "Arial, sans-serif", "font-weight": 800 }, g); t.textContent = o.et ? o.et(v) : v; }
   }
   const tu = mk("text", { x: cx, y: cy + r * 0.38, "font-size": r * 0.19, "text-anchor": "middle", fill: "#222", "font-family": "Arial, sans-serif", "font-weight": 700 }, g); tu.textContent = o.unit;
   const ts = mk("text", { x: cx, y: cy + r * 0.58, "font-size": r * 0.14, "text-anchor": "middle", fill: "#555", "font-family": "Arial, sans-serif" }, g); ts.textContent = o.sub || "";
   const umbra = mk("polygon", { points: `0,${-(r - 7)} -2.2,3 -1.4,${r * 0.2} 1.4,${r * 0.2} 2.2,3`, fill: "#000", opacity: 0.25, filter: "url(#fBlur1)" }, g);
-  const ac = mk("polygon", { points: `0,${-(r - 7)} -2.2,3 -1.4,${r * 0.2} 1.4,${r * 0.2} 2.2,3`, fill: "#111" }, g);
+  const ac = mk("polygon", { points: `0,${-(r - 6)} -3.2,3 -2,${r * 0.2} 2,${r * 0.2} 3.2,3`, fill: "#c62828" }, g);
   mk("circle", { cx, cy, r: r * 0.11, fill: "url(#gOtelR)", stroke: "#333", "stroke-width": 0.6 }, g);
   mk("path", { d: `M${cx - r + 3} ${cy - 4} A ${r - 3} ${r - 3} 0 0 1 ${cx + r * 0.4} ${cy - r + 4} Q ${cx - r * 0.2} ${cy - r * 0.5} ${cx - r + 3} ${cy - 4} Z`, fill: "url(#gSticla)" }, g);
   return v => {
@@ -89,7 +89,7 @@ function construiesteSVG() {
   SV.ferPist = [0, 1].map(k => { const p = mk("g", {}, gw); mk("rect", { x: 0, y: yc - 14, width: 34, height: 28, rx: 2, fill: "url(#gOtel)" }, p); [2, 28].forEach(x => mk("rect", { x, y: yc - 15, width: 5, height: 30, rx: 1.5, fill: "#151515" }, p)); mk("rect", { x: -30, y: yc - 5, width: 30, height: 10, fill: "url(#gCrom)" }, p); return p; });
   SV.ferArc = [0, 1].map(() => mk("path", { d: "", fill: "none", stroke: "#9aa1a8", "stroke-width": 1.6 }, gw));
   // cadranele manometrelor (scări corecte) și afișajele
-  SV.vacuum = cadranFoto(g, Object.assign({}, FOTO.g0, { max: 1, maj: 0.5, min: 0.1, unit: "−bar", sub: "vacuum", et: v => String(v).replace(".", ",") }));
+  SV.vacuum = cadranFoto(g, Object.assign({}, FOTO.g0, { max: 1, maj: 0.5, min: 0.1, unit: "", sub: "", et: v => String(v).replace(".", ",") }));
   SV.man1 = cadranFoto(g, Object.assign({}, FOTO.g1, { max: 160, maj: 40, min: 10, rosu: 120, unit: "bar", sub: "circuit 1" }));
   SV.man2 = cadranFoto(g, Object.assign({}, FOTO.g2, { max: 160, maj: 40, min: 10, rosu: 120, unit: "bar", sub: "circuit 2" }));
   const L = FOTO.lcd;
@@ -127,8 +127,23 @@ function construiesteSVG() {
   eticheta(SV.et, 1400, 180, 1520, 14, "Etrier flotant – celula de forță între plăcuțe", "end");
   eticheta(SV.et, 1300, 610, 1240, 690, "Afișajul celulei de forță", "end");
   prefixeazaId(svg, "p3-");
+  construiesteLupa();
   actualizeazaCote();
   actualizeazaSVG();
+}
+/** cadranele manometrelor mărite (lupă), pentru citirea precisă */
+function construiesteLupa() {
+  const svg = $("#svg-lupa"); if (!svg) return; svg.innerHTML = "";
+  const defs = mk("defs", {}, svg); defsComune(defs);
+  const g = mk("g", { "font-family": "system-ui, sans-serif" }, svg);
+  const C = [[160, "Vacuummetru – servofrână", { max: 1, unit: "bar", pasMaj: 0.2, pasMin: 0.02, subtitlu: "vacuum", eticheta: v => v ? "−" + v.toFixed(1).replace(".", ",") : "0" }],
+    [480, "Manometru – circuit 1 (etrier)", { max: 160, unit: "bar", pasMaj: 20, pasMin: 2, rosu: 120, subtitlu: "circuit 1" }],
+    [800, "Manometru – circuit 2", { max: 160, unit: "bar", pasMaj: 20, pasMin: 2, rosu: 120, subtitlu: "circuit 2" }]];
+  SV.lupa = C.map(([cx, titlu, o]) => {
+    const t = mk("text", { x: cx, y: 262, "font-size": 15, "text-anchor": "middle", style: "fill:var(--text)", "font-weight": 700 }, g); t.textContent = titlu;
+    return manometru(g, cx, 122, 108, o);
+  });
+  prefixeazaId(svg, "l3-");
 }
 function actualizeazaCote() {
   if (!SV.cote) return;
@@ -150,6 +165,7 @@ function actualizeazaSVG() {
   SV.cablu.setAttribute("d", `M93 216 C 93 300, ${cx - 40} ${cy - 40}, ${cx} ${cy}`);
   SV.lcdFp.textContent = FpAfisat().toFixed(0);
   SV.vacuum(sim.vAf); SV.man1(sim.pAf1); SV.man2(sim.pAf2);
+  if (SV.lupa) { SV.lupa[0](sim.vAf); SV.lupa[1](sim.pAf1); SV.lupa[2](sim.pAf2); }
   SV.lcdF.textContent = Math.round(sim.Fc).toString();
   // pistoanele din fereastra de secțiune: cursa reală s_m = s_p/i_p (2 px/mm)
   const f = FOTO.fer, yc = f.y + f.h / 2, sm = sim.sp / M3.ip(P()), s2 = Math.max(0, sm - 1.5) * 0.85 + Math.min(sm, 1.5);
@@ -393,6 +409,7 @@ Cadru.porneste({
     html: `<div class="sim-grila">
     <div class="card sim-scena scena">
       <svg id="svg-pascal" viewBox="0 0 1536 760" role="img" aria-label="Fotografia standului de frânare, animată: pedală cu dinamometru, servofrână cu vacuum, pompă centrală tandem cu fereastră de secțiune, manometre și etrier cu celulă de forță"></svg>
+      <svg id="svg-lupa" viewBox="0 0 960 270" role="img" aria-label="Cadranele mărite ale vacuummetrului și ale manometrelor de pe cele două circuite" style="margin-top:.4rem"></svg>
       <div class="afisaje">
         <div class="afisaj"><span>Forța pe pedală</span><b id="af-F">0</b><small>N (dinamometru)</small></div>
         <div class="afisaj"><span>Presiunea – circuit 1 / 2</span><b id="af-p">0,0</b><small>bar</small></div>
