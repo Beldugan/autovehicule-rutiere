@@ -40,187 +40,190 @@ function stabil() {
 }
 function aRand(k) { return ((Cadru.D.varianta || {}).a || {})[k]; }
 
-/* ------------------------------------------------------------------ desenul */
+/* ------------------------------------------------------------------ desenul: fotografia bancului hidraulic, animată */
+/* Coordonatele în fotografia bancului (1536 × 790 px): tuburile piezometrice (golite în fotografie, coloanele de apă sunt
+   desenate după cotele calculate), profilul tubului Venturi, paharul gradat, furtunul de alimentare. */
+const BANC = {
+  tub: [365.5, 514, 668.5, 827.5, 998.5, 1167], prize: [330, 555, 686, 780, 1011, 1186], tubSus: 10, tubJos: 188, kH: 178 / 500,
+  ax: 385, xIn: 262, xConf: 442, xGat0: 660, xGat1: 705, xDif: 1180, xIes: 1200, rIn: 56, rGat: 11,
+  pahar: { x0: 1341, x1: 1489, jos: 752, pxL: 34 }, furtun: 392
+};
+const VAS = { max: 6 };
+const hY = h => BANC.tubJos - h * BANC.kH;
 const SV = { g: null };
-const YC = 352, DS = 2.0, X0V = 228, LVPX = 520;   // axa tubului, scara diametrelor, începutul și lungimea tubului în px
-const hY = h => 262 - h * 0.45;                      // rigla panoului: 0…500 mm
-let SCX = 2;
-const XV = x => X0V + x * SCX;
-const VAS = { x: 792, y: 404, w: 80, h: 84, max: 6 };
-const yVas = V => VAS.y + VAS.h - V / VAS.max * VAS.h;
-const MM = { x0: 30, y0: 122, px: 1.42 };            // micromanometrul înclinat: originea și scara [px/mm] în lungul tubului
-const COS_M = Math.sqrt(1 - SIN_M * SIN_M);
-const mmPct = l => [MM.x0 + l * MM.px * COS_M, MM.y0 - l * MM.px * SIN_M];
-
+function razaFoto(x) {
+  const B = BANC;
+  if (x <= B.xConf) return B.rIn;
+  if (x <= B.xGat0) return B.rIn - (B.rIn - B.rGat) * (x - B.xConf) / (B.xGat0 - B.xConf);
+  if (x <= B.xGat1) return B.rGat;
+  if (x <= B.xDif) return B.rGat + (B.rIn - B.rGat) * (x - B.xGat1) / (B.xDif - B.xGat1);
+  return B.rIn;
+}
+function etichetaFoto(parent, x, y, x2, y2, text, ancora) {
+  mk("line", { x1: x, y1: y, x2, y2, stroke: "#1b2a3a", "stroke-width": 1.2 }, parent);
+  mk("circle", { cx: x, cy: y, r: 3, fill: "#1b2a3a" }, parent);
+  const t = mk("text", { x: x2 + (ancora === "end" ? -5 : 5), y: y2 + 5, "text-anchor": ancora || "start", "font-size": 15, "font-weight": 600, fill: "#10202f", "font-family": "system-ui, sans-serif" }, parent);
+  t.textContent = text;
+  requestAnimationFrame(() => { try { const b = t.getBBox(); const r = mk("rect", { x: b.x - 5, y: b.y - 2, width: b.width + 10, height: b.height + 4, rx: 5, fill: "#ffffff", opacity: 0.88, stroke: "#c5ced8" }, parent); parent.insertBefore(r, t); } catch (e) { } });
+}
 function construiesteSVG() {
   const svg = $("#svg-venturi"); svg.innerHTML = "";
   const defs = mk("defs", {}, svg); defsComune(defs);
-  grad(defs, "gBazaA", [[0, "#4166a8"], [0.5, "#27467e"], [1, "#132a52"]]);
-  grad(defs, "gPanou", [[0, "#ffffff"], [1, "#eef1f4"]], { x1: 0, y1: 0, x2: 1, y2: 0 });
-  grad(defs, "gApaV", [[0, "#7fc0ef", 0.75], [0.5, "#bfe2fa", 0.55], [1, "#5aa6e0", 0.8]]);
-  grad(defs, "gPompa", [[0, "#3d5f8f"], [0.5, "#1f3b63"], [1, "#0e2340"]]);
+  grad(defs, "gApaTub", [[0, "#5d9fcf", 0.85], [0.35, "#a8d3ee", 0.7], [0.65, "#9ccbea", 0.7], [1, "#4f8fbf", 0.85]], { x1: 0, y1: 0, x2: 1, y2: 0 });
+  grad(defs, "gApaPahar", [[0, "#7db7de", 0.55], [0.5, "#b9dcf2", 0.45], [1, "#6aa8d4", 0.6]], { x1: 0, y1: 0, x2: 1, y2: 0 });
+  grad(defs, "gRigla", [[0, "#f7f7f2"], [1, "#e4e2d6"]], { x1: 0, y1: 0, x2: 1, y2: 0 });
+  grad(defs, "gLCDf", [[0, "#a7b39b"], [1, "#909d86"]]);
+  grad(defs, "gRosuV", [[0, "#e35d4f"], [0.5, "#c62828"], [1, "#7f1010"]]);
+  const cpP = mk("clipPath", { id: "cPahar" }, defs); mk("rect", { x: BANC.pahar.x0, y: 500, width: BANC.pahar.x1 - BANC.pahar.x0, height: BANC.pahar.jos - 500, rx: 6 }, cpP);
+  const cpV = mk("clipPath", { id: "cVenturi" }, defs);
+  const pts = []; for (let x = BANC.xIn; x <= BANC.xIes; x += 4) pts.push([x, razaFoto(x)]);
+  mk("polygon", { points: pts.map(([x, r]) => `${x},${BANC.ax - r}`).concat(pts.slice().reverse().map(([x, r]) => `${x},${BANC.ax + r}`)).join(" ") }, cpV);
   const g = mk("g", {}, svg); SV.g = g;
-  const pr = P(), G4 = geomCurenta(); SCX = LVPX / G4.L;
-  // bazinul bancului (rezervorul de apă) și batiul
-  mk("rect", { x: 132, y: 436, width: 640, height: 50, rx: 6, fill: "#e8f2fa", stroke: "#7f9db8" }, g);
-  mk("rect", { x: 135, y: 452, width: 634, height: 31, rx: 4, fill: "url(#gApa)" }, g);
-  mk("rect", { x: 10, y: 486, width: 880, height: 10, rx: 3, fill: "url(#gBazaA)" }, g);
-  // panoul piezometrelor
-  mk("rect", { x: 182, y: 14, width: 626, height: 262, rx: 6, fill: "url(#gPanou)", stroke: "#9aa5b1" }, g);
+  mk("image", { href: "img/sim_banc.jpg", x: 0, y: 0, width: 1536, height: 790, preserveAspectRatio: "none" }, g);
+  const B = BANC;
+  // rigla panoului de piezometre (0…500 mm) și liniile de reper
+  mk("rect", { x: 302, y: B.tubSus - 4, width: 34, height: B.tubJos - B.tubSus + 10, rx: 2, fill: "url(#gRigla)", stroke: "#a9a690" }, g);
   for (let h = 0; h <= 500; h += 10) {
     const y = hY(h), maj = h % 50 === 0;
-    mk("line", { x1: 192, y1: y, x2: maj ? 806 : 200, y2: y, stroke: maj ? "#c9d1da" : "#8a96a3", "stroke-width": maj ? 0.6 : 0.5 }, g);
-    if (maj) { const t = mk("text", { x: 214, y: y + 3.5, "font-size": 9, fill: "#3b4651" }, g); t.textContent = h; }
+    mk("line", { x1: 336 - (h % 100 === 0 ? 12 : maj ? 9 : 5), y1: y, x2: 336, y2: y, stroke: "#1b1b1b", "stroke-width": maj ? 0.9 : 0.5 }, g);
+    if (h % 100 === 0) { const t = mk("text", { x: 320, y: y + 3.5, "font-size": 9, "text-anchor": "end", fill: "#1b1b1b", "font-family": "Arial, sans-serif", "font-weight": 700 }, g); t.textContent = h; }
+    if (maj) mk("line", { x1: 340, y1: y, x2: 1185, y2: y, stroke: "#5a7da0", "stroke-width": 0.5, opacity: h % 100 ? 0.12 : 0.22 }, g);
   }
-  const tmm = mk("text", { x: 196, y: 26, "font-size": 9, fill: "#3b4651", "font-weight": 700 }, g); tmm.textContent = "mm";
-  // tubul Venturi transparent: profilul real (confuzor 21°, gât, difuzor 7°)
-  const prof = []; for (let x = 0; x <= G4.L; x += 1) prof.push([x, M4.diametru(x, pr.d2)]);
-  const sus = prof.map(([x, d]) => `${XV(x)},${YC - d / 2 * DS}`), jos = prof.slice().reverse().map(([x, d]) => `${XV(x)},${YC + d / 2 * DS}`);
-  mk("polygon", { points: [...sus, ...jos].join(" "), fill: "url(#gApaV)" }, g);
-  const pereteSus = prof.map(([x, d]) => `${XV(x)},${YC - d / 2 * DS - 5}`).join(" "), pereteJos = prof.map(([x, d]) => `${XV(x)},${YC + d / 2 * DS + 5}`).join(" ");
-  mk("polygon", { points: `${pereteSus} ${sus.slice().reverse().join(" ")}`, fill: "#dceaf5", opacity: 0.75, stroke: "#8fb0c9", "stroke-width": 0.6 }, g);
-  mk("polygon", { points: `${pereteJos} ${jos.join(" ")}`, fill: "#dceaf5", opacity: 0.75, stroke: "#8fb0c9", "stroke-width": 0.6 }, g);
-  mk("rect", { x: XV(0), y: YC - 33, width: XV(G4.L) - XV(0), height: 10, fill: "url(#gLuciu)", opacity: 0.5 }, g);
-  SV.part = mk("g", {}, g);
-  // flanșele și suporturile
-  [XV(0), XV(G4.L)].forEach(x => { mk("rect", { x: x - 6, y: YC - 40, width: 12, height: 80, rx: 2, fill: "url(#gOtelO)", stroke: "#4b5259" }, g); [-30, 30].forEach(dy => surub(g, x, YC + dy, 3.5)); });
-  [XV(G4.L * 0.12), XV(G4.L * 0.86)].forEach(x => mk("path", { d: `M${x - 16} 436 L${x - 9} ${YC + 33} H${x + 9} L${x + 16} 436 Z`, fill: "url(#gAlbastruO)", stroke: "#0d2240" }, g));
-  // conducta de alimentare, pompa și robinetul de reglare
-  mk("path", { d: `M86 432 V${YC} H${XV(0) - 6}`, fill: "none", stroke: "#9fb6c8", "stroke-width": 24, "stroke-linejoin": "round", opacity: 0.85 }, g);
-  mk("path", { d: `M86 432 V${YC} H${XV(0) - 6}`, fill: "none", stroke: "#cfe6f7", "stroke-width": 16, "stroke-linejoin": "round" }, g);
-  SV.apaAlim = mk("path", { d: `M86 432 V${YC} H${XV(0) - 6}`, fill: "none", stroke: "#5aa6e0", "stroke-width": 14, "stroke-linejoin": "round", opacity: 0 }, g);
-  mk("rect", { x: 38, y: 432, width: 96, height: 50, rx: 8, fill: "url(#gPompa)", stroke: "#0b1a30" }, g);
-  mk("circle", { cx: 70, cy: 457, r: 18, fill: "url(#gOtelR)", stroke: "#333" }, g);
-  SV.rotor = mk("g", {}, g);
-  for (let k = 0; k < 6; k++) mk("line", { x1: 70, y1: 457, x2: 70 + 14 * Math.cos(k * Math.PI / 3), y2: 457 + 14 * Math.sin(k * Math.PI / 3), stroke: "#2b2f35", "stroke-width": 2.4 }, SV.rotor);
-  SV.ledPompa = mk("circle", { cx: 120, cy: 444, r: 5, fill: "#555" }, g);
-  const tp = mk("text", { x: 86, y: 478, "font-size": 8, "text-anchor": "middle", fill: "#dfe8f3" }, g); tp.textContent = "pompă centrifugă";
-  const xr = 152;
-  mk("rect", { x: xr - 16, y: YC - 17, width: 32, height: 34, rx: 5, fill: "url(#gAlama)", stroke: "#5f430f" }, g);
-  mk("rect", { x: xr - 3, y: YC - 44, width: 6, height: 28, fill: "url(#gCromO)" }, g);
-  SV.roata = mk("g", {}, g);
-  mk("circle", { cx: xr, cy: YC - 48, r: 15, fill: "none", stroke: "#b71c1c", "stroke-width": 4 }, SV.roata);
-  for (let k = 0; k < 3; k++) mk("line", { x1: xr, y1: YC - 48, x2: xr + 15 * Math.cos(k * 2 * Math.PI / 3), y2: YC - 48 + 15 * Math.sin(k * 2 * Math.PI / 3), stroke: "#b71c1c", "stroke-width": 2.5 }, SV.roata);
-  mk("circle", { cx: xr, cy: YC - 48, r: 4, fill: "url(#gOtelR)" }, SV.roata);
-  // conducta de ieșire și deviatorul (bazin / vas volumetric)
-  const xe = XV(G4.L) + 6;
-  mk("path", { d: `M${xe} ${YC} H832 V392`, fill: "none", stroke: "#9fb6c8", "stroke-width": 24, "stroke-linejoin": "round", opacity: 0.85 }, g);
-  mk("path", { d: `M${xe} ${YC} H832 V392`, fill: "none", stroke: "#cfe6f7", "stroke-width": 16, "stroke-linejoin": "round" }, g);
-  SV.apaIes = mk("path", { d: `M${xe} ${YC} H832 V392`, fill: "none", stroke: "#5aa6e0", "stroke-width": 14, "stroke-linejoin": "round", opacity: 0 }, g);
-  SV.jet = mk("path", { d: "", fill: "none", stroke: "#5aa6e0", "stroke-width": 6, "stroke-linecap": "round", opacity: 0.85 }, g);
-  SV.deviator = mk("path", { d: "", fill: "url(#gOtelO)", stroke: "#4b5259" }, g);
-  mk("path", { d: "M770 436 L784 412 H792", fill: "none", stroke: "#8aa0b3", "stroke-width": 3 }, g);   // jgheabul spre bazin
-  // vasul volumetric gradat
-  mk("rect", { x: VAS.x, y: VAS.y, width: VAS.w, height: VAS.h, rx: 3, fill: "#f4f9fd", stroke: "#7f9db8", "stroke-width": 1.5 }, g);
-  SV.apaVas = mk("rect", { x: VAS.x + 1, y: VAS.y + VAS.h, width: VAS.w - 2, height: 0, fill: "url(#gApa)" }, g);
-  for (let v = 0; v <= VAS.max + 1e-9; v += 0.1) {
-    const y = yVas(v), l1 = Math.abs(v - Math.round(v)) < 1e-6, l5 = Math.abs(v * 2 - Math.round(v * 2)) < 1e-6;
-    mk("line", { x1: VAS.x + VAS.w - (l1 ? 22 : l5 ? 15 : 8), y1: y, x2: VAS.x + VAS.w, y2: y, stroke: "#1b2b3a", "stroke-width": l1 ? 0.9 : 0.5 }, g);
-    if (l1 && v > 0) { const t = mk("text", { x: VAS.x + VAS.w - 25, y: y + 3, "font-size": 8, "text-anchor": "end", fill: "#1b2b3a" }, g); t.textContent = Math.round(v) + " L"; }
-  }
-  mk("rect", { x: VAS.x + 4, y: VAS.y + 4, width: 8, height: VAS.h - 8, fill: "url(#gLuciu)", opacity: 0.6 }, g);
-  SV.cron = afisajLCD(g, 690, 404, 80, 22, { unit: "s", fundal: "#cfe6ff" });
-  const tc = mk("text", { x: 730, y: 397, "font-size": 9, "text-anchor": "middle", style: "fill:var(--text-sec)" }, g); tc.textContent = "cronometru";
-  // termometrul în bazin
-  mk("rect", { x: 466, y: 418, width: 7, height: 56, rx: 3.5, fill: "#f7f7f7", stroke: "#888" }, g);
-  mk("circle", { cx: 469.5, cy: 476, r: 6, fill: "#d32f2f" }, g);
-  mk("rect", { x: 468, y: 440, width: 3, height: 34, fill: "#d32f2f" }, g);
-  SV.term = afisajLCD(g, 482, 412, 62, 20, { unit: "°C", fundal: "#f2e6c9" });
-  // prizele, furtunurile și tuburile piezometrice
-  SV.tub = []; SV.col = []; SV.men = []; SV.bula = [];
-  G4.prize.forEach((p, i) => {
-    const x = XV(p.x), yT = YC - p.d / 2 * DS - 5;
-    mk("rect", { x: x - 4, y: yT - 8, width: 8, height: 10, rx: 1.5, fill: "url(#gAlamaO)", stroke: "#5f430f", "stroke-width": 0.6 }, g);
-    mk("path", { d: `M${x} ${yT - 8} V268`, fill: "none", stroke: "#c7d6e2", "stroke-width": 5, opacity: 0.9 }, g);
-    mk("path", { d: `M${x} ${yT - 8} V268`, fill: "none", stroke: "#8fc3ea", "stroke-width": 2.4 }, g);
-    mk("rect", { x: x - 6, y: 30, width: 12, height: 238, rx: 5, fill: "url(#gTubO)", stroke: "#8fb0c9", "stroke-width": 0.8 }, g);
-    SV.col.push(mk("rect", { x: x - 4, y: 262, width: 8, height: 4, fill: "url(#gApaO)" }, g));
-    SV.men.push(mk("path", { d: "", fill: "none", stroke: "#2f78b8", "stroke-width": 1.2 }, g));
-    SV.bula.push(mk("ellipse", { cx: x, cy: 0, rx: 3.2, ry: 5, fill: "url(#gBula)", opacity: 0 }, g));
-    mk("rect", { x: x - 6, y: 264, width: 12, height: 8, rx: 1.5, fill: "url(#gOtelO)" }, g);
-    const t = mk("text", { x, y: 287, "font-size": 11, "text-anchor": "middle", style: "fill:var(--text)", "font-weight": 700 }, g); t.textContent = i + 1;
+  const tmm = mk("text", { x: 319, y: B.tubSus - 8 + 2, "font-size": 9, "text-anchor": "middle", fill: "#1b1b1b", "font-family": "Arial, sans-serif" }, g); tmm.textContent = "mm";
+  // coloanele de apă din tuburile piezometrice
+  SV.col = []; SV.men = []; SV.bula = [];
+  B.tub.forEach((x, i) => {
+    SV.col.push(mk("rect", { x: x - 6.5, y: B.tubJos, width: 13, height: 0, fill: "url(#gApaTub)" }, g));
+    SV.men.push(mk("path", { d: "", fill: "none", stroke: "#2f6f9f", "stroke-width": 1.6 }, g));
+    SV.bula.push(mk("ellipse", { cx: x, cy: 0, rx: 3.5, ry: 5.5, fill: "url(#gBula)", opacity: 0 }, g));
+    const t = mk("text", { x, y: B.tubJos + 34, "font-size": 15, "text-anchor": "middle", fill: "#10202f", "font-weight": 800, "font-family": "system-ui, sans-serif" }, g); t.textContent = i + 1;
   });
-  SV.linP = mk("polyline", { points: "", fill: "none", stroke: "#1f5f9e", "stroke-width": 1.6, opacity: 0.9 }, g);
-  SV.linE = mk("polyline", { points: "", fill: "none", stroke: "#d32f2f", "stroke-width": 1.6, "stroke-dasharray": "6 4" }, g);
-  // cote d1, d2
-  const tg = mk("text", { x: XV(G4.prize[2].x), y: YC + 48, "font-size": 10, "text-anchor": "middle", style: "fill:var(--text)", "font-weight": 700 }, g); tg.textContent = `d₂ = ${pr.d2} mm`;
-  const ti = mk("text", { x: 192, y: YC + 48, "font-size": 10, "text-anchor": "middle", style: "fill:var(--text)", "font-weight": 700 }, g); ti.textContent = `d₁ = ${D1} mm`;
-  // tubul Pitot (în secțiunea de intrare, în axă) și micromanometrul înclinat
-  SV.pitot = mk("g", {}, g);
-  const xp = XV(G4.prize[0].x) - 2;
-  mk("path", { d: `M${xp} ${YC - 60} V${YC} H${xp - 16}`, fill: "none", stroke: "url(#gCrom)", "stroke-width": 4, "stroke-linejoin": "round" }, SV.pitot);
-  mk("circle", { cx: xp - 16, cy: YC, r: 2.2, fill: "#333" }, SV.pitot);
-  mk("rect", { x: xp - 6, y: YC - 34, width: 12, height: 6, rx: 1.5, fill: "url(#gAlama)" }, SV.pitot);
-  mk("path", { d: `M${xp} ${YC - 60} V300 Q ${xp} 290 ${xp - 12} 290 H192 Q 180 290 180 278 V${mmPct(100)[1] + 12} Q 180 ${mmPct(100)[1]} ${mmPct(100)[0]} ${mmPct(100)[1] - 4}`, fill: "none", stroke: "#8fc3ea", "stroke-width": 2.2, opacity: 0.8 }, SV.pitot);
-  // micromanometrul
-  mk("rect", { x: 10, y: 37, width: 166, height: 112, rx: 6, fill: "url(#gPanou)", stroke: "#9aa5b1" }, g);
-  mk("rect", { x: MM.x0 - 16, y: MM.y0 - 8, width: 22, height: 22, rx: 3, fill: "url(#gTub)", stroke: "#8fb0c9" }, g);
-  const [xa, ya] = mmPct(0), [xb, yb] = mmPct(100);
-  mk("line", { x1: xa, y1: ya, x2: xb, y2: yb, stroke: "#c7d6e2", "stroke-width": 7, "stroke-linecap": "round" }, g);
-  SV.colM = mk("line", { x1: xa, y1: ya, x2: xa, y2: ya, stroke: "#2f78b8", "stroke-width": 4, "stroke-linecap": "round" }, g);
-  for (let l = 0; l <= 100; l += 2) {
-    const [x, y] = mmPct(l), maj = l % 10 === 0, n = [SIN_M, COS_M];
-    mk("line", { x1: x, y1: y + 4, x2: x + n[0] * (maj ? 7 : 4), y2: y + 4 + n[1] * (maj ? 7 : 4), stroke: "#2b2f35", "stroke-width": maj ? 0.8 : 0.4 }, g);
-    if (l % 20 === 0) { const t = mk("text", { x: x + 4, y: y + 19, "font-size": 7.5, "text-anchor": "middle", fill: "#2b2f35" }, g); t.textContent = l; }
-  }
-  const tmm2 = mk("text", { x: 93, y: 51, "font-size": 9, "text-anchor": "middle", fill: "#2b2f35", "font-weight": 700 }, g); tmm2.textContent = "micromanometru 1:5";
-  const tmm3 = mk("text", { x: 93, y: 63, "font-size": 8, "text-anchor": "middle", fill: "#4b5561" }, g); tmm3.textContent = "Pitot – priza statică 1 · l [mm]";
-  SV.lcdM = afisajLCD(g, 112, 70, 56, 18, { unit: "l mm", fundal: "#cfe6ff" });
-  // etichete
-  SV.et = mk("g", { "font-size": 10.5, style: "fill:var(--text)" }, g);
-  const et = (x, y, x2, y2, t) => { mk("line", { x1: x, y1: y, x2, y2, style: "stroke:var(--text-sec)", "stroke-width": 0.8 }, SV.et); const e = mk("text", { x: x2 + (x2 >= x ? 3 : -3), y: y2 + 4, "text-anchor": x2 >= x ? "start" : "end" }, SV.et); e.textContent = t; };
-  et(XV(G4.x0 + G4.Lc * 0.5), YC + 22, XV(G4.x0 + G4.Lc * 0.5) + 22, 424, "Confuzor");
-  et(XV(G4.prize[4].x), YC + 18, XV(G4.prize[4].x) + 12, 420, "Difuzor");
-  mk("line", { x1: xr - 13, y1: YC - 52, x2: 62, y2: 262, style: "stroke:var(--text-sec)", "stroke-width": 0.8 }, SV.et);
-  { const e = mk("text", { x: 12, y: 258 }, SV.et); e.textContent = "Robinet de reglare"; }
-  et(VAS.x + 40, VAS.y, 832, 386, "");
-  prefixeazaId(svg, "v4-");
-  // particulele de trasor (viteza locală = Q/A(x): continuitate)
+  SV.linP = mk("polyline", { points: "", fill: "none", stroke: "#1f5f9e", "stroke-width": 2, opacity: 0.85 }, g);
+  SV.linE = mk("polyline", { points: "", fill: "none", stroke: "#d32f2f", "stroke-width": 2, "stroke-dasharray": "8 5" }, g);
+  // trasorul din tubul Venturi (viteza locală după continuitate)
+  SV.part = mk("g", { "clip-path": "url(#cVenturi)" }, g);
   sim.part = [];
-  for (let k = 0; k < 46; k++) sim.part.push({ x: Math.random() * G4.L, r: (Math.random() * 2 - 1) * 0.82, el: mk("circle", { r: 1.6, fill: "#ffffff", opacity: 0.9 }, SV.part) });
+  for (let k = 0; k < 70; k++) sim.part.push({ x: B.xIn + Math.random() * (B.xIes - B.xIn), r: (Math.random() * 2 - 1) * 0.85, el: mk("circle", { r: 2, fill: "#ffffff", opacity: 0.85 }, SV.part) });
+  // robinetul de reglare (ventil cu roată de manevră) pe furtunul de alimentare
+  const xr = 70, yf = B.furtun;
+  mk("rect", { x: xr - 34, y: yf - 22, width: 68, height: 44, rx: 10, fill: "url(#gAlama)", stroke: "#5f430f" }, g);
+  [xr - 40, xr + 30].forEach(x => mk("rect", { x, y: yf - 17, width: 10, height: 34, rx: 2, fill: "url(#gAlamaO)", stroke: "#5f430f" }, g));
+  mk("rect", { x: xr - 13, y: yf - 48, width: 26, height: 28, rx: 3, fill: "url(#gAlamaO)", stroke: "#5f430f" }, g);
+  SV.tija = mk("rect", { x: xr - 3.5, y: yf - 80, width: 7, height: 34, fill: "url(#gCromO)", stroke: "#555" }, g);
+  SV.roata = mk("g", {}, g);
+  mk("ellipse", { cx: xr, cy: 0, rx: 30, ry: 7, fill: "none", stroke: "url(#gRosuV)", "stroke-width": 6 }, SV.roata);
+  mk("rect", { x: xr - 30, y: -2, width: 60, height: 4, fill: "#a51d1d" }, SV.roata);
+  mk("circle", { cx: xr, cy: 0, r: 5, fill: "url(#gOtelR)" }, SV.roata);
+  SV.lcdA = mk("text", { x: xr, y: yf + 42, "font-size": 13, "text-anchor": "middle", fill: "#10202f", "font-weight": 700, "font-family": "system-ui, sans-serif" }, g);
+  // pompa: LED de funcționare pe cutia de borne
+  mk("rect", { x: 576, y: 524, width: 36, height: 16, rx: 3, fill: "#16191d", stroke: "#000" }, g);
+  SV.ledPompa = mk("circle", { cx: 586, cy: 532, r: 4.5, fill: "#3a3a3a" }, g);
+  const tO = mk("text", { x: 596, y: 536, "font-size": 8, fill: "#cfd6dd", "font-family": "Arial" }, g); tO.textContent = "ON";
+  // tubul Pitot în axa secțiunii de intrare (presetupă + sondă în L, orificiul contra curentului)
+  SV.pitot = mk("g", {}, g);
+  const xp = 296;
+  mk("rect", { x: xp - 9, y: B.ax - B.rIn - 20, width: 18, height: 16, rx: 2, fill: "url(#gCromO)", stroke: "#4b5259" }, SV.pitot);
+  mk("path", { d: `M${xp} ${B.ax - B.rIn - 60} V${B.ax} H${xp - 22}`, fill: "none", stroke: "url(#gCrom)", "stroke-width": 5, "stroke-linejoin": "round" }, SV.pitot);
+  mk("circle", { cx: xp - 22, cy: B.ax, r: 2.6, fill: "#222" }, SV.pitot);
+  mk("path", { d: `M${xp} ${B.ax - B.rIn - 60} C ${xp} 240, 220 250, 200 200 S 160 150, 150 132`, fill: "none", stroke: "#c9dbe8", "stroke-width": 5, opacity: 0.9 }, SV.pitot);
+  mk("path", { d: `M330 ${B.ax - B.rIn - 6} C 300 260, 250 250, 220 200 S 190 150, 178 136`, fill: "none", stroke: "#c9dbe8", "stroke-width": 5, opacity: 0.9 }, SV.pitot);
+  // micromanometrul înclinat 1:5 (sus, stânga)
+  const mm = { x0: 40, y0: 120, px: 2.1 }; SV.mm = mm;
+  mk("rect", { x: 14, y: 20, width: 272, height: 128, rx: 8, fill: "url(#gAlu)", stroke: "#6f767e" }, g);
+  mk("rect", { x: 20, y: 26, width: 260, height: 116, rx: 5, fill: "#f8f8f4", stroke: "#b9bdc2" }, g);
+  const ca = Math.sqrt(1 - SIN_M * SIN_M), P2 = l => [mm.x0 + l * mm.px * ca, mm.y0 - l * mm.px * SIN_M];
+  mk("rect", { x: mm.x0 - 18, y: mm.y0 - 12, width: 26, height: 24, rx: 4, fill: "url(#gTub)", stroke: "#8fb0c9" }, g);
+  const [ax0, ay0] = P2(0), [ax1, ay1] = P2(110);
+  mk("line", { x1: ax0, y1: ay0, x2: ax1, y2: ay1, stroke: "#d3e3ef", "stroke-width": 9, "stroke-linecap": "round" }, g);
+  SV.colM = mk("line", { x1: ax0, y1: ay0, x2: ax0, y2: ay0, stroke: "#3a7fb8", "stroke-width": 5, "stroke-linecap": "round" }, g);
+  for (let l = 0; l <= 110; l += 2) {
+    const [x, y] = P2(l), maj = l % 10 === 0;
+    mk("line", { x1: x, y1: y + 6, x2: x + SIN_M * (maj ? 8 : 4.5), y2: y + 6 + ca * (maj ? 8 : 4.5), stroke: "#1b1b1b", "stroke-width": maj ? 0.8 : 0.4 }, g);
+    if (l % 20 === 0) { const t = mk("text", { x: x + 3, y: y + 24, "font-size": 9, "text-anchor": "middle", fill: "#1b1b1b", "font-family": "Arial" }, g); t.textContent = l; }
+  }
+  SV.P2 = P2;
+  const tm1 = mk("text", { x: 150, y: 42, "font-size": 12, "text-anchor": "middle", fill: "#1b1b1b", "font-weight": 700, "font-family": "system-ui" }, g); tm1.textContent = "Micromanometru înclinat 1:5";
+  const tm2 = mk("text", { x: 150, y: 56, "font-size": 10, "text-anchor": "middle", fill: "#4b5561", "font-family": "system-ui" }, g); tm2.textContent = "Pitot (total) – priza 1 (static) · l [mm]";
+  // paharul gradat: apa colectată, gradațiile, jetul de la furtunul de evacuare
+  const Pa = B.pahar;
+  SV.apaVas = mk("rect", { x: Pa.x0, y: Pa.jos, width: Pa.x1 - Pa.x0, height: 0, fill: "url(#gApaPahar)", "clip-path": "url(#cPahar)" }, g);
+  for (let v = 0.5; v <= 6 + 1e-9; v += 0.5) {
+    const y = Pa.jos - v * Pa.pxL, int = Math.abs(v - Math.round(v)) < 1e-6;
+    mk("line", { x1: Pa.x0 + 58, y1: y, x2: Pa.x0 + 58 + (int ? 34 : 20), y2: y, stroke: "#26323d", "stroke-width": int ? 1.2 : 0.7, opacity: 0.8 }, g);
+    if (int) { const t = mk("text", { x: Pa.x0 + 96, y: y + 4, "font-size": 11, fill: "#26323d", "font-family": "Arial", "font-weight": 700 }, g); t.textContent = v + " L"; }
+  }
+  SV.jet = mk("path", { d: "", fill: "none", stroke: "#8cc4ea", "stroke-width": 5, "stroke-linecap": "round", opacity: 0.85 }, g);
+  SV.deviator = mk("g", {}, g);
+  mk("rect", { x: 1448, y: 506, width: 26, height: 20, rx: 4, fill: "url(#gCromO)", stroke: "#4b5259" }, g);
+  SV.manetaDev = mk("rect", { x: 1461, y: 497, width: 30, height: 6, rx: 3, fill: "#c62828" }, g);
+  SV.tDev = mk("text", { x: 1440, y: 522, "font-size": 12, "text-anchor": "end", fill: "#10202f", "font-family": "system-ui", "font-weight": 700 }, g);
+  // cronometrul digital
+  mk("rect", { x: 1330, y: 120, width: 170, height: 92, rx: 30, fill: "url(#gNegru)", stroke: "#000" }, g);
+  mk("rect", { x: 1404, y: 106, width: 22, height: 16, rx: 4, fill: "url(#gCromO)" }, g);
+  mk("rect", { x: 1350, y: 140, width: 130, height: 44, rx: 6, fill: "url(#gLCDf)" }, g);
+  SV.cron = mk("text", { x: 1472, y: 172, "text-anchor": "end", "font-size": 28, "font-family": "'Courier New', monospace", "font-weight": 700, fill: "#1d2618" }, g);
+  const tcr = mk("text", { x: 1415, y: 203, "font-size": 10, "text-anchor": "middle", fill: "#d8dde2", "font-family": "Arial" }, g); tcr.textContent = "cronometru [s]";
+  // termometrul digital cu sondă în bazin
+  mk("path", { d: "M1120 600 C 1120 560, 1150 540, 1170 520", fill: "none", stroke: "#1a1a1a", "stroke-width": 3 }, g);
+  mk("rect", { x: 1166, y: 470, width: 6, height: 70, rx: 3, fill: "url(#gCromO)" }, g);
+  mk("rect", { x: 1060, y: 598, width: 118, height: 52, rx: 8, fill: "#e9edf1", stroke: "#8a949e" }, g);
+  mk("rect", { x: 1068, y: 606, width: 102, height: 30, rx: 3, fill: "url(#gLCDf)" }, g);
+  SV.term = mk("text", { x: 1164, y: 630, "text-anchor": "end", "font-size": 20, "font-family": "'Courier New', monospace", "font-weight": 700, fill: "#1d2618" }, g);
+  const tte = mk("text", { x: 1119, y: 646, "font-size": 8.5, "text-anchor": "middle", fill: "#3b4651", "font-family": "Arial" }, g); tte.textContent = "°C · termometru";
+  // etichete
+  SV.et = mk("g", {}, g);
+  etichetaFoto(SV.et, 70, 352, 120, 300, "Robinet de reglare");
+  etichetaFoto(SV.et, 700, 560, 640, 700, "Pompă centrifugă", "end");
+  etichetaFoto(SV.et, 1000, 560, 1000, 720, "Bazinul bancului hidraulic");
+  etichetaFoto(SV.et, 560, 385, 480, 470, `Confuzor 21° (d₁ = 25 mm)`, "end");
+  etichetaFoto(SV.et, 900, 395, 860, 470, `Gât d₂ = ${P().d2} mm · difuzor 7°`);
+  etichetaFoto(SV.et, 1330, 640, 1290, 760, "Vas gradat (6 L)", "end");
+  prefixeazaId(svg, "v4-");
   actualizeazaSVG();
 }
 function actualizeazaSVG() {
   if (!SV.g) return;
-  const G4 = geomCurenta(), t = tinte();
-  // pompa, robinetul, apa în conducte
-  SV.ledPompa.setAttribute("fill", sim.pompa ? "#4caf50" : "#555");
-  SV.roata.setAttribute("transform", `rotate(${sim.a * 5.4} 152 ${YC - 48})`);
-  const curge = sim.pompa && sim.aEf > 0.3;
-  [SV.apaAlim, SV.apaIes].forEach(e => e.setAttribute("opacity", sim.pompa ? 0.8 : 0));
-  // deviatorul și jetul
-  SV.deviator.setAttribute("d", sim.colect ? "M824 392 h16 l-4 10 h-8 z" : "M824 392 h16 l-14 10 h-8 z");
-  SV.jet.setAttribute("d", !curge ? "" : sim.colect ? `M832 402 V${Math.max(yVas(sim.Vvas), VAS.y + 2)}` : "M826 402 Q 806 408 790 414");
-  SV.jet.setAttribute("stroke-width", curge ? clamp(2 + sim.aEf / 18, 2, 7) : 0);
-  const V = Math.min(sim.Vvas, VAS.max * 1.02);
-  SV.apaVas.setAttribute("y", yVas(V)); SV.apaVas.setAttribute("height", Math.max(0, VAS.y + VAS.h - yVas(V)));
-  SV.cron(fmt(sim.tCron, 2)); SV.term(fmt(P().T, 1));
-  // piezometrele
-  G4.prize.forEach((p, i) => {
-    const x = XV(p.x), h = clamp(sim.hAf[i] + sim.zg[i], -5, 505), y = hY(h);
-    SV.col[i].setAttribute("y", y); SV.col[i].setAttribute("height", Math.max(0, 266 - y));
-    SV.men[i].setAttribute("d", `M${x - 4} ${y + 1.5} Q ${x} ${y - 1.5} ${x + 4} ${y + 1.5}`);
+  const B = BANC, t = tinte();
+  SV.ledPompa.setAttribute("fill", sim.pompa ? "#4caf50" : "#3a3a3a");
+  // robinetul: tija urcă proporțional cu deschiderea
+  const ridic = sim.a * 0.22;
+  SV.tija.setAttribute("y", B.furtun - 80 - ridic); SV.tija.setAttribute("height", 34 + ridic);
+  SV.roata.setAttribute("transform", `translate(0,${B.furtun - 80 - ridic})`);
+  SV.lcdA.textContent = `${fmt(sim.a, 1)} %`;
+  // coloanele piezometrice
+  B.tub.forEach((x, i) => {
+    const h = clamp(sim.hAf[i] + sim.zg[i], 0, 505), y = hY(h);
+    SV.col[i].setAttribute("y", y); SV.col[i].setAttribute("height", Math.max(0, B.tubJos - y));
+    SV.men[i].setAttribute("d", `M${x - 6.5} ${y + 2} Q ${x} ${y - 2} ${x + 6.5} ${y + 2}`);
     const bula = sim.pompa && !sim.aerisit && sim.bule[i] !== 0;
-    SV.bula[i].setAttribute("opacity", bula ? 0.95 : 0); SV.bula[i].setAttribute("cy", 262 - 8 - ((performance.now() / 40 + i * 13) % 20));
+    SV.bula[i].setAttribute("opacity", bula ? 0.95 : 0); SV.bula[i].setAttribute("cy", B.tubJos - 6 - ((performance.now() / 35 + i * 17) % Math.max(10, B.tubJos - y - 10)));
   });
-  SV.linP.setAttribute("points", sim.linPiezo ? G4.prize.map((p, i) => `${XV(p.x)},${hY(sim.hAf[i])}`).join(" ") : "");
-  if (sim.linEnerg && !MOD.eval && t.s) SV.linE.setAttribute("points", G4.prize.map((p, i) => `${XV(p.x)},${hY(t.s.E[i] + P().eh[i])}`).join(" "));
+  SV.linP.setAttribute("points", sim.linPiezo ? B.tub.map((x, i) => `${x},${hY(sim.hAf[i])}`).join(" ") : "");
+  if (sim.linEnerg && !MOD.eval && t.s) SV.linE.setAttribute("points", B.tub.map((x, i) => `${x},${hY(t.s.E[i] + P().eh[i])}`).join(" "));
   else SV.linE.setAttribute("points", "");
-  // tubul Pitot și micromanometrul
+  // micromanometrul și tubul Pitot
   SV.pitot.style.display = sim.pitot ? "" : "none";
-  const [x1, y1] = mmPct(0), [x2, y2] = mmPct(clamp(sim.lAf + sim.zgL, 0, 102));
-  SV.colM.setAttribute("x1", x1); SV.colM.setAttribute("y1", y1); SV.colM.setAttribute("x2", x2); SV.colM.setAttribute("y2", y2);
-  SV.lcdM(sim.pitot ? fmt(citireL(), 1) : "—");
+  const [x2, y2] = SV.P2(clamp(sim.lAf + sim.zgL, 0, 110)), [x1, y1] = SV.P2(0);
+  SV.colM.setAttribute("x2", x2); SV.colM.setAttribute("y2", y2); SV.colM.setAttribute("x1", x1); SV.colM.setAttribute("y1", y1);
+  // vasul gradat, deviatorul și jetul
+  const V = Math.min(sim.Vvas, VAS.max * 1.02), yV = B.pahar.jos - V * B.pahar.pxL;
+  SV.apaVas.setAttribute("y", yV); SV.apaVas.setAttribute("height", Math.max(0, B.pahar.jos - yV));
+  const curge = sim.pompa && sim.aEf > 0.3;
+  SV.jet.setAttribute("d", curge && sim.colect ? `M1461 526 V${yV}` : "");
+  SV.jet.setAttribute("stroke-width", curge ? clamp(2 + sim.aEf / 16, 2, 8) : 0);
+  SV.manetaDev.setAttribute("transform", sim.colect ? "rotate(90 1461 500)" : "");
+  SV.tDev.textContent = sim.colect ? "↓ spre vas" : "→ spre bazin";
+  SV.cron.textContent = fmt(sim.tCron, 2); SV.term.textContent = fmt(P().T, 1);
   SV.et.style.display = sim.etichete ? "" : "none";
 }
 function miscaParticule(dt) {
   if (!SV.part) return;
-  const G4 = geomCurenta(), d2 = P().d2, Q = sim.pompa ? M4.debit(sim.aEf, prEfectiv()) : 0;
+  const B = BANC, d2 = P().d2, Q = sim.pompa ? M4.debit(sim.aEf, prEfectiv()) : 0;
   sim.part.forEach(p => {
-    const d = M4.diametru(p.x, d2), v = Q * 1e-3 / (M4.aria(d) * 1e-6);
-    p.x += v * 1000 * dt * 0.06 * (1 - 0.35 * p.r * p.r);
-    if (p.x > G4.L) { p.x -= G4.L; p.r = (Math.random() * 2 - 1) * 0.82; }
-    p.el.setAttribute("cx", XV(p.x)); p.el.setAttribute("cy", YC + p.r * M4.diametru(p.x, d2) / 2 * DS);
+    const r = razaFoto(p.x), s = (B.rIn - r) / (B.rIn - B.rGat), dm = D1 - s * (D1 - d2), v = Q * 1e-3 / (M4.aria(dm) * 1e-6);
+    p.x += v * 95 * dt * (1 - 0.3 * p.r * p.r);
+    if (p.x > B.xIes) { p.x -= B.xIes - B.xIn; p.r = (Math.random() * 2 - 1) * 0.85; }
+    p.el.setAttribute("cx", p.x); p.el.setAttribute("cy", B.ax + p.r * razaFoto(p.x) * 0.92);
   });
 }
 
@@ -668,7 +671,7 @@ Cadru.porneste({
   sim: {
     html: `<div class="sim-grila">
     <div class="card sim-scena scena">
-      <svg id="svg-venturi" viewBox="0 0 900 500" role="img" aria-label="Banc hidraulic: pompă, robinet de reglare, tub Venturi cu 6 prize piezometrice, panou de piezometre, tub Pitot cu micromanometru înclinat, vas volumetric și cronometru"></svg>
+      <svg id="svg-venturi" viewBox="0 0 1536 790" role="img" aria-label="Banc hidraulic: pompă, robinet de reglare, tub Venturi cu 6 prize piezometrice, panou de piezometre, tub Pitot cu micromanometru înclinat, vas volumetric și cronometru"></svg>
       <div class="afisaje">
         <div class="afisaj"><span>Robinet de reglare</span><b id="af-a">0,0</b><small>% deschidere</small></div>
         <div class="afisaj"><span>Δh₁₋₃ (piezometre)</span><b id="af-dh">0</b><small>mm</small></div>
