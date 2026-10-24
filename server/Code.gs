@@ -62,7 +62,7 @@ const PORTAL = {
     MAM1: {
       nume: "Mecatronica automobilului modern I", an: "anul IV", sem: 1, cod: "MR4105", tip: "Laborator", dosar: "mam1",
       indrumar: "Îndrumar de laborator – Mecatronica automobilului modern I (2026)",
-      endpoint: "",
+      endpoint: "https://script.google.com/macros/s/AKfycbynSqzjkqNO18yZWA8mbz1yQNdjzTAJuzZX8s-MQWvZryUHd8i0F2GlToenUnf5ydc/exec",
       lucrari: [
         "Microcontrolere: intrări/ieșiri, convertor A/D, timere, întreruperi și PWM",
         "Condiționarea semnalelor și conversia analog-digitală",
