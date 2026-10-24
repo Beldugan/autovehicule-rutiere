@@ -59,5 +59,22 @@ var SEMNALE = (function () {
     }
     return o;
   }
-  return { gauss: gauss, injectorMPI: injectorMPI, pwmMasa: pwmMasa, puncteH: puncteH, achizitie: achizitie, umplere: umplere };
+  /** antetul ecranului Launch X-431 PRO: bara de stare Android + bara aplicației cu calea meniului */
+  function antetX431(cale, ubat) {
+    var d = new Date(), ora = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+    return '<div class="x4-stare"><span>' + ora + '</span><span>VCI ● &nbsp;Wi-Fi ▴ &nbsp;▮▮▮▯ 78 %</span></div>' +
+      '<div class="x4-bara"><span class="x4-sigla">LAUNCH</span><span class="x4-cale">' + cale + '</span><span class="x4-ub">' + (ubat ? "🔋 " + ubat : "") + '</span></div>';
+  }
+  /** fluxul de date (Data Stream): rânduri [nume, valoare (număr sau text), [min, max] sau null, unitate]; valorile din afara intervalului se afișează cu roșu, ca pe tester */
+  function fluxDate(r, activ) {
+    var f = function (v) { return typeof v === "number" ? String(v).replace(".", ",") : v; };
+    var h = '<table class="tabel x431 x4-flux"><thead><tr><th>Nume</th><th>Valoare</th><th>Interval std.</th></tr></thead><tbody>';
+    r.forEach(function (x) {
+      var v = x[1], iv = x[2], afara = activ && iv && typeof v === "number" && (v < iv[0] || v > iv[1]), u = x[3] ? ' <small>' + x[3] + '</small>' : "";
+      h += '<tr' + (afara ? ' class="x4-afara"' : "") + '><td>' + x[0] + '</td><td><b>' + (activ ? f(v) : "—") + '</b>' + u + '</td><td>' + (iv ? f(iv[0]) + "…" + f(iv[1]) : "") + '</td></tr>';
+    });
+    return h + '</tbody></table>';
+  }
+  function subsolX431(b) { return '<div class="x4-subsol">' + (b || ["Grafic", "Combină", "Înregistrează", "Raport"]).map(function (t) { return "<span>" + t + "</span>"; }).join("") + '</div>'; }
+  return { antetX431: antetX431, fluxDate: fluxDate, subsolX431: subsolX431, gauss: gauss, injectorMPI: injectorMPI, pwmMasa: pwmMasa, puncteH: puncteH, achizitie: achizitie, umplere: umplere };
 })();

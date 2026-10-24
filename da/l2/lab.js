@@ -412,14 +412,15 @@ function actualizeazaPanou() {
 }
 function liveX431() {
   const el = $("#x431-live"); if (!el || el.getClientRects().length === 0) return;
-  const d = defect(), on = sim.contact;
-  const rand = (n, v, u) => `<tr><td>${n}</td><td><b>${on ? v : "—"}</b></td><td>${u}</td></tr>`;
-  el.innerHTML = `<table class="tabel x431"><tbody>
-    ${rand("Turație motor", Math.round(sim.rpm), "rot/min")}${rand("Temp. lichid răcire", x431("ect"), "°C")}${rand("Temp. aer admis", x431("iat"), "°C")}
-    ${rand("Presiune colector", Math.round(sim.p), "kPa")}${rand("Poziție clapetă", fmt(sim.tps, 1), "%")}${rand("Tensiune sondă λ amonte", fmt(lambdaU(sim.t), 3), "V")}
-    ${rand("Tensiune sondă λ aval", fmt(semnal("l2", sim.t), 3), "V")}${rand("Timp de injecție", fmt(sim.merge ? timpInj() : 0, 2), "ms")}
-    ${rand("Corecție scurtă STFT", fmt(sim.merge ? sim.stft : 0, 1), "%")}${rand("Corecție lungă LTFT", fmt(sim.ltft, 1), "%")}
-    ${rand("Stare buclă", buclaInchisa() ? "închisă" : "deschisă", "")}${rand("Tensiune baterie", fmt(sim.merge ? 13.9 : 12.4, 1), "V")}</tbody></table>`;
+  const on = sim.contact, m = sim.merge, ral = sim.mod === "ralanti", r1 = x => Math.round(x * 10) / 10, r3 = x => Math.round(x * 1000) / 1000;
+  el.innerHTML = SEMNALE.antetX431("Renault › K7J 1.4 MPI › Injecție › Flux de date", on ? fmt(m ? 13.9 : 12.4, 1) + " V" : "") + SEMNALE.fluxDate([
+    ["Turație motor", Math.round(sim.rpm), m && ral ? [650, 1150] : null, "rot/min"],
+    ["Temp. lichid răcire", x431("ect"), [-40, 115], "°C"], ["Temp. aer admis", x431("iat"), [-40, 80], "°C"],
+    ["Presiune colector", Math.round(sim.p), m && ral ? [25, 45] : [20, 105], "kPa"], ["Poziție clapetă", r1(sim.tps), m && ral ? [0, 5] : [0, 100], "%"],
+    ["Tensiune sondă λ amonte", r3(lambdaU(sim.t)), [0.05, 0.95], "V"], ["Tensiune sondă λ aval", r3(semnal("l2", sim.t)), m && buclaInchisa() ? [0.5, 0.85] : [0, 1], "V"],
+    ["Timp de injecție", Math.round((m ? timpInj() : 0) * 100) / 100, m && ral ? [2, 4] : null, "ms"],
+    ["Corecție scurtă STFT", r1(m ? sim.stft : 0), [-10, 10], "%"], ["Corecție lungă LTFT", r1(sim.ltft), [-10, 10], "%"],
+    ["Stare buclă", buclaInchisa() ? "închisă" : "deschisă", null, ""], ["Tensiune baterie", m ? 13.9 : 12.4, m ? [13.5, 14.8] : [12.2, 12.9], "V"]], on) + SEMNALE.subsolX431();
 }
 
 /* ------------------------------------------------------------------ calculele determinărilor */
@@ -649,7 +650,7 @@ Cadru.porneste({
       <h2>Instrumentul</h2>
       <div class="comutator-aparat" role="group"><button type="button" data-aparat="x431">Tester X431</button><button type="button" data-aparat="osc">Osciloscop</button><button type="button" data-aparat="mm">Multimetru</button></div>
       <div class="panou-aparat" data-p="x431">
-        <div id="x431-live"></div>
+        <div class="tableta"><div class="ecran-tester" id="x431-live"></div></div>
         <div class="rand-butoane"><button type="button" id="btn-cod">Citește codurile</button><button type="button" id="btn-sterge">Șterge codurile</button></div>
         <p class="nota" id="x431-cod"></p>
         <details class="setari"><summary>Teste active</summary>

@@ -427,7 +427,7 @@ function actualizeazaPanou() {
   panouX431(); panouOBD();
 }
 function tabel(rows, cap) { return `<table class="tabel x431">${cap ? `<thead><tr>${cap.map(c => `<th>${c}</th>`).join("")}</tr></thead>` : ""}<tbody>${rows.map(r => Array.isArray(r) ? `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>` : `<tr class="sep"><td colspan="${cap ? cap.length : 4}">${r}</td></tr>`).join("")}</tbody></table>`; }
-function antetTester(t) { return `<div class="tester-antet"><span>LAUNCH X-431</span><span>${t}</span><span>${sim.contact ? "12,4 V" : ""}</span></div>`; }
+function antetTester(t) { return SEMNALE.antetX431(`Diagnoză › Autoturism 2025 › ${t}`, sim.contact ? fmt(P().Ubat, 1) + " V" : ""); }
 function panouX431() {
   const el = $("#x431-ecran"); if (!el) return;
   if (!sim.x431) { el.innerHTML = antetTester("VCI deconectată") + `<p class="nota">Interfața VCI nu este conectată la priza de diagnoză.</p>`; return; }

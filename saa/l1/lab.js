@@ -176,9 +176,14 @@ function actualizeazaPanou() {
 }
 function liveOBD() {
   const el = $("#obd-live"); if (!el || el.getClientRects().length === 0) return;
-  const on = sim.motor, r = (n, v, u) => `<tr><td>${n}</td><td><b>${v}</b></td><td>${u}</td></tr>`, o = obd();
-  el.innerHTML = `<table class="tabel x431"><tbody>${r("Turație motor", on ? o.n : 0, "rot/min")}${r("Presiune colector (MAP)", o.p, "kPa")}${r("Temp. lichid răcire", fmt(sim.motor || sim.tPorn ? sim.T : P().T0, 1), "°C")}${r("Temp. aer admis", "27", "°C")}
-    ${r("Poziție clapetă", fmt(sim.tps, 1), "%")}${r("Timp de injecție", on ? fmt(o.ti, 2) : "0,00", "ms")}${r("Tensiune baterie", fmt(ubat(), 1), "V")}${r("Injecție", !on ? "—" : sim.taiat ? "<span class='rau-t'>ÎNTRERUPTĂ</span>" : "activă", "")}${r("Buclă λ", on && cald() ? "închisă" : "deschisă (încălzire)", "")}</tbody></table>`;
+  const a = $("#x4-antet"); if (a) a.innerHTML = SEMNALE.antetX431("Renault › K7J 1.4 MPI › Injecție › Flux de date", fmt(ubat(), 1) + " V");
+  const on = sim.motor, o = obd(), ral = sim.reg === "ral" && sim.mod === "stab", T = sim.motor || sim.tPorn ? sim.T : P().T0;
+  el.innerHTML = SEMNALE.fluxDate([
+    ["Turație motor", on ? Math.round(o.n) : 0, ral ? [650, 1250] : null, "rot/min"], ["Presiune colector (MAP)", Math.round(o.p), on && ral ? [25, 45] : [20, 105], "kPa"],
+    ["Temp. lichid răcire", Math.round(T * 10) / 10, [-40, 115], "°C"], ["Temp. aer admis", 27, [-40, 80], "°C"],
+    ["Poziție clapetă", Math.round(sim.tps * 10) / 10, ral ? [0, 5] : [0, 100], "%"], ["Timp de injecție", on ? Math.round(o.ti * 100) / 100 : 0, null, "ms"],
+    ["Tensiune baterie", Math.round(ubat() * 10) / 10, on ? [13.5, 14.8] : [12.2, 12.9], "V"],
+    ["Injecție", !on ? "—" : sim.taiat ? "<span class='rau-t'>ÎNTRERUPTĂ</span>" : "activă", null, ""], ["Buclă λ", on && cald() ? "închisă" : "deschisă (încălzire)", null, ""]], true);
 }
 function deseneazaGraficOBD() {
   const cv = $("#cv-obd"); if (!cv || !cv.getClientRects().length) return;
@@ -546,9 +551,9 @@ Cadru.porneste({
       <div class="rand-butoane"><button type="button" id="btn-acc">Accelerare bruscă</button><button type="button" id="btn-dec">Decelerare (clapetă închisă)</button></div>
       <label class="camp">Timpul simulat (încălzire, consum) <select id="sel-viteza"><option value="1">×1 (timp real)</option><option value="5" selected>×5</option><option value="10">×10</option></select></label>
       <h2>Instrumentul</h2>
-      <div class="comutator-aparat" role="group"><button type="button" data-aparat="obd">Tester OBD</button><button type="button" data-aparat="osc">Osciloscop</button><button type="button" data-aparat="cantar">Cântar</button></div>
+      <div class="comutator-aparat" role="group"><button type="button" data-aparat="obd">Tester X-431</button><button type="button" data-aparat="osc">Osciloscop</button><button type="button" data-aparat="cantar">Cântar</button></div>
       <div class="panou-aparat" data-p="obd">
-        <div class="tableta"><div class="ecran-tester"><div class="tester-antet"><span>TESTER OBD</span><span>date live</span><span></span></div><div id="obd-live"></div>
+        <div class="tableta"><div class="ecran-tester"><div id="x4-antet"></div><div id="obd-live"></div>
           <canvas id="cv-obd" height="190" aria-label="Graficul turației și al timpului de injecție"></canvas><p class="nota" id="obd-cit"></p></div></div>
         <div class="rand-butoane"><button type="button" class="primar" id="btn-inc">● Încălzire → Tabelul 1.1</button><button type="button" class="primar" id="btn-reg">● Regim → Tabelul 1.2</button></div>
         <button type="button" class="lat" id="btn-ing">Îngheață graficul</button>

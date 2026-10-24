@@ -426,7 +426,7 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .comutator-vedere button[aria-pressed="true"] { background: var(--accent); color: var(--pe-accent); border-color: var(--accent); }
 .sim-scena > .btn-ecran + .vedere-sim .comutator-vedere { margin-left: 9.5rem; }
 .tableta { background: #15181c; border-radius: 16px; padding: 10px 10px 14px; box-shadow: inset 0 0 0 2px #2b3036, 0 6px 16px rgba(0, 0, 0, .25); margin: .5rem 0; }
-.tableta .ecran-tester { margin: 0; border-radius: 6px; }
+.tableta .ecran-tester { margin: 0; border-radius: 6px; max-height: 620px; }
 .tableta.telefon { border-radius: 22px; padding: 14px 10px 18px; }
 .tester-antet { display: flex; justify-content: space-between; gap: .5rem; background: #b3261e; color: #fff; font-size: .72rem; font-weight: 700; padding: .25rem .5rem; margin: -.5rem -.6rem .5rem; border-radius: 6px 6px 0 0; }
 .tester-antet.obd { background: #4a3a7a; }
@@ -472,3 +472,23 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .sz-concl { margin: .4rem 0 0; font-size: .9rem; border-left: 3px solid var(--accent); padding-left: .6rem; }
 @media (max-width: 900px) { .sz-grila { grid-template-columns: 1fr; } .sz-3d { height: 280px; } }
 .sim-grila:fullscreen .sim-scena.tk, .sim-grila.ecran-plin .sim-scena.tk { display: block; }
+
+/* ecranul Launch X-431 PRO (bara de stare, bara aplicației, fluxul de date cu interval standard, bara de jos) */
+.tableta { position: relative; }
+.tableta::before { content: ""; position: absolute; top: 4px; left: 50%; width: 5px; height: 5px; margin-left: -2px; border-radius: 50%; background: #3a4048; }
+.x4-stare { display: flex; justify-content: space-between; font-size: .64rem; color: #c9d3dc; background: #0a0e12; margin: -.5rem -.6rem 0; padding: .12rem .5rem; border-radius: 6px 6px 0 0; font-variant-numeric: tabular-nums; }
+.x4-bara { display: flex; align-items: center; gap: .5rem; background: linear-gradient(#1f6fd1, #1857a8); color: #fff; margin: 0 -.6rem .4rem; padding: .3rem .5rem; font-size: .72rem; }
+.x4-sigla { font-weight: 900; letter-spacing: .06em; background: #d71920; padding: .05rem .3rem; border-radius: 2px; font-size: .66rem; }
+.x4-cale { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .95; }
+.x4-ub { font-variant-numeric: tabular-nums; }
+.ecran-tester table.x4-flux th { background: #e9eef5; color: #20354f; font-size: .68rem; font-weight: 700; text-align: left; }
+.ecran-tester table.x4-flux { background: #f7f9fc; color: #18232e; }
+.ecran-tester table.x4-flux tbody tr:nth-child(even) { background: #eef2f7; }
+.ecran-tester table.x4-flux td { border-bottom: 1px solid #dde4ec; }
+.ecran-tester table.x4-flux td:nth-child(3) { color: #5b6b7c; font-size: .66rem; white-space: nowrap; text-align: right; }
+.ecran-tester table.x4-flux td:first-child { font-family: inherit; font-size: .72rem; white-space: normal; }
+.ecran-tester table.x4-flux td:nth-child(2) { white-space: nowrap; }
+.ecran-tester table.x4-flux td small { color: #5b6b7c; font-size: .64rem; font-weight: 400; }
+.ecran-tester table.x4-flux tr.x4-afara td:nth-child(2) b { color: #d71920; }
+.x4-subsol { display: flex; gap: 2px; margin: .4rem -.6rem -.5rem; background: #dfe5ec; border-radius: 0 0 6px 6px; overflow: hidden; }
+.x4-subsol span { flex: 1; text-align: center; font-size: .66rem; padding: .3rem .1rem; background: #f4f6f9; color: #1857a8; font-weight: 600; }
