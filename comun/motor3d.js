@@ -99,13 +99,33 @@ export function transmisieAccesorii(opt = {}) {
   pompa.add(lathe([[0.008, -0.03], [0.016, -0.03], [0.016, -0.022], [PW.r + 0.003, -0.022], ...profilPolyV(PW.r, 0.0035, -0.016, 0.012, 6), [PW.r + 0.003, 0.012], [PW.r + 0.003, 0.015], [0.03, 0.015], [0.03, 0.006], [0.016, 0.006], [0.016, 0.012], [0.008, 0.012]], MP.fulie));
   for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2; cyl(0.004, 0.004, 0.006, M.crom, 0.014, Math.cos(a) * 0.011, Math.sin(a) * 0.011, "x", pompa); }   // șuruburile fuliei
   for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + 0.3; cyl(0.006, 0.006, 0.005, MP.negru, 0.013, Math.cos(a) * 0.022, Math.sin(a) * 0.022, "x", pompa); }  // degajările fuliei
+  // compresorul de climatizare (cu cilindree variabilă): cuplaj electromagnetic cu fulie Poly-V, corp din aluminiu turnat, chiulasa cu racordurile
+  const PC = { y: -0.04, z: 0.21, r: 0.055 };
+  { const C = new THREE.Group(); C.position.set(0, PC.y, PC.z); g.add(C);
+    C.add(lathe([[0.02, 0.135], [0.05, 0.135], [0.058, 0.145], [0.06, 0.16], [0.06, 0.25], [0.056, 0.262], [0.04, 0.27], [0.03, 0.29]], MP.aluCast));    // corpul
+    C.add(lathe([[0.012, 0.128], [0.052, 0.128], [0.055, 0.135], [0.012, 0.135]], MP.alu));                                                              // chiulasa (capacul posterior)
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + 0.3; cyl(0.004, 0.004, 0.14, M.otel, 0.2, Math.cos(a) * 0.054, Math.sin(a) * 0.054, "x", C); }   // șuruburile de asamblare
+    [[0.07, 1], [-0.07, -1]].forEach(([y, s2]) => { box(0.03, 0.028, 0.03, MP.aluCast, 0.16, y, 0, C); box(0.03, 0.028, 0.03, MP.aluCast, 0.255, y, 0, C); cyl(0.007, 0.007, 0.13, M.otel, 0.205, y, 0, "x", C); });   // urechile de prindere
+    box(0.12, 0.03, 0.06, M.fonta, 0.2, -0.085, -0.05, C);                                                                                             // suportul pe bloc
+    // racordurile: aspirație (Ø mare, de la vaporizator) și refulare (spre condensator), cu flanșe și șuruburi
+    [[0.16, 0.012, 0.028, 0.012], [0.16, -0.012, 0.022, 0.009]].forEach(([x, z, h, r]) => { rbox(0.024, 0.016, 0.024, 0.004, MP.alu, x, 0.064, z, C); cyl(r, r, h, MP.alu, x, 0.075 + h / 2, z, "y", C); cyl(0.0035, 0.0035, 0.02, M.crom, x + 0.012, 0.07, z, "y", C); });
+    rbox(0.022, 0.016, 0.02, 0.004, M.plasticGri, 0.24, 0.0, 0.066, C); tub([[0.24, 0.0, 0.076], [0.22, 0.02, 0.1], [0.12, 0.08, 0.1]], 0.0035, M.cauciuc, C);   // supapa de comandă și bobina cuplajului
+    // cuplajul electromagnetic: bobina fixă, fulia pe rulment, discul de antrenare cu arcuri lamelare
+    const fc = new THREE.Group(); fc.position.x = 0; C.add(fc); rot.comp = fc;
+    fc.add(lathe([[0.018, XP - 0.03], [PC.r + 0.003, XP - 0.03], ...profilPolyV(PC.r, 0.0035, XP - 0.016, XP + 0.012, 6), [PC.r + 0.003, XP + 0.012], [PC.r + 0.003, XP + 0.014], [0.018, XP + 0.014]], MP.fulie));
+    fc.add(lathe([[0.008, XP + 0.015], [0.046, XP + 0.015], [0.046, XP + 0.019], [0.008, XP + 0.019]], MP.alu));                                         // discul de antrenare
+    for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2; const l = box(0.003, 0.034, 0.012, M.otel, XP + 0.021, Math.cos(a) * 0.026, Math.sin(a) * 0.026, fc); l.rotation.x = a; }
+    cyl(0.012, 0.012, 0.008, M.crom, XP + 0.023, 0, 0, "x", fc);
+    cyl(0.05, 0.05, 0.02, MP.negru, XP - 0.042, 0, 0, "x", C);                                                                                          // bobina
+  }
+  const portAC = { asp: new THREE.Vector3(0.16, PC.y + 0.103, PC.z + 0.012), ref: new THREE.Vector3(0.16, PC.y + 0.097, PC.z - 0.012) };
   // rola întinzătoare automată: braț pivotant cu arc, rolă netedă pe rulment (apasă pe spatele curelei, pe ramura lungă)
-  const PT = { y: 0.075, z: 0.125, r: 0.032 };
+  const PT = { y: 0.09, z: 0.13, r: 0.032 };
   const intinz = new THREE.Group(); intinz.position.set(XP, PT.y, PT.z); g.add(intinz); rot.intinz = intinz;
   intinz.add(lathe([[0.008, -0.016], [PT.r - 0.002, -0.016], [PT.r, -0.012], [PT.r + 0.0008, 0], [PT.r, 0.012], [PT.r - 0.002, 0.016], [0.008, 0.016]], MP.rola));
   intinz.add(lathe([[0.008, 0.016], [0.02, 0.016], [0.02, 0.02], [0.008, 0.02]], MP.negru));                                // capacul de praf al rulmentului
   cyl(0.006, 0.006, 0.006, M.crom, 0.022, 0, 0, "x", intinz);
-  { const piv = { y: 0.15, z: 0.065 }, dy = PT.y - piv.y, dz = PT.z - piv.z, L = Math.hypot(dy, dz);
+  { const piv = { y: 0.148, z: 0.058 }, dy = PT.y - piv.y, dz = PT.z - piv.z, L = Math.hypot(dy, dz);
     const brat = box(0.012, L + 0.03, 0.026, MP.aluCast, XP - 0.024, (PT.y + piv.y) / 2, (PT.z + piv.z) / 2); brat.rotation.x = Math.atan2(dz, dy) * -1;
     cyl(0.022, 0.022, 0.03, MP.aluCast, XP - 0.036, piv.y, piv.z, "x");                                                    // carcasa arcului spiral
     cyl(0.008, 0.008, 0.01, M.crom, XP - 0.016, piv.y, piv.z, "x");
@@ -113,7 +133,7 @@ export function transmisieAccesorii(opt = {}) {
     box(0.004, 0.012, 0.003, M.galben, XP - 0.02, piv.y + 0.018, piv.z, g);                                              // indicatorul de tensiune
   }
   // cureaua Poly-V (6 nervuri), calculată ca tangente exterioare/interioare la cele trei fulii
-  { const P = [{ u: 0, v: 0, r: 0.074 + 0.003 }, { u: PT.z, v: PT.y, r: -(PT.r + 0.0008) }, { u: 0.19, v: 0.205, r: 0.028 + 0.003 }, { u: PW.z, v: PW.y, r: PW.r + 0.003 }];   // r < 0: fulia atinge spatele curelei
+  { const P = [{ u: 0, v: 0, r: 0.074 + 0.003 }, { u: PC.z, v: PC.y, r: PC.r + 0.003 }, { u: PT.z, v: PT.y, r: -(PT.r + 0.0008) }, { u: 0.19, v: 0.205, r: 0.028 + 0.003 }, { u: PW.z, v: PW.y, r: PW.r + 0.003 }];   // r < 0: fulia atinge spatele curelei
     const tang = (a, b) => { const dx = b.u - a.u, dy = b.v - a.v, L = Math.hypot(dx, dy), A = (b.r - a.r) / L, B = Math.sqrt(1 - A * A), du = dx / L, dv = dy / L, nu = A * du - B * dv, nv = A * dv + B * du;
       return [{ u: a.u - a.r * nu, v: a.v - a.r * nv }, { u: b.u - b.r * nu, v: b.v - b.r * nv }]; };
     const T = P.map((p, k) => tang(p, P[(k + 1) % P.length]));
@@ -153,9 +173,9 @@ export function transmisieAccesorii(opt = {}) {
     };
     rot.marcaje.pozitie(0);
   }
-  return { grup: g, rot, XP,
+  return { grup: g, rot, XP, portAC,
     roteste(d) {
-      rot.fulia.rotation.x -= d; rot.altern.rotation.x -= d * 0.077 / 0.031; rot.intinz.rotation.x += d * 0.077 / 0.0328; rot.pompa.rotation.x -= d * 0.077 / 0.05;
+      rot.fulia.rotation.x -= d; rot.altern.rotation.x -= d * 0.077 / 0.031; rot.intinz.rotation.x += d * 0.077 / 0.0328; rot.pompa.rotation.x -= d * 0.077 / 0.05; rot.comp.rotation.x -= d * 0.077 / 0.058;
       rot.sCurea = (rot.sCurea || 0) + d * 0.077; rot.marcaje.pozitie(rot.sCurea);
     } };
 }
@@ -236,17 +256,41 @@ function sistemRacire(M, opt) {
     const mC = new THREE.MeshStandardMaterial({ map: tc, color: 0x9aa0a6, roughness: 0.6, metalness: 0.5 });
     const cond = new THREE.Mesh(new THREE.BoxGeometry(W + 0.02, H - 0.03, 0.016), [mMuchie, mMuchie, mMuchie, mMuchie, mC, mC]); cond.position.z = -0.035; R.add(cond);
     cyl(0.022, 0.022, 0.24, M.alu, W / 2 + 0.07, -0.01, -0.035, "y", R);                     // filtrul deshidrator
-    const mAl = M.alu;
-    // conducta de înaltă presiune (lichid) cu senzorul de presiune și conducta de refulare spre condensator
-    tub([wp([W / 2 + 0.07, 0.12, -0.035]), wp([W / 2 + 0.07, H / 2 + 0.03, 0.0]), wp([W / 2 + 0.04, H / 2 + 0.06, 0.12]), [0.36, 0.33, -0.2], [0.38, 0.34, 0.1], [0.4, 0.3, 0.4]].map(v => v.x !== undefined ? [v.x, v.y, v.z] : v), 0.005, mAl, g, 60);
-    tub([wp([-W / 2 - 0.01, H / 2 - 0.04, -0.035]), wp([-W / 2 - 0.02, H / 2 + 0.05, 0.02]), [-0.43, 0.42, -0.35], [-0.4, 0.42, 0.0], [-0.38, 0.36, 0.4]].map(v => v.x !== undefined ? [v.x, v.y, v.z] : v), 0.007, mAl, g, 60);
-    const ps = wp([W / 2 + 0.06, H / 2 + 0.05, 0.08]);
+    const mAl = M.alu, V3 = (x, y, z) => new THREE.Vector3(x, y, z), pa = opt.portAC;
+    const linie = (pts, r) => { const c = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.35); add(new THREE.Mesh(new THREE.TubeGeometry(c, 90, r, 10, false), mAl)); return c; };
+    // racordul de intrare al condensatorului și ventilul de expansiune (pe peretele parafoc) cu blocul de racorduri
+    const inCond = wp([W / 2 + 0.012, H / 2 - 0.045, -0.035]);
+    rbox(0.022, 0.03, 0.022, 0.004, mAl, inCond.x, inCond.y, inCond.z, g);
+    const VE = V3(0.27, 0.32, 0.545); rbox(0.05, 0.05, 0.03, 0.006, mAl, VE.x, VE.y, VE.z, g); box(0.07, 0.07, 0.006, mP, VE.x, VE.y, VE.z + 0.02, g);
+    // conducta de refulare (gaz fierbinte, înaltă presiune): compresor → condensator
+    if (pa) linie([pa.ref.clone().add(V3(0, 0.02, 0)), V3(0.17, 0.06, 0.27), V3(0.2, -0.1, 0.3), V3(0.27, -0.2, 0.15), V3(0.26, -0.2, -0.1), V3(0.26, -0.17, -0.38), V3(0.37, -0.12, -0.45), V3(0.37, 0.05, -0.58), V3(inCond.x + 0.02, inCond.y - 0.01, inCond.z - 0.02), inCond], 0.0065);   // pe sub fulii, ocolind bazinul radiatorului
+    // conducta de aspirație (vapori reci, joasă presiune, Ø mare): ventilul de expansiune → compresor
+    if (pa) linie([V3(VE.x - 0.012, VE.y - 0.02, VE.z - 0.016), V3(0.25, 0.27, 0.48), V3(0.2, 0.17, 0.4), V3(0.17, 0.11, 0.31), pa.asp.clone().add(V3(0, 0.03, 0)), pa.asp], 0.009);
+    // conducta de lichid (înaltă presiune): filtrul deshidrator → ventilul de expansiune, cu senzorul de presiune
+    const top = wp([W / 2 + 0.07, 0.125, -0.035]);
+    const cL = linie([top, top.clone().add(V3(0, 0.06, 0.02)), V3(0.39, 0.32, -0.42), V3(0.31, 0.475, -0.12), V3(0.31, 0.47, 0.25), V3(0.29, 0.38, 0.46), V3(VE.x + 0.012, VE.y + 0.01, VE.z - 0.016)], 0.005);   // pe deasupra carcasei distribuției
+    // prizele de service (H roșu pe lichid, L albastru pe aspirație)
+    const ph = cL.getPointAt(0.42); cyl(0.007, 0.007, 0.02, M.alama, ph.x, ph.y + 0.012, ph.z, "y", g); cyl(0.009, 0.009, 0.014, new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.4 }), ph.x, ph.y + 0.027, ph.z, "y", g);
+    if (pa) { const pl = V3(0.2, 0.17, 0.4); cyl(0.008, 0.008, 0.02, M.alama, pl.x, pl.y + 0.015, pl.z, "y", g); cyl(0.01, 0.01, 0.014, new THREE.MeshStandardMaterial({ color: 0x1f5fd0, roughness: 0.4 }), pl.x, pl.y + 0.03, pl.z, "y", g); }
+    const ps = cL.getPointAt(0.18);
     const sAC = new THREE.Group(); sAC.position.copy(ps); g.add(sAC);
     cyl(0.009, 0.009, 0.01, M.alama, 0, 0.004, 0, "y", sAC); cyl(0.0105, 0.0105, 0.012, M.otel, 0, 0.014, 0, "y", sAC);   // piulița hexagonală pe ventilul Schrader
     cyl(0.011, 0.011, 0.025, mP, 0, 0.033, 0, "y", sAC); rbox(0.02, 0.012, 0.018, 0.003, M.plasticGri, 0, 0.052, 0, sAC);
     tub([[0, 0.058, 0], [0.0, 0.1, 0.02], [-0.05, 0.14, 0.08]], 0.0035, M.cauciuc, sAC);
+    // blocul de climatizare din habitaclu (carcasă translucidă): vaporizatorul, radiatorul de încălzire, suflanta, clapetele de amestec
+    const mHV = new THREE.MeshPhysicalMaterial({ color: 0x3a3f46, roughness: 0.5, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+    rbox(0.62, 0.3, 0.26, 0.03, mHV, 0.02, 0.3, 0.72, g);
+    const te = texturaNucleu().clone(); te.needsUpdate = true; te.repeat.set(5, 3);
+    const mEv = new THREE.MeshStandardMaterial({ map: te, color: 0xc8d4e0, roughness: 0.6, metalness: 0.5 });
+    const ev = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.2, 0.04), [mMuchie, mMuchie, mMuchie, mMuchie, mEv, mEv]); ev.position.set(0.15, 0.3, 0.63); g.add(ev);   // vaporizatorul
+    tub([[VE.x, VE.y, VE.z + 0.02], [0.24, 0.32, 0.6], [0.22, 0.32, 0.63]], 0.006, mAl, g);
+    const sc = add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 32), mHV)); sc.position.set(0.42, 0.28, 0.76);         // carcasa suflantei
+    cyl(0.04, 0.04, 0.07, M.otel, 0.42, 0.18, 0.76, "y", g); for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; box(0.004, 0.1, 0.02, mP, 0.42 + Math.cos(a) * 0.075, 0.28, 0.76 + Math.sin(a) * 0.075, g).rotation.y = -a; }
+    box(0.16, 0.012, 0.18, M.otel, -0.06, 0.38, 0.72, g).rotation.x = 0.5;                                                              // clapeta de amestec
+    [[-0.25, 0.47, 0.8], [0.0, 0.47, 0.82], [0.25, 0.47, 0.8]].forEach(([x, y, z]) => rbox(0.12, 0.08, 0.08, 0.02, mHV, x, y, z, g));   // gurile de distribuție (parbriz, centru, picioare)
     out.ac = sAC; ancore.ac = ps.clone().add(new THREE.Vector3(0, 0.06, 0));
   }
+  if (!opt.ac && opt.portAC) [[opt.portAC.ref, 0xc62828, 0.011], [opt.portAC.asp, 0x1f5fd0, 0.013]].forEach(([p, c, r]) => cyl(r, r, 0.012, new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }), p.x, p.y + 0.004, p.z, "y"));   // capacele de protecție ale racordurilor (stand fără circuit A/C)
   // furtunul superior: termostat → bazinul din stânga (sus); furtunul inferior: bazinul din dreapta (jos) → pompa de apă
   const IN = wp([tL, H / 2 - 0.035, 0.075]), OUT = wp([tD, -H / 2 + 0.035, 0.075]);
   const T = new THREE.Vector3(...(opt.T || [-0.33, 0.31, 0.04])), P = new THREE.Vector3(...(opt.P || [0.255, 0.2, -0.15])), RT = new THREE.Vector3(...(opt.retur || [-0.2, 0.14, 0.145]));
@@ -275,8 +319,10 @@ function sistemRacire(M, opt) {
   // furtunurile radiatorului de încălzire (habitaclu): tur de la carcasa termostatului, retur în bloc
   { const [hx, hy, hz] = opt.incalzire;
     cyl(0.009, 0.009, 0.03, M.alu, T.x + 0.06, T.y, T.z + 0.05, "z"); cyl(0.009, 0.009, 0.03, M.alu, RT.x, RT.y, RT.z, "z");
-    tub([[T.x + 0.06, T.y, T.z + 0.06], [T.x + 0.06, T.y + 0.01, T.z + 0.16], [hx + 0.04, hy + 0.04, hz - 0.12], [hx + 0.04, hy + 0.04, hz - 0.03]], 0.009, mFurt, g, 50);
-    tub([[RT.x, RT.y, RT.z + 0.01], [RT.x, RT.y, RT.z + 0.1], [hx - 0.04, hy - 0.04, hz - 0.12], [hx - 0.04, hy - 0.04, hz - 0.03]], 0.009, mFurt, g, 50);
+    tub([[T.x + 0.06, T.y, T.z + 0.06], [T.x + 0.07, T.y - 0.04, T.z + 0.14], [T.x + 0.1, 0.2, (T.z + hz) / 2], [hx + 0.04, hy + 0.04, hz - 0.15], [hx + 0.04, hy + 0.04, hz - 0.075]], 0.009, mFurt, g, 60);   // turul: sub tubulatura de aer, ocolind debitmetrul
+    tub([[RT.x, RT.y, RT.z + 0.01], [RT.x, RT.y, RT.z + 0.1], [(RT.x + hx) / 2, 0.17, (RT.z + hz) / 2], [hx - 0.04, hy - 0.04, hz - 0.15], [hx - 0.04, hy - 0.04, hz - 0.075]], 0.009, mFurt, g, 60);
+    // țevile radiatorului de încălzire (trec prin peretele parafoc) cu colierele furtunurilor
+    [[hx + 0.04, hy + 0.04], [hx - 0.04, hy - 0.04]].forEach(([x, y]) => { cyl(0.0095, 0.0095, 0.08, M.alu, x, y, hz - 0.036, "z"); const c = add(new THREE.Mesh(new THREE.TorusGeometry(0.0115, 0.002, 6, 16), mClema)); c.position.set(x, y, hz - 0.068); });
     const ti = texturaNucleu().clone(); ti.needsUpdate = true; ti.repeat.set(4, 3);
     const mI = new THREE.MeshStandardMaterial({ map: ti, roughness: 0.6, metalness: 0.5 });
     const inc = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.035), [mMuchie, mMuchie, mMuchie, mMuchie, mI, mI]); inc.position.set(hx, hy, hz + 0.02); g.add(inc);
@@ -316,10 +362,38 @@ export function construiesteMotor(opt = {}) {
   const acc = transmisieAccesorii({ M }); g.add(acc.grup); Object.assign(rot, acc.rot); const XP = acc.XP;
   ancore.distributie = new THREE.Vector3(XP, 0.1, 0.0);
 
+  /** cutia de viteze automată cu dublu ambreiaj (transaxle): carterul, diferențialul cu flanșele de ieșire, arborele intermediar,
+      unitatea mecatronică (blocul hidraulic + TCU) cu pompa electrică și conectorul, maneta selectorului cu cablul */
+  function cutieAutomata() {
+    const lath = (prof, m, y, z) => { const geo = new THREE.LatheGeometry(prof.map(([r, xx]) => new THREE.Vector2(r, xx)), 48); geo.rotateZ(-Math.PI / 2); const o = add(new THREE.Mesh(geo, m)); o.position.set(0, y, z); return o; };
+    lath([[0.12, -0.665], [0.13, -0.655], [0.14, -0.62], [0.15, -0.5], [0.17, -0.44], [0.172, -0.41]], M.aluMat, -0.02, 0);                   // carterul principal
+    for (let k = 0; k < 9; k++) { const a = -0.4 + k * 0.42; const nv = box(0.2, 0.012, 0.012, M.aluMat, -0.53, -0.02 + Math.cos(a) * 0.148, Math.sin(a) * 0.148); nv.rotation.x = -a; }   // nervurile
+    const DY = -0.087, DZ = 0.335;
+    rbox(0.2, 0.15, 0.27, 0.03, M.aluMat, -0.525, -0.085, 0.17);                                                                            // puntea spre diferențial
+    lath([[0.05, -0.64], [0.075, -0.625], [0.09, -0.58], [0.09, -0.46], [0.07, -0.42]], M.aluMat, DY, DZ);                                    // carcasa diferențialului
+    rbox(0.2, 0.04, 0.24, 0.01, M.alu, -0.53, -0.17, 0.05); cyl(0.01, 0.01, 0.012, M.otel, -0.5, -0.195, 0.05, "y");                      // baia de ulei a cutiei, bușonul
+    const flansa = (x, s2) => { cyl(0.045, 0.045, 0.012, M.otel, x, DY, DZ, "x"); for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; cyl(0.004, 0.004, 0.02, M.crom, x + s2 * 0.006, DY + Math.cos(a) * 0.032, DZ + Math.sin(a) * 0.032, "x"); } };
+    flansa(-0.648, -1);
+    cyl(0.018, 0.018, 0.68, M.otel, -0.08, DY, DZ, "x");                                                                                  // arborele intermediar (spre roata dreaptă)
+    cyl(0.03, 0.03, 0.03, M.cauciuc, -0.04, DY, DZ, "x"); box(0.03, 0.05, 0.2, M.fonta, -0.04, DY + 0.01, DZ - 0.1);                      // lagărul de sprijin pe bloc
+    flansa(0.268, 1);
+    ancore.flansaSt = new THREE.Vector3(-0.66, DY, DZ); ancore.flansaDr = new THREE.Vector3(0.28, DY, DZ);
+    // unitatea mecatronică (pe partea din față a cutiei)
+    const mM = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6 });
+    rbox(0.19, 0.13, 0.04, 0.008, M.alu, -0.53, 0.06, -0.125);                                                                             // blocul hidraulic (sertarele, electrovalvele)
+    for (let k = 0; k < 6; k++) box(0.004, 0.11, 0.008, M.alu, -0.61 + k * 0.032, 0.06, -0.148);
+    rbox(0.17, 0.11, 0.022, 0.006, mM, -0.53, 0.06, -0.156);                                                                              // capacul cu TCU integrat
+    cyl(0.026, 0.026, 0.08, M.otel, -0.53, 0.145, -0.13, "x"); cyl(0.028, 0.028, 0.012, mM, -0.575, 0.145, -0.13, "x");                   // electropompa de ulei și acumulatorul
+    rbox(0.05, 0.026, 0.03, 0.005, mM, -0.47, 0.06, -0.18); box(0.04, 0.006, 0.02, M.plasticGri, -0.47, 0.076, -0.18);                     // conectorul TCU (cu pârghie de blocare)
+    tub([[-0.47, 0.06, -0.196], [-0.45, 0.12, -0.22], [-0.38, 0.3, -0.12], [-0.3, 0.42, 0.0]], 0.006, M.cauciuc);                          // cablajul spre rețeaua vehiculului
+    ancore.tcu = new THREE.Vector3(-0.53, 0.13, -0.16);
+    // arborele selectorului cu maneta și cablul spre maneta din habitaclu
+    cyl(0.012, 0.012, 0.04, M.otel, -0.5, 0.15, 0.06, "y"); box(0.012, 0.01, 0.07, M.otel, -0.5, 0.17, 0.09);
+    tub([[-0.5, 0.17, 0.125], [-0.48, 0.2, 0.25], [-0.35, 0.18, 0.45], [-0.15, 0.12, 0.62]], 0.005, M.cauciuc);
+  }
   // ---------------- partea volantului (−x): carcasa ambreiajului cu fereastră, coroana dințată 60−2, senzorul CKP
   const clopot = cyl(0.19, 0.17, 0.16, M.alu, -0.33, 0.0, 0.0, "x");
-  cyl(0.15, 0.13, 0.25, M.alu, -0.53, -0.02, 0.0, "x");                           // cutia de viteze
-  rbox(0.12, 0.2, 0.18, 0.02, M.alu, -0.6, -0.07, 0.08);
+  cutieAutomata();
   const volant = new THREE.Group(); volant.position.set(-0.27, 0, 0); g.add(volant); rot.volant = volant;
   const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.165, 0.025, 64), M.otel); disc.rotation.z = Math.PI / 2; add(disc, volant);
   for (let k = 0; k < 60; k++) { if (k >= 58) continue; const a = k / 60 * Math.PI * 2; const d = box(0.022, 0.012, 0.009, M.crom, 0, Math.cos(a) * 0.17, Math.sin(a) * 0.17, volant); d.rotation.x = -a; }
@@ -379,8 +453,9 @@ export function construiesteMotor(opt = {}) {
     const YG = -0.21, ZG = -0.3;                                                                                                        // axa filtrului GPF
     corpRev([[0.024, -0.665], [0.055, -0.635], [0.066, -0.62], [0.066, -0.465], [0.055, -0.45], [0.024, -0.42]], M.scut, 0, YG, ZG);      // filtrul de particule (monolit ceramic cu canale închise alternativ)
     inel(0.067, -0.62, YG, ZG); inel(0.067, -0.465, YG, ZG); inel(0.067, -0.5425, YG, ZG);
-    tub([[-0.665, YG, ZG], [-0.72, -0.22, -0.29], [-0.78, -0.25, -0.26]], 0.024, M.ruginaCald);
-    cyl(0.045, 0.045, 0.008, M.otel, -0.78, -0.25, -0.26, "x");                                                                         // flanșa spre țeava intermediară
+    tub([[-0.665, YG, ZG], [-0.71, -0.23, -0.29], [-0.735, -0.28, -0.24], [-0.735, -0.3, -0.18]], 0.024, M.ruginaCald);
+    cyl(0.045, 0.045, 0.008, M.otel, -0.735, -0.3, -0.178, "z");                                                                        // flanșa spre țeava intermediară
+    ancore.evacIesire = new THREE.Vector3(-0.735, -0.3, -0.174);
     // ștuțurile de prelevare a presiunii: P1 pe conul de intrare (înainte de monolit), P2 pe conul de ieșire (după monolit)
     const PR = [{ x: -0.442, xs: -0.515 }, { x: -0.643, xs: -0.545 }];
     PR.forEach(q => { cyl(0.0065, 0.0065, 0.016, M.otel, q.x, YG + 0.052, ZG, "y"); cyl(0.0045, 0.0045, 0.006, M.crom, q.x, YG + 0.063, ZG, "y"); });
@@ -410,8 +485,8 @@ export function construiesteMotor(opt = {}) {
   rbox(0.07, 0.07, 0.08, 0.012, M.alu, -0.27, 0.31, 0.04);
   { const c = grupC("ect", "Senzorul de temperatură CTS"); cyl(0.012, 0.012, 0.03, M.alama, -0.27, 0.355, 0.06, "y", c); conectori.ect = rbox(0.022, 0.02, 0.024, 0.004, M.verde, -0.27, 0.38, 0.06, c); ancore.ect = new THREE.Vector3(-0.27, 0.39, 0.06); }
   const rac = sistemRacire(M, opt.stand !== false
-    ? { xc: -0.02, yR: 0.05, zR: -0.85, vas: [0.2, 0.33, -0.79], suportVas: true, incalzire: [-0.3, 0.2, 0.5] }
-    : { xc: -0.02, yR: -0.02, zR: -0.52, vas: [-0.47, 0.3, -0.25], suportVas: true, incalzire: [-0.3, 0.28, 0.5], ac: true });
+    ? { xc: -0.02, yR: 0.05, zR: -0.85, vas: [0.2, 0.33, -0.79], suportVas: true, incalzire: [-0.3, 0.2, 0.5], portAC: acc.portAC }
+    : { xc: -0.02, yR: -0.02, zR: -0.52, vas: [-0.47, 0.3, -0.25], suportVas: true, incalzire: [-0.15, 0.29, 0.68], ac: true, portAC: acc.portAC });
   g.add(rac.grup); rot.vent = rac.rot.vent;
   if (rac.ac) { const c = grupC("ac", "Senzorul de presiune A/C"); c.add(rac.ac); ancore.ac = rac.ancore.ac; }
 

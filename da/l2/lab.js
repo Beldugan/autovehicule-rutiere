@@ -220,7 +220,7 @@ function actualizeazaSVG(dt) {
 /* motorul 3D realist pe stand (cu revenire la desenul 2D dacă WebGL lipsește) */
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=6").then(m => {
+  import(BAZA_COMUN + "motor3d.js?v=7").then(m => {
     const ET = { ckp: "CKP", cmp: "CMP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", clap: "clapetă", can: "canistră", knock: "detonație" };
     SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: k => { if (COMP[k]) selecteaza(k, false); } });
     $("#svg-motor").style.display = "none";

@@ -4,7 +4,7 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=6";
+import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=7";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -232,8 +232,12 @@ export function creeaza(gazda, optiuni = {}) {
   }
 
   /* --- sistemul de frânare */
-  if (sistem === "retea" || sistem === "frana" || !sistem) { ascundeContur(ctx, ["motor", "cutie", "radiator"]); motorAutoturism(caroserie, 0.5); }
+  let motCtx = null;
+  if (sistem === "retea" || sistem === "frana" || !sistem) { ascundeContur(ctx, ["motor", "cutie", "radiator"]); motCtx = motorAutoturism(caroserie, 0.5); }
   const S = sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : sistem === "senzori" ? construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "retea" ? construiesteRetea({ caroserie, optiuni }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
+
+  // celelalte sisteme ale autoturismului (transmisie, direcție, baterie, combustibil, evacuare)
+  { const mSist = motCtx || (S.motor || null); const gs = sistemeAutoturism(caroserie, mSist); if (motCtx) estompeaza(gs, 0.5); }
 
   /* --- etichete HTML */
   const elEt = gazda.querySelector(".v3d-etichete");
@@ -579,6 +583,81 @@ function construiesteFrana({ THREE, sasiu, caroserie, roti }) {
   return { etichete: et, actualizeaza };
 }
 
+/* ------------------------------------------------------------------ alte sisteme ale autoturismului modern (comune tuturor lucrărilor)
+   planetarele (transmisia la roțile față), caseta de direcție cu asistare electrică (EPS), bateria cu senzorul IBS,
+   rezervorul cu modulul pompei și conducta de alimentare, canistra EVAP, linia de evacuare cu tobele. Coordonatele caroseriei. */
+function sistemeAutoturism(caroserie, mot) {
+  const M = MAT(), G = new THREE.Group(); G.name = "sisteme"; caroserie.add(G);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const add = (o, p = G) => { o.castShadow = true; p.add(o); return o; };
+  const bara = (a, b, r, m, seg = 16) => { const d = b.clone().sub(a), L = d.length(); const o = add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, seg), m)); o.position.copy(a).add(b).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); return o; };
+  const tub = (pts, r, m, seg = 80) => add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p => V(...p)), false, "catmullrom", 0.3), seg, r, 10, false), m));
+  const burduf = (a, b, r0, r1, n = 6) => {      // burduf de cauciuc (ondulat), de la a (rază r0) la b (rază r1)
+    const prof = []; for (let i = 0; i <= n * 2; i++) { const u = i / (n * 2), r = r0 + (r1 - r0) * u; prof.push(new THREE.Vector2(r * (i % 2 ? 0.86 : 1), u)); }
+    const geo = new THREE.LatheGeometry(prof, 24); const o = add(new THREE.Mesh(geo, M.cauciuc)); const d = b.clone().sub(a); o.position.copy(a); o.scale.set(1, d.length(), 1); o.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); return o; };
+  const cutie = (w, h, d, m, x, y, z) => { const o = add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m)); o.position.set(x, y, z); return o; };
+  const inMasina = v => { mot.grup.updateMatrix(); return v.clone().applyMatrix4(mot.grup.matrix); };
+  const YR = CAR.yRoata;
+
+  // 1. planetarele: cuplaj tripod (interior) – arbore – cuplaj homocinetic Rzeppa (exterior), cu burdufuri
+  if (mot && mot.ancore.flansaSt) {
+    [[mot.ancore.flansaSt, -1], [mot.ancore.flansaDr, 1]].forEach(([fl, s]) => {
+      const A = inMasina(fl), B = V(XF, YR, s * (ZR - 0.12)), d = B.clone().sub(A).normalize();
+      const a1 = A.clone().addScaledVector(d, 0.05), a2 = A.clone().addScaledVector(d, 0.13), b2 = B.clone().addScaledVector(d, -0.14), b1 = B.clone().addScaledVector(d, -0.05);
+      bara(A, a1, 0.042, M.otel, 24); burduf(a1, a2, 0.04, 0.016); bara(a2, b2, 0.014, M.otel); burduf(b2, b1, 0.016, 0.045); bara(b1, B, 0.046, M.otel, 24);
+    });
+  }
+  // 2. caseta de direcție cu cremalieră și asistare electrică pe cremalieră (EPS), bieletele, axul volanului cu cardane
+  { const xR = 1.33, yR = 0.37;
+    bara(V(xR, yR, -0.4), V(xR, yR, 0.4), 0.024, M.alu, 20);
+    [-1, 1].forEach(s => { burduf(V(xR, yR, s * 0.4), V(xR, yR, s * 0.5), 0.028, 0.012, 7); bara(V(xR, yR, s * 0.5), V(XF - 0.1, yR + 0.01, s * (ZR - 0.14)), 0.009, M.otel); add(new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 8), M.otel)).position.set(XF - 0.1, yR + 0.01, s * (ZR - 0.14)); });
+    bara(V(xR, yR - 0.01, 0.06), V(xR, yR - 0.01, 0.24), 0.048, M.otel, 28); cutie(0.07, 0.06, 0.1, M.alu, xR - 0.07, yR, 0.15);          // motorul EPS și calculatorul
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.04), M.plasticGri)).position.set(xR - 0.07, yR + 0.04, 0.15);
+    bara(V(xR, yR - 0.02, -0.33), V(xR - 0.02, yR + 0.08, -0.36), 0.03, M.alu, 20);                                                      // carcasa pinionului
+    const c1 = V(xR - 0.03, yR + 0.1, -0.37), c2 = V(1.12, 0.62, -0.4), c3 = V(0.86, 0.86, -0.4);
+    bara(c1, c2, 0.011, M.otel); bara(c2, c3, 0.016, M.otel); [c1, c2].forEach(p => add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 8), M.otel)).position.copy(p));   // axul intermediar cu cardane
+  }
+  // 3. bateria de 12 V (AGM) cu suportul, bornele, cablurile și senzorul IBS pe borna negativă
+  { const B = new THREE.Group(); B.position.set(1.95, 0.72, -0.63); G.add(B);
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.19, 0.175), M.baterie), B);
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.012, 0.175), new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.6 })), B).position.y = 0.1;
+    [[0.09, 0xc62828], [-0.09, 0x222222]].forEach(([x, c]) => { const b = add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, 0.025, 16), M.plumb || M.otel), B); b.position.set(x, 0.115, 0.05); const cap = add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.035), new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 })), B); cap.position.set(x, 0.135, 0.05); });
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.01, 0.2), M.otel), B).position.set(0, 0.1, 0);                                     // bride de fixare
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.2), M.plastic), B).position.y = -0.105;
+    tub([[2.04, 0.865, -0.58], [1.98, 0.92, -0.62], [1.82, 0.78, -0.58], [1.7, 0.5, -0.45], [1.62, 0.42, -0.3]], 0.009, new THREE.MeshStandardMaterial({ color: 0xb02020, roughness: 0.5 }));   // cablul + spre demaror/alternator
+    tub([[1.86, 0.865, -0.58], [1.8, 0.88, -0.66], [1.75, 0.78, -0.72]], 0.009, M.cauciuc);                                              // cablul − spre caroserie
+  }
+  // 4. rezervorul de combustibil (în șa, sub bancheta spate), modulul pompei, canistra EVAP, conducta de alimentare și cea de purjare
+  { const mR = new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.7 });
+    const RG = new THREE.Group(); RG.position.set(-0.75, 0.0, 0.0); G.add(RG);
+    [[-0.32, 0.36], [0.27, 0.38]].forEach(([z, w]) => { const o = add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, w), mR), RG); o.position.set(0, 0.27, z); });
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 0.3), mR), RG).position.set(0, 0.33, -0.02);                                    // puntea peste tunel
+    [-0.2, 0.2].forEach(x => add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 1.02), M.otel), RG).position.set(x, 0.165, 0));   // chingile de fixare
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.03, 32), M.plastic), RG).position.set(0.13, 0.385, 0.3);               // flanșa modulului pompei
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 32), M.plasticGri), RG).position.set(0.13, 0.405, 0.3);
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.03), M.plasticGri), RG).position.set(0.17, 0.42, 0.3);
+    tub([[-1.0, 0.33, -0.42], [-1.2, 0.5, -0.6], [-1.45, 0.75, -0.8]], 0.022, M.cauciuc);                                              // gâtul de umplere
+    const can = add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.24, 24), new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.6 }))); can.rotation.z = Math.PI / 2; can.position.set(-1.25, 0.3, 0.5);   // canistra cu cărbune activ
+    const mCond = new THREE.MeshStandardMaterial({ color: 0xa8aeb5, roughness: 0.35, metalness: 0.8 });
+    const rampa = mot ? inMasina(V(-0.19, 0.29, 0.165)) : V(1.62, 0.7, -0.17), purj = mot ? inMasina(V(0.18, 0.43, 0.36)) : V(1.43, 0.8, 0.2);
+    tub([[-0.62, 0.42, 0.3], [-0.5, 0.3, 0.28], [-0.35, 0.16, 0.24], [0.6, 0.15, 0.24], [1.15, 0.17, 0.24], [1.32, 0.48, 0.18], [1.48, 0.62, 0.0], [rampa.x - 0.03, rampa.y, rampa.z - 0.05], [rampa.x, rampa.y, rampa.z]], 0.005, mCond, 160);   // tur combustibil (fără retur)
+    tub([[-1.13, 0.3, 0.5], [-0.9, 0.18, 0.4], [-0.35, 0.16, 0.27], [0.6, 0.15, 0.27], [1.15, 0.17, 0.27], [1.3, 0.5, 0.25], [purj.x, purj.y + 0.02, purj.z]], 0.004, M.cauciuc, 160);   // purjarea canistrei spre supapa EVAP
+    tub([[-1.37, 0.3, 0.5], [-1.5, 0.3, 0.55], [-1.6, 0.35, 0.6]], 0.004, M.cauciuc);                                                  // aerisirea canistrei (filtrul de aer)
+  }
+  // 5. linia de evacuare: țeava flexibilă, toba intermediară, toba finală transversală, ornamentul
+  if (mot && mot.ancore.evacIesire) {
+    const E = inMasina(mot.ancore.evacIesire), mE = new THREE.MeshStandardMaterial({ color: 0x9ca2a8, roughness: 0.45, metalness: 0.85 }), mR = M.ruginaCald || mE;
+    tub([[E.x, E.y, E.z], [E.x - 0.04, E.y - 0.01, E.z + 0.12], [1.72, 0.115, -0.32], [1.5, 0.115, -0.1], [1.15, 0.13, -0.05], [0.4, 0.14, -0.05]], 0.024, mE, 120);
+    burduf(V(1.62, 0.115, -0.22), V(1.52, 0.115, -0.12), 0.03, 0.03, 10);                                                               // decuplorul flexibil
+    { const t = add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.5, 32), mE)); t.rotation.z = Math.PI / 2; t.scale.set(1, 1, 0.65); t.position.set(0.15, 0.14, -0.05); }   // toba intermediară
+    tub([[-0.1, 0.14, -0.05], [-0.4, 0.14, -0.05], [-1.1, 0.14, -0.05], [-1.4, 0.15, -0.1], [-1.65, 0.2, -0.2], [-1.8, 0.22, -0.25]], 0.022, mE, 120);
+    { const t = add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.62, 32), mE)); t.rotation.x = Math.PI / 2; t.scale.set(1.25, 1, 0.7); t.position.set(-1.92, 0.24, -0.15); }   // toba finală (transversală)
+    tub([[-1.92, 0.22, -0.46], [-2.05, 0.2, -0.5], [-2.3, 0.2, -0.5]], 0.025, mE); bara(V(-2.3, 0.2, -0.5), V(-2.38, 0.2, -0.5), 0.034, M.crom, 24);   // țeava finală cu ornament
+    [[0.45, -0.05], [-0.9, -0.05], [-1.92, 0.12]].forEach(([x, z]) => bara(V(x, 0.15, z), V(x, 0.26, z), 0.008, M.cauciuc));            // suporturile elastice
+  }
+  return G;
+}
+
 /* ------------------------------------------------------------------ motorul real în compartimentul motor */
 const CONTUR = { motor: [1.82, 0.62], cutie: [1.62, 0.5], radiator: [2.25, 0.55] };
 function ascundeContur(ctx, ce) { ctx.children.forEach(l => { const p = l.position; if (ce.some(k => Math.abs(p.x - CONTUR[k][0]) < 0.01 && Math.abs(p.y - CONTUR[k][1]) < 0.01)) l.visible = false; }); }
@@ -586,9 +665,10 @@ function ascundeContur(ctx, ce) { ctx.children.forEach(l => { const p = l.positi
 function motorAutoturism(caroserie, opacitate) {
   const mot = construiesteMotor({ stand: false, filtruAer: false });
   mot.grup.rotation.y = -Math.PI / 2; mot.grup.position.set(1.78, 0.42, 0.02); mot.grup.scale.setScalar(0.98);
-  if (opacitate) { const map = new Map(); mot.grup.traverse(o => { if (!o.isMesh) return; const f = m => { if (!map.has(m)) { const c = m.clone(); c.transparent = true; c.opacity = Math.min(c.opacity ?? 1, opacitate); c.depthWrite = false; map.set(m, c); } return map.get(m); }; o.material = Array.isArray(o.material) ? o.material.map(f) : f(o.material); o.castShadow = false; }); }
+  if (opacitate) estompeaza(mot.grup, opacitate);
   caroserie.add(mot.grup); return mot;
 }
+function estompeaza(grup, opacitate) { const map = new Map(); grup.traverse(o => { if (!o.isMesh) return; const f = m => { if (!map.has(m)) { const c = m.clone(); c.transparent = true; c.opacity = Math.min(c.opacity ?? 1, opacitate); c.depthWrite = false; map.set(m, c); } return map.get(m); }; o.material = Array.isArray(o.material) ? o.material.map(f) : f(o.material); o.castShadow = false; }); }
 
 /* ================================================================== ungerea motorului (L1 – vâscozitatea uleiului) */
 const ULEIURI3D = {
@@ -839,9 +919,9 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     { k: "l2", s: "evac", n: "Sonda λ aval (cu salt, după catalizator)", e: "λ aval" },
     { k: "egt", s: "evac", n: "Senzorul de temperatură a gazelor de evacuare (PT200)", e: "temp. gaze evac.", mot: [0.0, -0.05, -0.336], forma: ["cyl", 0.008, 0.05, 0xd0d4d8], tip: "dc", u: st => 0.6 + st.tEvac / 400, info: st => `T = ${fx(st.tEvac, 0)} °C` },
     { k: "gpf", s: "evac", n: "Senzorul de presiune diferențială al filtrului de particule GPF", e: "Δp filtru GPF", tip: "dc", u: st => 0.5 + st.dpGpf / 10, info: st => `Δp = ${fx(st.dpGpf, 1)} kPa (încărcarea filtrului)` },
-    { k: "evap", s: "evac", n: "Senzorul de presiune din rezervor (sistemul EVAP)", e: "presiune rezervor", car: [-1.15, 0.32, 0.35], forma: ["box", 0.04, 0.03, 0.04, 0x2b2f35], tip: "dc", u: st => 2.5 + 0.05 * Math.sin(st.t * 0.2), info: () => "p = −0,2 kPa (rel.)" },
+    { k: "evap", s: "evac", n: "Senzorul de presiune din rezervor (sistemul EVAP)", e: "presiune rezervor", car: [-0.62, 0.43, 0.3], forma: ["box", 0.04, 0.03, 0.04, 0x2b2f35], tip: "dc", u: st => 2.5 + 0.05 * Math.sin(st.t * 0.2), info: () => "p = −0,2 kPa (rel.)" },
     { k: "ect", s: "racire", n: "Senzorul de temperatură a lichidului de răcire CTS (NTC)", e: "CTS" },
-    { k: "nivRacire", s: "racire", n: "Senzorul de nivel al lichidului de răcire (vas de expansiune)", e: "nivel lichid răcire", car: [1.95, 0.78, 0.62], forma: ["box", 0.1, 0.12, 0.08, 0x9be36b], tip: "sw", u: () => 0, info: () => "nivel corect (contact deschis)" },
+    { k: "nivRacire", s: "racire", n: "Senzorul de nivel al lichidului de răcire (vas de expansiune)", e: "nivel lichid răcire", car: [2.03, 0.64, -0.44], forma: ["box", 0.1, 0.12, 0.08, 0x9be36b], tip: "sw", u: () => 0, info: () => "nivel corect (contact deschis)" },
     { k: "uleiP", s: "racire", n: "Senzorul de presiune a uleiului", e: "presiune ulei", mot: [0.12, 0.0, 0.16], forma: ["cyl", 0.013, 0.04, 0x2b2f35], tip: "dc", u: st => 0.5 + st.pUlei, info: st => `p = ${fx(st.pUlei, 1)} bar` },
     { k: "uleiN", s: "racire", n: "Senzorul de nivel și temperatură a uleiului (ultrasonic)", e: "nivel ulei", mot: [0.05, -0.27, 0.0], forma: ["cyl", 0.025, 0.02, 0x2b2f35], tip: "pwm", f: () => 25, info: st => `T ulei ${fx(st.ect - 4, 0)} °C · nivel 74 %` },
     { k: "ac", s: "racire", n: "Senzorul de presiune din circuitul de climatizare (A/C)", e: "presiune A/C", tip: "dc", u: st => 0.5 + (st.motor ? 1.7 : 0.6), info: st => `p = ${st.motor ? "14" : "6"} bar` },
@@ -868,8 +948,8 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     { k: "pdcS1", s: "adas", n: "Senzorul de parcare spate (ultrasunete 48 kHz)", e: "parcare spate", car: [-2.38, 0.5, -0.25], forma: ["cyl", 0.012, 0.012, 0x777777], tip: "us", dist: 0.6, info: () => "distanța măsurată 0,60 m" },
     { k: "camS", s: "adas", n: "Camera de mers înapoi", e: "cameră spate", car: [-2.32, 0.86, 0], forma: ["box", 0.03, 0.03, 0.04, 0x222222], tip: "eth", info: () => "LVDS / Ethernet · imagine activă în marșarier" },
     { k: "ploaie", s: "car", n: "Senzorul de ploaie și lumină (pe parbriz, LIN)", e: "ploaie / lumină", car: [0.62, 1.31, 0.09], forma: ["box", 0.04, 0.015, 0.05, 0x333333], tip: "lin", info: () => "fără ploaie · lumină 12 000 lx" },
-    { k: "ibs", s: "car", n: "Senzorul inteligent al bateriei IBS (borna negativă, LIN)", e: "senzor baterie IBS", car: [1.9, 0.82, -0.62], forma: ["box", 0.2, 0.17, 0.15, 0x24272b], tip: "lin", info: st => `U = ${st.motor ? "14,1" : "12,5"} V · I = ${st.motor ? "+12" : "−3"} A · SOC 82 %` },
-    { k: "comb", s: "car", n: "Traductorul de nivel al combustibilului (în rezervor)", e: "nivel combustibil", car: [-1.0, 0.28, 0.25], forma: ["box", 0.5, 0.18, 0.6, 0x3a3d42], tip: "dc", u: () => 1.7, info: () => "nivel 58 % (≈ 29 L)" },
+    { k: "ibs", s: "car", n: "Senzorul inteligent al bateriei IBS (borna negativă, LIN)", e: "senzor baterie IBS", car: [1.86, 0.875, -0.58], forma: ["box", 0.2, 0.17, 0.15, 0x24272b], tip: "lin", info: st => `U = ${st.motor ? "14,1" : "12,5"} V · I = ${st.motor ? "+12" : "−3"} A · SOC 82 %` },
+    { k: "comb", s: "car", n: "Traductorul de nivel al combustibilului (în rezervor)", e: "nivel combustibil", car: [-0.72, 0.27, 0.3], forma: ["box", 0.5, 0.18, 0.6, 0x3a3d42], tip: "dc", u: () => 1.7, info: () => "nivel 58 % (≈ 29 L)" },
     { k: "ocupare", s: "car", n: "Senzorul de ocupare a scaunului pasagerului (airbag)", e: "ocupare scaun", car: [0.15, 0.53, 0.4], forma: ["box", 0.35, 0.01, 0.35, 0x444444], tip: "dc", u: () => 1.1, info: () => "scaun liber – airbag pasager dezactivat" },
     { k: "crashF", s: "car", n: "Senzorul de impact frontal (airbag, PSI5)", e: "impact frontal", car: [2.22, 0.55, 0.0], forma: ["box", 0.04, 0.03, 0.03, 0x333333], tip: "psi5", info: st => `a = ${fx(-st.a / 9.81, 2)} g` },
     { k: "crashL", s: "car", n: "Senzorul de impact lateral (stâlpul B, PSI5)", e: "impact lateral", car: [-0.1, 0.65, -0.9], forma: ["box", 0.03, 0.04, 0.02, 0x333333], tip: "psi5", info: () => "a = 0,00 g" }
@@ -1166,7 +1246,7 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       <div>λ <b>${f(lambda(st, st.t), 2)}</b> V · t<sub>i</sub> <b>${f(st.ti || 0, 2)}</b> ms</div>
       ${st.fuelCut ? '<div class="v3d-abs">injecție întreruptă (frână de motor)</div>' : ""}${st.brk > 0.05 ? '<div class="v3d-blocare">frânare</div>' : ""}`;
   }
-  return { etichete: et, html, leaga, pas, hud, stare, api, dupaRandare,
+  return { motor: mot, etichete: et, html, leaga, pas, hud, stare, api, dupaRandare,
     camere: { motor: [[3.3, 1.7, 1.4], [1.75, 0.6, 0]], roataABS: [[XF + 0.4, 0.55, -ZR - 1.1], [XF, 0.38, -ZR + 0.1]], pedale: [[0.25, 1.2, -1.4], [1.05, 0.55, -0.3]], dedesubt: [[1.6, -1.8, 1.6], [1.4, 0.2, 0]] },
     camereButoane: [["motor", "motorul"], ["roataABS", "roata (ABS)"], ["pedale", "pedalier"], ["dedesubt", "de dedesubt"]],
     cameraInitiala: [[4.3, 2.1, 3.2], [1.4, 0.55, 0]] };
