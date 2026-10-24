@@ -233,16 +233,52 @@ export function construiesteMotor(opt = {}) {
   XC.forEach((x, i) => gal.push(tub([[x, 0.29, -0.13], [x, 0.27, -0.19], [x * 0.5, 0.2, -0.23], [0.0, 0.14, -0.25]], 0.022, M.ruginaCald)));
   cyl(0.04, 0.04, 0.06, M.ruginaCald, 0.0, 0.12, -0.25, "y");
   const scut = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.36, 24, 1, true, Math.PI * 0.45, Math.PI * 0.65), M.scut); scut.rotation.z = Math.PI / 2; scut.position.set(0, 0.25, -0.2); add(scut);
-  const linieEv = opt.stand === false
-    ? [[0.0, 0.1, -0.25], [0.02, 0.0, -0.3], [-0.05, -0.12, -0.32], [-0.25, -0.2, -0.3], [-0.6, -0.24, -0.25]]
-    : [[0.0, 0.1, -0.25], [0.02, 0.0, -0.3], [0.0, -0.15, -0.34], [-0.15, -0.3, -0.36], [-0.45, -0.34, -0.36]];
-  tub(linieEv, 0.024, M.ruginaCald);
-  const cat = linieEv[3];
-  rbox(0.22, 0.11, 0.13, 0.04, M.scut, cat[0] - 0.08, cat[1], cat[2]);
   { const c = grupC("l1", "Sonda λ amonte"); const s = cyl(0.009, 0.009, 0.05, M.crom, 0.05, 0.13, -0.29, "y", c); s.rotation.x = -0.6; cyl(0.012, 0.012, 0.012, M.otel, 0.05, 0.11, -0.28, "y", c);
     tub([[0.05, 0.16, -0.31], [0.08, 0.3, -0.33], [0.1, 0.42, -0.3]], 0.0035, M.cauciuc, c); conectori.l1 = rbox(0.03, 0.018, 0.02, 0.004, M.violet, 0.1, 0.43, -0.3, c); ancore.l1 = new THREE.Vector3(0.05, 0.16, -0.31); }
-  { const c = grupC("l2", "Sonda λ aval"); const p = linieEv[3]; cyl(0.009, 0.009, 0.05, M.crom, p[0] - 0.24, p[1] + 0.06, p[2], "y", c);
-    tub([[p[0] - 0.24, p[1] + 0.09, p[2]], [p[0] - 0.24, p[1] + 0.25, p[2] + 0.02], [p[0] - 0.3, p[1] + 0.35, p[2] + 0.05]], 0.0035, M.cauciuc, c); conectori.l2 = rbox(0.03, 0.018, 0.02, 0.004, M.violet, p[0] - 0.3, p[1] + 0.36, p[2] + 0.05, c); ancore.l2 = new THREE.Vector3(p[0] - 0.24, p[1] + 0.09, p[2]); }
+  if (opt.stand !== false) {
+    const linieEv = [[0.0, 0.1, -0.25], [0.02, 0.0, -0.3], [0.0, -0.15, -0.34], [-0.15, -0.3, -0.36], [-0.45, -0.34, -0.36]];
+    tub(linieEv, 0.024, M.ruginaCald);
+    const cat = linieEv[3];
+    rbox(0.22, 0.11, 0.13, 0.04, M.scut, cat[0] - 0.08, cat[1], cat[2]);
+    { const c = grupC("l2", "Sonda λ aval"); const p = linieEv[3]; cyl(0.009, 0.009, 0.05, M.crom, p[0] - 0.24, p[1] + 0.015, p[2], "y", c);
+      tub([[p[0] - 0.24, p[1] + 0.045, p[2]], [p[0] - 0.24, p[1] + 0.25, p[2] + 0.02], [p[0] - 0.3, p[1] + 0.35, p[2] + 0.05]], 0.0035, M.cauciuc, c); conectori.l2 = rbox(0.03, 0.018, 0.02, 0.004, M.violet, p[0] - 0.3, p[1] + 0.36, p[2] + 0.05, c); ancore.l2 = new THREE.Vector3(p[0] - 0.24, p[1] + 0.045, p[2]); }
+  } else {
+    // autoturism 2025: țeava de legătură, catalizatorul apropiat (TWC), sonda λ aval, filtrul de particule GPF cu senzorul de presiune diferențială
+    const corpRev = (prof, m, x, y, z) => { const geo = new THREE.LatheGeometry(prof.map(([r, xx]) => new THREE.Vector2(r, xx)), 40); geo.rotateZ(-Math.PI / 2); const o = add(new THREE.Mesh(geo, m)); o.position.set(x, y, z); return o; };
+    const inel = (r, x, y, z) => { const t = add(new THREE.Mesh(new THREE.TorusGeometry(r, 0.003, 6, 40), M.scut)); t.rotation.y = Math.PI / 2; t.position.set(x, y, z); };
+    tub([[0.0, 0.1, -0.25], [0.02, 0.0, -0.3], [-0.04, -0.13, -0.315], [-0.12, -0.195, -0.31], [-0.18, -0.2, -0.31]], 0.024, M.ruginaCald);
+    corpRev([[0.024, -0.345], [0.05, -0.32], [0.055, -0.31], [0.055, -0.21], [0.05, -0.2], [0.024, -0.175]], M.scut, 0, -0.2, -0.31);          // catalizatorul cu trei căi
+    inel(0.056, -0.31, -0.2, -0.31); inel(0.056, -0.21, -0.2, -0.31);
+    tub([[-0.34, -0.2, -0.31], [-0.38, -0.205, -0.305], [-0.425, -0.21, -0.3]], 0.024, M.ruginaCald);
+    const YG = -0.21, ZG = -0.3;                                                                                                        // axa filtrului GPF
+    corpRev([[0.024, -0.665], [0.055, -0.635], [0.066, -0.62], [0.066, -0.465], [0.055, -0.45], [0.024, -0.42]], M.scut, 0, YG, ZG);      // filtrul de particule (monolit ceramic cu canale închise alternativ)
+    inel(0.067, -0.62, YG, ZG); inel(0.067, -0.465, YG, ZG); inel(0.067, -0.5425, YG, ZG);
+    tub([[-0.665, YG, ZG], [-0.72, -0.22, -0.29], [-0.78, -0.25, -0.26]], 0.024, M.ruginaCald);
+    cyl(0.045, 0.045, 0.008, M.otel, -0.78, -0.25, -0.26, "x");                                                                         // flanșa spre țeava intermediară
+    // ștuțurile de prelevare a presiunii: P1 pe conul de intrare (înainte de monolit), P2 pe conul de ieșire (după monolit)
+    const PR = [{ x: -0.442, xs: -0.515 }, { x: -0.643, xs: -0.545 }];
+    PR.forEach(q => { cyl(0.0065, 0.0065, 0.016, M.otel, q.x, YG + 0.052, ZG, "y"); cyl(0.0045, 0.0045, 0.006, M.crom, q.x, YG + 0.063, ZG, "y"); });
+    { const c = grupC("gpf", "Senzorul de presiune diferențială al filtrului GPF");
+      const yS = -0.045, zS = -0.24;
+      // conductele metalice (rezistă la temperatura gazelor) și furtunurile din cauciuc siliconic spre senzor
+      PR.forEach(q => {
+        tub([[q.x, YG + 0.065, ZG], [q.x, -0.12, ZG], [(q.x + q.xs) / 2, -0.102, (ZG + zS) / 2], [q.xs, -0.1, zS - 0.004]], 0.0028, M.otel, c, 40);
+        tub([[q.xs, -0.1, zS - 0.004], [q.xs, -0.09, zS - 0.001], [q.xs, -0.074, zS]], 0.0048, M.cauciuc, c);
+        const cl = add(new THREE.Mesh(new THREE.TorusGeometry(0.0055, 0.0012, 6, 16), M.otel), c); cl.rotation.x = Math.PI / 2; cl.position.set(q.xs, -0.078, zS);   // colierul
+        cyl(0.003, 0.003, 0.014, M.plastic, q.xs, -0.068, zS, "y", c);                                                                   // racordurile senzorului (P1, P2)
+      });
+      rbox(0.064, 0.038, 0.03, 0.006, M.plastic, -0.53, yS, zS, c);                                                                      // corpul senzorului (membrană piezorezistivă)
+      box(0.05, 0.002, 0.022, M.plasticGri, -0.53, yS + 0.02, zS, c);                                                                     // eticheta
+      conectori.gpf = rbox(0.024, 0.02, 0.018, 0.004, M.plasticGri, -0.53, yS + 0.004, zS - 0.024, c);                                   // conectorul cu 3 pini (5 V, masă, semnal)
+      box(0.008, 0.004, 0.008, M.plastic, -0.53, yS + 0.016, zS - 0.024, c);                                                             // clema de blocare
+      tub([[-0.53, yS + 0.004, zS - 0.034], [-0.53, yS + 0.03, zS - 0.06], [-0.5, 0.08, -0.3], [-0.42, 0.2, -0.33]], 0.004, M.cauciuc, c);  // cablajul spre ECU
+      box(0.05, 0.012, 0.09, M.otel, -0.53, yS + 0.02, (zS + -0.14) / 2 + 0.005, c);                                                     // suportul, prins pe carcasa cutiei de viteze
+      cyl(0.006, 0.006, 0.012, M.crom, -0.53, yS + 0.028, -0.155, "y", c);
+      ancore.gpf = new THREE.Vector3(-0.53, yS + 0.03, zS); }
+    { const c = grupC("l2", "Sonda λ aval"); const x = -0.385, y = -0.205, z = -0.305;
+      cyl(0.011, 0.011, 0.012, M.otel, x, y + 0.03, z, "y", c); cyl(0.009, 0.009, 0.045, M.crom, x, y + 0.055, z, "y", c);
+      tub([[x, y + 0.078, z], [x, y + 0.15, z - 0.01], [x - 0.04, 0.05, -0.33], [x - 0.04, 0.16, -0.33]], 0.0035, M.cauciuc, c); conectori.l2 = rbox(0.03, 0.018, 0.02, 0.004, M.violet, x - 0.04, 0.17, -0.33, c); ancore.l2 = new THREE.Vector3(x, y + 0.08, z); }
+  }
 
   // ---------------- răcirea: carcasa termostatului cu senzorul CTS, furtunurile
   rbox(0.07, 0.07, 0.08, 0.012, M.alu, -0.27, 0.31, 0.04);

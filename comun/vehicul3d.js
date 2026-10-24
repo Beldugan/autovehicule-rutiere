@@ -4,7 +4,7 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { construiesteMotor, transmisieAccesorii } from "./motor3d.js?v=4";
+import { construiesteMotor, transmisieAccesorii } from "./motor3d.js?v=5";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -821,8 +821,8 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     { k: "inj1", s: "motor", n: "Injectorul cilindrului 1 (comanda ECU)", e: "injector 1" },
     { k: "l1", s: "evac", n: "Sonda λ amonte (bandă largă LSU)", e: "λ amonte" },
     { k: "l2", s: "evac", n: "Sonda λ aval (cu salt, după catalizator)", e: "λ aval" },
-    { k: "egt", s: "evac", n: "Senzorul de temperatură a gazelor de evacuare (PT200)", e: "temp. gaze evac.", mot: [0.05, -0.05, -0.33], forma: ["cyl", 0.008, 0.05, 0xd0d4d8], tip: "dc", u: st => 0.6 + st.tEvac / 400, info: st => `T = ${fx(st.tEvac, 0)} °C` },
-    { k: "gpf", s: "evac", n: "Senzorul de presiune diferențială al filtrului de particule GPF", e: "Δp filtru GPF", mot: [0.15, -0.12, -0.2], forma: ["box", 0.05, 0.035, 0.04, 0x2b2f35], tip: "dc", u: st => 0.5 + st.dpGpf / 10, info: st => `Δp = ${fx(st.dpGpf, 1)} kPa (încărcarea filtrului)` },
+    { k: "egt", s: "evac", n: "Senzorul de temperatură a gazelor de evacuare (PT200)", e: "temp. gaze evac.", mot: [0.0, -0.05, -0.336], forma: ["cyl", 0.008, 0.05, 0xd0d4d8], tip: "dc", u: st => 0.6 + st.tEvac / 400, info: st => `T = ${fx(st.tEvac, 0)} °C` },
+    { k: "gpf", s: "evac", n: "Senzorul de presiune diferențială al filtrului de particule GPF", e: "Δp filtru GPF", tip: "dc", u: st => 0.5 + st.dpGpf / 10, info: st => `Δp = ${fx(st.dpGpf, 1)} kPa (încărcarea filtrului)` },
     { k: "evap", s: "evac", n: "Senzorul de presiune din rezervor (sistemul EVAP)", e: "presiune rezervor", car: [-1.15, 0.32, 0.35], forma: ["box", 0.04, 0.03, 0.04, 0x2b2f35], tip: "dc", u: st => 2.5 + 0.05 * Math.sin(st.t * 0.2), info: () => "p = −0,2 kPa (rel.)" },
     { k: "ect", s: "racire", n: "Senzorul de temperatură a lichidului de răcire CTS (NTC)", e: "CTS" },
     { k: "nivRacire", s: "racire", n: "Senzorul de nivel al lichidului de răcire (vas de expansiune)", e: "nivel lichid răcire", car: [1.95, 0.78, 0.62], forma: ["box", 0.1, 0.12, 0.08, 0x9be36b], tip: "sw", u: () => 0, info: () => "nivel corect (contact deschis)" },
