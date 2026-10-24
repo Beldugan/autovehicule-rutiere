@@ -81,103 +81,160 @@ const COMP = {
   ecu: ["Calculatorul motorului (ECU Delphi DCM)", "Citește turația (CKP), sarcina (pedala, MAF), temperaturile și presiunea din rampă; comandă IMV, injectoarele, EGR și turbosuflanta."],
   obd: ["Priza de diagnoză OBD", "Testerul citește presiunea cerută / reală, comanda IMV, turația și temperatura combustibilului; înregistrează datele."]
 };
+const MOT = { X: [600, 690, 780, 870], yc: 352, r: 15, L: 62, crown: 22, deck: 246, OFF: [0, 540, 180, 360], LENT: 25 };   // OFF: decalajul ciclului (°) – ordinea 1-3-4-2
+/** poziția mecanismului bielă-manivelă al cilindrului i pentru unghiul ciclului th [°] */
+function pozaMec(i, th) {
+  const x = MOT.X[i], phi = ((th - MOT.OFF[i]) % 720 + 720) % 720, a = phi * Math.PI / 180, r = MOT.r, L = MOT.L;
+  return { x, phi, ypin: MOT.yc - (r * Math.cos(a) + Math.sqrt(L * L - r * r * Math.sin(a) ** 2)), xm: x + r * Math.sin(a), ym: MOT.yc - r * Math.cos(a) };
+}
 function schemaSVG(P = "cr") {
   const id = n => `${P}-${n}`, u = n => `url(#${P}-${n})`;
   const c = (k, s) => `<g class="cr-comp" data-comp="${k}">${s}</g>`;
-  const T = (x, y, t, o = "") => `<text x="${x}" y="${y}" font-size="9.5" fill="currentColor" ${o}>${t}</text>`;
-  const gr = (n, st, vert = true) => `<linearGradient id="${id(n)}" x1="0" y1="0" x2="${vert ? 0 : 1}" y2="${vert ? 1 : 0}">${st.map(([o, cl]) => `<stop offset="${o}" stop-color="${cl}"/>`).join("")}</linearGradient>`;
+  const T = (x, y, t, o = "") => `<text x="${x}" y="${y}" font-size="10" fill="currentColor" ${o}>${t}</text>`;
+  const lin = (n, st, x2 = 0, y2 = 1) => `<linearGradient id="${id(n)}" x1="0" y1="0" x2="${x2}" y2="${y2}">${st.map(([o, cl]) => `<stop offset="${o}" stop-color="${cl}"/>`).join("")}</linearGradient>`;
+  const tub = (d, w, col = ["#3d4349", "#9aa2aa", "#eef1f4"], extra = "") => `<path d="${d}" fill="none" stroke="${col[0]}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${extra}/><path d="${d}" fill="none" stroke="${col[1]}" stroke-width="${w * 0.62}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${col[2]}" stroke-width="${w * 0.2}" stroke-linecap="round" stroke-linejoin="round" opacity=".8" transform="translate(-${w * 0.12} -${w * 0.12})"/>`;
+  const furtun = d => tub(d, 8, ["#050607", "#22262b", "#5a6168"]);
+  const hex = (x, y, s, vert = true) => { const pts = [0, 1, 2, 3, 4, 5].map(k => { const a = Math.PI / 3 * k + (vert ? 0 : Math.PI / 6); return `${(x + s * Math.cos(a)).toFixed(1)},${(y + s * Math.sin(a)).toFixed(1)}`; }).join(" "); return `<polygon points="${pts}" fill="${u("hex")}" stroke="#4b5157" stroke-width=".8"/><line x1="${x - s * 0.5}" y1="${y - s * 0.86}" x2="${x - s * 0.5}" y2="${y + s * 0.86}" stroke="#fff" stroke-opacity=".35"/>`; };
+  const surub = (x, y, r = 4) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${u("hex")}" stroke="#3d4349" stroke-width=".7"/><circle cx="${x - r * 0.25}" cy="${y - r * 0.25}" r="${r * 0.35}" fill="#fff" opacity=".35"/>`;
+  const mufa = (x, y, w, h, nr = 2, cul = "#26292e") => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${cul}" stroke="#000"/><rect x="${x + 2}" y="${y + 2}" width="${w - 4}" height="${h * 0.35}" rx="1" fill="#3c4148"/>${Array.from({ length: nr }, (_, k) => `<rect x="${x + (k + 0.5) * w / nr - 1.2}" y="${y + h * 0.55}" width="2.4" height="${h * 0.3}" fill="#c9a227"/>`).join("")}`;
   let s = `<defs>
-    ${gr("alu", [[0, "#e4e8ec"], [0.45, "#b9c0c7"], [1, "#858d96"]])}${gr("alu2", [[0, "#cfd5db"], [1, "#9aa3ac"]], false)}
-    ${gr("otel", [[0, "#f1f3f5"], [0.5, "#a9b0b8"], [1, "#6c737b"]])}${gr("fonta", [[0, "#8a9097"], [1, "#5b6168"]])}
-    ${gr("chiul", [[0, "#c7ccd1"], [1, "#9ba2a9"]])}${gr("plastic", [[0, "#3b4047"], [1, "#16191d"]])}
-    ${gr("filtru", [[0, "#f3efe4"], [0.5, "#ddd6c4"], [1, "#b9b19c"]], false)}${gr("mot", [[0, "#f6d77a"], [1, "#c99a25"]])}
-    ${gr("ecu", [[0, "#d9dde1"], [1, "#9ea5ad"]])}
-    <pattern id="${id("canelat")}" width="4" height="6" patternUnits="userSpaceOnUse"><rect width="4" height="6" fill="#1c1f23"/><rect width="4" height="2" fill="#30353b"/></pattern>
-    <filter id="${id("umbra")}" x="-10%" y="-10%" width="130%" height="130%"><feDropShadow dx="1.5" dy="2" stdDeviation="1.6" flood-opacity=".35"/></filter>
-    <marker id="${id("sag")}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10z" fill="#4a7fc0"/></marker>
+    ${lin("otel", [[0, "#5f666d"], [0.2, "#c9cfd5"], [0.38, "#f7f9fa"], [0.6, "#a3abb3"], [1, "#4b5157"]])}
+    ${lin("otelV", [[0, "#4b5157"], [0.25, "#b7bec5"], [0.42, "#f2f4f6"], [0.65, "#9aa2aa"], [1, "#454b51"]], 1, 0)}
+    ${lin("alu", [[0, "#f0f2f4"], [0.35, "#c6ccd2"], [0.7, "#9aa2a9"], [1, "#6f777e"]])}
+    ${lin("aluV", [[0, "#7a828a"], [0.3, "#d9dee2"], [0.5, "#eef1f3"], [0.75, "#aab2b9"], [1, "#6b737a"]], 1, 0)}
+    ${lin("negru", [[0, "#3a3f45"], [0.5, "#1e2125"], [1, "#0d0f11"]])}
+    ${lin("negruV", [[0, "#0c0e10"], [0.35, "#3b4047"], [0.55, "#2a2e33"], [1, "#0c0e10"]], 1, 0)}
+    ${lin("hex", [[0, "#f4f6f8"], [0.5, "#b4bbc2"], [1, "#6c747b"]], 1, 1)}
+    ${lin("filtru", [[0, "#8f8a7c"], [0.25, "#e9e5d8"], [0.45, "#fbf9f2"], [0.7, "#d7d1c0"], [1, "#8b8577"]], 1, 0)}
+    ${lin("rez", [[0, "#3b4046"], [0.4, "#1f2327"], [1, "#0b0d0f"]])}
+    ${lin("mot", [[0, "#f8dc84"], [1, "#c6951d"]])}
+    ${lin("fonta", [[0, "#7b8187"], [1, "#4d5359"]])}
+    ${lin("chiul", [[0, "#d9dde1"], [1, "#a3aab1"]])}
+    ${lin("ecu", [[0, "#e6e9ec"], [0.5, "#b9c0c6"], [1, "#8a929a"]])}
+    ${lin("piston", [[0, "#6f777e"], [0.3, "#d5dadf"], [0.5, "#f3f5f7"], [0.75, "#b3bac1"], [1, "#6a7279"]], 1, 0)}
+    ${lin("cil", [[0, "#22262a"], [0.5, "#3b4045"], [1, "#22262a"]], 1, 0)}
+    <radialGradient id="${id("flac")}" cx="50%" cy="10%" r="90%"><stop offset="0" stop-color="#fff3b0"/><stop offset=".4" stop-color="#ffb02e"/><stop offset="1" stop-color="#e2531d" stop-opacity="0"/></radialGradient>
+    <filter id="${id("turnat")}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" seed="4" result="z"/><feColorMatrix in="z" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0" result="g"/><feComposite in="g" in2="SourceGraphic" operator="in" result="g2"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="g2"/></feMerge></filter>
+    <filter id="${id("umbra")}" x="-15%" y="-15%" width="140%" height="140%"><feDropShadow dx="2" dy="3" stdDeviation="2.2" flood-opacity=".35"/></filter>
+    <pattern id="${id("canelat")}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><rect width="5" height="5" fill="#15181b"/><rect width="5" height="2" fill="#30353b"/></pattern>
+    <clipPath id="${id("clipBloc")}"><rect x="548" y="246" width="374" height="140"/></clipPath>
   </defs>`;
-  // ---------------- motorul în secțiune: blocul, cilindrii, pistoanele, chiulasa
-  s += `<g filter="${u("umbra")}"><path d="M395,205 L815,205 L815,300 L790,322 L420,322 L395,300z" fill="${u("fonta")}" stroke="#3d4247"/>`;
-  [480, 570, 660, 750].forEach((x, i) => { s += `<rect x="${x - 34}" y="208" width="68" height="92" fill="#2a2e33" stroke="#1b1e22"/><g id="${id("pist" + i)}"><rect x="${x - 31}" y="226" width="62" height="34" rx="3" fill="${u("alu")}" stroke="#555"/><path d="M${x - 31},232 h62 M${x - 31},237 h62 M${x - 31},242 h62" stroke="#666" stroke-width="1.2"/><path d="M${x - 14},${226} q14,9 28,0" fill="#6b7178"/><rect x="${x - 6}" y="258" width="12" height="40" fill="#7d848b"/></g>`; });
-  s += `<path d="M380,128 L830,128 L830,205 L380,205z" fill="${u("chiul")}" stroke="#5f666d"/><path d="M372,96 Q372,84 386,84 L824,84 Q838,84 838,96 L838,128 L372,128z" fill="#2f3439" stroke="#15181b"/>`;
-  s += `<text x="605" y="111" text-anchor="middle" font-size="12" font-weight="800" fill="#c9cfd5" letter-spacing="3">dCi</text>`;
-  [480, 570, 660, 750].forEach(x => { s += `<path d="M${x - 30},205 q30,-16 60,0" fill="#1b1e22" opacity=".8"/>`; });
-  s += `</g>`;
-  s += T(440, 316, "bloc motor K9K – secțiune prin cilindri (ordinea de injecție 1-3-4-2)", `font-size="9" fill="#e9edf1" opacity=".85"`);
-  // ---------------- curea de distribuție, roata pompei, roata arborelui cotit
-  s += `<g><path d="M302,224 L362,326 M358,222 L398,322" stroke="#141414" stroke-width="5"/><circle cx="380" cy="320" r="20" fill="#2a2e33" stroke="#111" stroke-width="4"/><circle cx="380" cy="320" r="6" fill="#888"/>
-    <circle cx="330" cy="212" r="31" fill="#1d2024" stroke="#2c3036" stroke-width="3"/></g>`;
-  s += T(398, 346, "curea de distribuție", 'font-size="8" opacity=".75"');
-  // ---------------- rezervorul (plastic, cu unitatea de nivel și fereastră de secțiune)
-  s += c("rez", `<path d="M18,262 Q18,248 32,248 L150,248 Q166,248 166,262 L166,326 Q166,340 150,340 L32,340 Q18,340 18,326z" fill="${u("plastic")}" stroke="#0c0d0f" filter="${u("umbra")}"/>
-    <rect x="30" y="268" width="122" height="62" rx="6" fill="#0d1014" stroke="#555" stroke-dasharray="2 2"/><rect id="${id("nivel")}" x="31" y="292" width="120" height="37" fill="${u("mot")}" opacity=".85"/>
-    <ellipse cx="92" cy="248" rx="24" ry="6" fill="#111" stroke="#666"/><rect x="82" y="236" width="8" height="12" fill="#8a9097"/><rect x="96" y="236" width="8" height="12" fill="#8a9097"/><rect x="66" y="240" width="12" height="8" rx="2" fill="#2e7d32"/>
-    <path d="M150,250 L162,226 L172,226" fill="none" stroke="#111" stroke-width="9"/><rect x="168" y="219" width="12" height="14" rx="2" fill="#222"/>
-    ${T(92, 354, "rezervor + unitatea de nivel", 'text-anchor="middle"')}`);
-  // ---------------- pompa de amorsare manuală (pară) și filtrul
-  s += c("filtru", `<path d="M200,96 Q200,88 208,88 L246,88 Q254,88 254,96 L254,178 Q254,190 242,190 L212,190 Q200,190 200,178z" fill="${u("filtru")}" stroke="#8a826e" filter="${u("umbra")}"/>
-    <rect x="196" y="82" width="62" height="12" rx="3" fill="#2a2e33"/><circle cx="214" cy="88" r="4" fill="#666"/><circle cx="240" cy="88" r="4" fill="#666"/>
-    <ellipse cx="227" cy="72" rx="13" ry="10" fill="#202327" stroke="#000"/><path d="M219,66 q8,-6 16,0" stroke="#3a3f45" fill="none"/>
-    <rect x="216" y="190" width="22" height="12" rx="2" fill="#1b1e22"/><rect x="223" y="202" width="8" height="8" fill="#c62828"/><rect x="236" y="194" width="10" height="8" rx="1" fill="#2e7d32"/>
-    <rect x="205" y="120" width="44" height="40" rx="2" fill="none" stroke="#b5ab92" stroke-dasharray="3 2"/><text x="227" y="144" text-anchor="middle" font-size="8" fill="#6d6553" font-weight="700">DELPHI</text>
-    ${T(222, 224, "filtru motorină", 'text-anchor="middle"')}${T(222, 235, "(separator apă)", 'text-anchor="middle" font-size="8" opacity=".75"')}`);
-  // ---------------- conductele de joasă presiune (alimentare, animate) și returul
-  s += `<path id="${id("jp")}" d="M86,236 L86,150 L200,150 M254,150 L292,150 L292,176" fill="none" stroke="#4a7fc0" stroke-width="4.5" stroke-dasharray="8 6" stroke-linecap="round"/>`;
-  s += `<path id="${id("ret")}" d="M296,246 L296,300 L176,300 L176,292 L166,292 M450,92 L450,78 L380,78 L380,58 L120,58 L120,236" fill="none" stroke="#9cc3ef" stroke-width="3" stroke-dasharray="5 6" stroke-linecap="round"/>`;
-  // ---------------- pompa Delphi DFP1 cu IMV și senzorul de temperatură
-  s += c("pip", `<g filter="${u("umbra")}"><path d="M282,176 L366,176 Q374,176 374,184 L374,236 Q374,246 364,246 L292,246 Q282,246 282,236z" fill="${u("alu")}" stroke="#5f666d"/>
-    <circle cx="330" cy="212" r="22" fill="${u("alu2")}" stroke="#6d757d"/><g id="${id("excentric")}"><circle cx="330" cy="212" r="15" fill="none" stroke="#5f666d" stroke-width="2"/><path d="M330,197 v30 M315,212 h30" stroke="#5f666d" stroke-width="3"/></g>
-    <rect x="352" y="182" width="16" height="10" fill="${u("otel")}" stroke="#555"/><path d="M286,190 h8 M286,200 h8 M286,224 h8" stroke="#7a828a"/></g>
-    ${T(290, 336, "pompa ÎP Delphi DFP1", 'text-anchor="middle"')}${T(290, 347, "(cu pompa de transfer)", 'text-anchor="middle" font-size="8" opacity=".75"')}`);
-  s += c("pjp", `<path d="M282,196 L270,196 L270,228 L282,228" fill="${u("alu2")}" stroke="#5f666d"/><circle cx="276" cy="212" r="7" fill="#6c737b"/>`);
-  s += c("imv", `<rect x="296" y="152" width="22" height="26" rx="3" fill="#202328" stroke="#000"/><rect x="299" y="142" width="16" height="12" rx="2" fill="#2b2f35"/><rect x="302" y="145" width="3" height="5" fill="#c9a227"/><rect x="309" y="145" width="3" height="5" fill="#c9a227"/>${T(278, 140, "IMV", 'font-weight="700"')}`);
-  s += `<rect x="340" y="164" width="10" height="13" rx="2" fill="#1b1e22"/>`;   // senzorul de temperatură a motorinei
-  // ---------------- conducta de înaltă presiune pompă → rampă
-  s += `<path id="${id("ip1")}" d="M368,186 C392,186 392,140 396,110 C398,90 404,66 422,66" fill="none" stroke="${u("otel")}" stroke-width="5.5"/>`;
-  // ---------------- rampa comună cu senzorul de presiune
-  s += c("rampa", `<rect x="420" y="54" width="352" height="22" rx="11" fill="${u("otel")}" stroke="#5c636a" filter="${u("umbra")}"/><rect id="${id("rampa-p")}" x="424" y="61" width="344" height="8" rx="4" fill="#4a7fc0" opacity=".85"/>
-    ${[480, 570, 660, 750].map(x => `<rect x="${x - 8}" y="73" width="16" height="9" rx="2" fill="${u("otel")}" stroke="#555"/>`).join("")}<rect x="430" y="48" width="14" height="8" fill="#8a9097"/><rect x="740" y="48" width="14" height="8" fill="#8a9097"/>
-    ${T(600, 44, "rampa comună (≤ 1600 bar)", 'text-anchor="middle"')}`);
-  s += c("senz", `<rect x="772" y="58" width="16" height="14" fill="${u("otel")}" stroke="#555"/><rect x="788" y="55" width="22" height="20" rx="3" fill="#202328"/><rect x="810" y="58" width="12" height="14" rx="2" fill="#2b2f35"/>${T(800, 46, "senzor p rampă", 'text-anchor="middle"')}`);
-  // ---------------- conductele rampă → injectoare și injectoarele Delphi
-  [480, 570, 660, 750].forEach((x, i) => {
-    s += `<path id="${id("ip" + (i + 2))}" d="M${x},82 L${x},90 C${x},98 ${x + 16},96 ${x + 16},104 L${x + 16},112" fill="none" stroke="${u("otel")}" stroke-width="4"/>`;
-    s += c("inj", `<g id="${id("inj" + i)}"><rect x="${x - 8}" y="96" width="16" height="32" rx="2" fill="#1d2024" stroke="#000"/><rect x="${x - 6}" y="88" width="12" height="9" rx="2" fill="#2b2f35"/><rect x="${x - 3.5}" y="90" width="2" height="5" fill="#c9a227"/><rect x="${x + 1.5}" y="90" width="2" height="5" fill="#c9a227"/>
-      <rect x="${x + 8}" y="108" width="10" height="7" fill="${u("otel")}" stroke="#555"/><rect x="${x - 7}" y="128" width="14" height="44" fill="${u("otel")}" stroke="#555"/><rect x="${x - 4}" y="172" width="8" height="26" fill="${u("alu")}" stroke="#555"/><path d="M${x - 3},198 L${x},205 L${x + 3},198z" fill="#555"/>
-      <path id="${id("jet" + i)}" d="M${x},205 L${x - 18},228 Q${x},234 ${x + 18},228z" fill="#fff6c4" opacity="0"/></g>
-      ${T(x - 20, 152, `${i + 1}`, 'font-size="10" font-weight="700" fill="#1b1e22"')}`);
+  /* ---------------- motorul K9K în secțiune: blocul, cilindrii, mecanismul bielă-manivelă, chiulasa cu supape */
+  s += `<g filter="${u("umbra")}"><path d="M540,246 L930,246 L930,334 L916,346 L916,392 Q916,404 904,404 L566,404 Q554,404 554,392 L554,346 L540,334z" fill="${u("fonta")}" stroke="#2f3439" filter="${u("turnat")}"/></g>`;
+  s += `<path d="M560,368 L910,368 L910,398 Q910,402 904,402 L566,402 Q560,402 560,398z" fill="#2b3035" opacity=".9"/><path d="M562,392 h346" stroke="#c99a25" stroke-width="5" opacity=".55"/>`;   // carterul cu ulei
+  MOT.X.forEach((x, i) => {
+    s += `<rect x="${x - 36}" y="246" width="72" height="92" fill="${u("cil")}"/><rect x="${x - 40}" y="250" width="4" height="84" fill="#5d7f9e" opacity=".55"/><rect x="${x + 36}" y="250" width="4" height="84" fill="#5d7f9e" opacity=".55"/>`;
+    const m0 = pozaMec(i, 0);
+    s += `<g clip-path="${u("clipBloc")}"><g id="${id("arb" + i)}" transform="rotate(${m0.phi % 360} ${x} ${MOT.yc})"><path d="M${x},${MOT.yc - 10} L${x - 16},${MOT.yc + 6} A20,20 0 0 0 ${x + 16},${MOT.yc + 6}z" fill="#5b6168" stroke="#2c3135"/></g>
+      <line id="${id("biela" + i)}" x1="${x}" y1="${m0.ypin}" x2="${m0.xm}" y2="${m0.ym}" stroke="#8d959c" stroke-width="10" stroke-linecap="round"/><line id="${id("biela2" + i)}" x1="${x}" y1="${m0.ypin}" x2="${m0.xm}" y2="${m0.ym}" stroke="#c7cdd2" stroke-width="3" stroke-linecap="round"/>
+      <circle id="${id("mp" + i)}" cx="${m0.xm}" cy="${m0.ym}" r="8" fill="#6d757c" stroke="#2c3135"/><circle cx="${x}" cy="${MOT.yc}" r="6" fill="#9aa2a9" stroke="#2c3135"/>
+      <g id="${id("pist" + i)}" transform="translate(0 ${m0.ypin - MOT.crown})"><rect x="${x - 34}" y="0" width="68" height="40" rx="3" fill="${u("piston")}" stroke="#4b5157"/>${[5, 9, 13].map(d => `<rect x="${x - 34}" y="${d}" width="68" height="1.8" fill="#3a4046"/>`).join("")}<path d="M${x - 16},0 Q${x},10 ${x + 16},0" fill="#5a6168"/><circle cx="${x}" cy="${MOT.crown}" r="5" fill="#7c848b" stroke="#3d4349"/></g>
+      <path id="${id("flac" + i)}" d="" fill="${u("flac")}" opacity="0"/></g>`;
   });
-  s += `<path d="M454,100 L454,94 C454,90 458,92 466,92 M466,92 L472,92 M488,92 L562,92 M578,92 L652,92 M668,92 L742,92" fill="none" stroke="#111" stroke-width="2.5"/>`;   // conducta de retur a injectoarelor (leak-off)
-  s += T(450, 103, "retur", 'font-size="8" text-anchor="end" opacity=".8"');
-  // ---------------- ECU Delphi DCM, priza OBD, cablajul
-  s += `<path d="M846,212 C846,150 830,140 800,136 L486,136" fill="none" stroke="${u("canelat")}" stroke-width="7"/><path d="M846,220 C846,270 600,250 330,250 L320,180" fill="none" stroke="${u("canelat")}" stroke-width="5" opacity=".9"/><path d="M846,212 C860,140 840,100 816,82" fill="none" stroke="${u("canelat")}" stroke-width="4"/>`;
-  [480, 570, 660].forEach(x => { s += `<path d="M${x + 6},136 L${x + 6},96" stroke="#2b2f35" stroke-width="2.5"/>`; });
-  s += `<path d="M756,136 L756,96" stroke="#2b2f35" stroke-width="2.5"/>`;
-  s += c("ecu", `<g filter="${u("umbra")}"><rect x="818" y="196" width="72" height="80" rx="4" fill="${u("ecu")}" stroke="#5f666d"/>${[0, 1, 2, 3, 4, 5, 6].map(k => `<rect x="${824 + k * 9.5}" y="250" width="5" height="22" fill="#8c949c"/>`).join("")}
-    <rect x="826" y="202" width="24" height="16" rx="2" fill="#1b1e22"/><rect x="856" y="202" width="28" height="16" rx="2" fill="#1b1e22"/><text x="854" y="236" text-anchor="middle" font-size="9" font-weight="800" fill="#2a2e33">DELPHI</text><text x="854" y="246" text-anchor="middle" font-size="7.5" fill="#333">DCM 1.2</text></g>
-    ${T(854, 290, "ECU", 'text-anchor="middle" font-weight="700"')}`);
-  s += c("obd", `<path d="M822,312 L878,312 L872,334 L828,334z" fill="#1b1e22" stroke="#000"/>${[0, 1, 2, 3, 4, 5, 6, 7].map(k => `<rect x="${829 + k * 5.6}" y="316" width="2.4" height="5" fill="#c9a227"/><rect x="${831 + k * 5}" y="325" width="2.4" height="5" fill="#c9a227"/>`).join("")}${T(850, 348, "priza OBD", 'text-anchor="middle"')}`);
-  s += `<path id="${id("obd-cab")}" d="M878,322 C895,322 898,300 900,292" fill="none" stroke="#1d4ed8" stroke-width="5" opacity="0"/>`;
-  s += `<g id="${id("cleste")}" opacity="0"><path d="M482,124 a10,10 0 1 1 1,0" fill="#ff8a1f" stroke="#7a3d00" stroke-width="2"/><rect x="490" y="112" width="26" height="10" rx="3" fill="#ff8a1f" stroke="#7a3d00"/><path d="M516,117 C540,117 540,150 560,150" fill="none" stroke="#111" stroke-width="2.5"/>${T(500, 156, "clește", 'font-size="8.5" fill="#1b1e22" font-weight="700"')}</g>`;
+  s += `<path d="M554,${MOT.yc} L916,${MOT.yc}" stroke="#7b8389" stroke-width="5" opacity=".7"/>`;
+  // chiulasa (aluminiu) cu supapele și arborele cu came
+  s += `<g filter="${u("umbra")}"><path d="M534,166 L936,166 L936,246 L534,246z" fill="${u("chiul")}" stroke="#6f777e" filter="${u("turnat")}"/><path d="M528,128 Q528,114 544,114 L926,114 Q942,114 942,128 L942,166 L528,166z" fill="${u("negru")}" stroke="#000"/></g>`;
+  s += `<text x="735" y="146" text-anchor="middle" font-size="15" font-weight="900" fill="#aeb6bd" letter-spacing="4" font-style="italic">dCi</text>`;
+  for (let k = 0; k < 9; k++) s += `<rect x="${548 + k * 44}" y="118" width="22" height="4" rx="2" fill="#40464c"/>`;
+  [560, 910].forEach(x => { s += surub(x, 140, 4.5); });
+  s += `<rect x="534" y="210" width="402" height="10" fill="#5d7f9e" opacity=".35"/>`;   // canalele de răcire
+  MOT.X.forEach((x, i) => {
+    s += `<path d="M${x - 34},246 Q${x},224 ${x + 34},246z" fill="#191c1f"/>`;
+    [[-17, "a"], [17, "e"]].forEach(([dx, t]) => { s += `<g id="${id("sup" + t + i)}"><line x1="${x + dx}" y1="190" x2="${x + dx}" y2="236" stroke="#9aa2a9" stroke-width="3"/><path d="M${x + dx - 9},239 L${x + dx + 9},239 L${x + dx + 3},234 L${x + dx - 3},234z" fill="#b7bec5" stroke="#4b5157" stroke-width=".7"/><rect x="${x + dx - 6}" y="180" width="12" height="11" rx="1" fill="#6b737a"/></g>`; });
+  });
+  s += T(552, 420, `secțiune prin motorul K9K · injecție 1-3-4-2 · mișcare încetinită ×${MOT.LENT}`, 'font-size="9.5" opacity=".8"');
+  /* ---------------- transmisia: roata pompei, cureaua de distribuție, roata arborelui cotit */
+  s += `<g><path d="M330,262 L508,348 M370,300 L512,384" stroke="#141618" stroke-width="7"/><g id="${id("roataC")}"><circle cx="520" cy="366" r="20" fill="#2a2e33" stroke="#111" stroke-width="3"/>${Array.from({ length: 12 }, (_, k) => `<rect x="518.5" y="344" width="3" height="5" fill="#111" transform="rotate(${k * 30} 520 366)"/>`).join("")}<circle cx="520" cy="366" r="6" fill="#8a9298"/><rect x="518" y="350" width="4" height="10" fill="#d32f2f"/></g></g>`;
+  /* ---------------- rezervorul */
+  s += c("rez", `<g filter="${u("umbra")}"><path d="M22,318 Q22,300 40,300 L198,300 Q216,300 216,318 L216,392 Q216,410 198,410 L40,410 Q22,410 22,392z" fill="${u("rez")}" stroke="#000"/>${[0, 1, 2, 3].map(k => `<path d="M${50 + k * 40},304 v102" stroke="#2c3136" stroke-width="5"/>`).join("")}<rect x="22" y="336" width="194" height="6" fill="#4a3d1f" opacity=".7"/></g>
+    <rect x="44" y="350" width="150" height="52" rx="4" fill="#090b0d" stroke="#555" stroke-dasharray="3 2"/><rect id="${id("nivel")}" x="45" y="370" width="148" height="31" fill="${u("mot")}" opacity=".85"/><text x="119" y="364" font-size="8" text-anchor="middle" fill="#aaa">secțiune</text>
+    <ellipse cx="120" cy="300" rx="32" ry="8" fill="#e8e8e2" stroke="#777"/><ellipse cx="120" cy="298" rx="22" ry="5" fill="#cfcfc6"/>${mufa(132, 286, 16, 10, 3, "#2e7d32")}<rect x="102" y="282" width="7" height="14" fill="${u("otelV")}"/><rect x="113" y="282" width="7" height="14" fill="${u("otelV")}"/>
+    ${tub("M198,302 L214,276 L226,272", 12, ["#050607", "#22262b", "#4b5157"])}<rect x="222" y="262" width="16" height="20" rx="3" fill="#202326" stroke="#000"/>
+    ${T(119, 432, "rezervor + unitatea de nivel", 'text-anchor="middle"')}`);
+  /* ---------------- filtrul de motorină cu pompa de amorsare */
+  s += c("filtru", `<g filter="${u("umbra")}"><rect x="244" y="130" width="66" height="128" rx="10" fill="${u("filtru")}" stroke="#7d7768"/><rect x="236" y="116" width="82" height="20" rx="5" fill="${u("negru")}" stroke="#000"/>
+    <rect x="252" y="160" width="50" height="62" rx="2" fill="#fbfaf4" stroke="#c9c3b0"/><rect x="252" y="160" width="50" height="12" fill="#1f4fa0"/><text x="277" y="169" text-anchor="middle" font-size="7.5" fill="#fff" font-weight="800">DELPHI</text><text x="277" y="184" text-anchor="middle" font-size="6.5" fill="#333">HDF 939</text><text x="277" y="196" text-anchor="middle" font-size="5.5" fill="#666">diesel · 4 µm</text><rect x="258" y="202" width="38" height="12" fill="#fff"/>${Array.from({ length: 16 }, (_, k) => `<rect x="${259 + k * 2.3}" y="203" width="${k % 3 ? 1 : 1.6}" height="10" fill="#222"/>`).join("")}
+    <ellipse cx="277" cy="104" rx="16" ry="13" fill="${u("negruV")}" stroke="#000"/><path d="M265,100 q12,-8 24,0 M265,107 q12,-8 24,0" stroke="#43484f" fill="none"/><rect x="270" y="113" width="14" height="5" fill="#111"/>
+    <rect x="262" y="258" width="30" height="10" rx="2" fill="#26292e"/><rect x="271" y="268" width="12" height="9" fill="#c62828"/>${mufa(290, 260, 16, 10, 2, "#1f2a1f")}</g>
+    <rect x="226" y="120" width="12" height="10" rx="2" fill="#e8e8e2" stroke="#888"/><rect x="316" y="120" width="12" height="10" rx="2" fill="#5ab04b" stroke="#2e6b25"/>
+    ${T(298, 92, "filtru Delphi", 'font-size="9"')}`);
+  /* ---------------- conductele de joasă presiune (furtune) și returul */
+  s += furtun("M113,282 L113,268 Q113,256 125,256 L170,256 Q182,256 182,244 L182,140 Q182,125 196,125 L226,125") + furtun("M328,125 L360,125 Q384,125 384,150 L384,206");
+  s += `<path id="${id("jp")}" d="M113,282 L113,268 Q113,256 125,256 L170,256 Q182,256 182,244 L182,140 Q182,125 196,125 L226,125 M328,125 L360,125 Q384,125 384,150 L384,206" fill="none" stroke="#7fb3ff" stroke-width="1.6" stroke-dasharray="3 9" opacity=".9"/>`;
+  s += tub("M476,226 Q476,200 490,190 L490,120 Q490,108 502,108 L560,108", 4.5, ["#050607", "#1d2024", "#4b5157"]) + tub("M560,108 L470,108 Q458,108 458,96 L458,76 Q458,64 446,64 L226,64 Q214,64 214,76 L214,300", 4.5, ["#050607", "#1d2024", "#4b5157"]);
+  s += `<path id="${id("ret")}" d="M476,226 Q476,200 490,190 L490,120 Q490,108 502,108 L560,108 M560,108 L470,108 Q458,108 458,96 L458,76 Q458,64 446,64 L226,64 Q214,64 214,76 L214,300" fill="none" stroke="#bcd8ff" stroke-width="1.4" stroke-dasharray="3 9" opacity=".8"/>`;
+  /* ---------------- pompa de înaltă presiune Delphi DFP1 */
+  s += c("pip", `<g filter="${u("umbra")}"><path d="M352,224 L468,224 Q482,224 482,238 L482,300 Q482,314 468,314 L352,314z" fill="${u("alu")}" stroke="#5f666d" filter="${u("turnat")}"/>
+    <path d="M396,206 L452,206 Q460,206 460,214 L460,226 L388,226 L388,214 Q388,206 396,206z" fill="${u("aluV")}" stroke="#5f666d"/>${[0, 1, 2, 3, 4].map(k => `<rect x="${404 + k * 10}" y="300" width="5" height="16" rx="1" fill="#8a9298"/>`).join("")}
+    ${surub(366, 236)}${surub(366, 302)}${surub(470, 236)}${surub(470, 302)}<text x="430" y="268" text-anchor="middle" font-size="8" font-weight="800" fill="#6b737a" letter-spacing="1">DELPHI DFP1</text><text x="430" y="279" text-anchor="middle" font-size="6.5" fill="#7c848b">9044A100A</text>
+    <rect x="482" y="236" width="12" height="16" fill="${u("otel")}"/>${hex(500, 244, 9)}</g>
+    <g id="${id("roataP")}"><circle cx="350" cy="280" r="44" fill="#1d2024" stroke="#0b0c0e" stroke-width="2"/>${Array.from({ length: 30 }, (_, k) => `<rect x="348" y="234" width="4" height="6" fill="#0b0c0e" transform="rotate(${k * 12} 350 280)"/>`).join("")}<circle cx="350" cy="280" r="36" fill="#2c3136"/>${[0, 1, 2].map(k => `<path d="M350,280 L${350 + 30 * Math.cos(k * 2.094)},${280 + 30 * Math.sin(k * 2.094)}" stroke="#3f454b" stroke-width="10" stroke-linecap="round"/>`).join("")}<circle cx="350" cy="280" r="12" fill="${u("otel")}" stroke="#333"/>${hex(350, 280, 6)}<rect x="347" y="240" width="6" height="8" fill="#e6e6e6"/></g>
+    ${T(228, 356, "pompa de înaltă presiune Delphi DFP1")}${T(228, 368, "(pompa de transfer integrată, roata dințată)", 'font-size="8.5" opacity=".75"')}`);
+  s += c("pjp", `<path d="M376,206 L392,206 L392,226 L376,226z" fill="${u("aluV")}" stroke="#5f666d"/>${hex(384, 210, 7, false)}`);
+  s += c("imv", `<g filter="${u("umbra")}"><rect x="414" y="168" width="28" height="40" rx="4" fill="${u("negruV")}" stroke="#000"/><rect x="410" y="200" width="36" height="8" rx="2" fill="${u("otelV")}"/>${mufa(416, 150, 24, 18, 2, "#2b2f35")}</g>${T(450, 164, "IMV", 'font-weight="700"')}`);
+  s += `<rect x="458" y="190" width="12" height="18" rx="2" fill="${u("negruV")}"/>${mufa(456, 180, 16, 10, 2, "#373c42")}`;   // senzorul de temperatură a motorinei
+  /* ---------------- conducta de înaltă presiune pompă → rampă */
+  s += tub("M509,244 C540,244 528,190 530,150 C532,110 538,90 556,90", 6) + hex(509, 244, 7) + hex(556, 90, 7, false);
+  /* ---------------- rampa comună forjată, cu senzorul de presiune */
+  s += c("rampa", `<g filter="${u("umbra")}"><rect x="552" y="72" width="368" height="30" rx="15" fill="${u("otel")}" stroke="#4b5157"/>${[620, 860].map(x => `<rect x="${x - 10}" y="58" width="20" height="16" fill="${u("otel")}" stroke="#4b5157"/>${surub(x, 62, 5)}`).join("")}
+    <rect id="${id("rampa-p")}" x="566" y="84" width="340" height="6" rx="3" fill="#4a7fc0" opacity=".55"/>
+    ${MOT.X.map(x => `<rect x="${x - 7}" y="100" width="14" height="10" fill="${u("otelV")}"/>${hex(x, 114, 8)}`).join("")}</g>
+    ${T(546, 66, "rampa comună", 'text-anchor="end"')}${T(546, 78, "≤ 1600 bar", 'text-anchor="end" font-size="8.5" opacity=".75"')}`);
+  s += c("senz", `<rect x="920" y="78" width="12" height="18" fill="${u("otelV")}"/>${hex(938, 87, 10, false)}<rect x="946" y="76" width="22" height="22" rx="3" fill="${u("negru")}" stroke="#000"/>${mufa(966, 78, 18, 18, 3, "#2b2f35")}${T(992, 122, "senzor p", 'text-anchor="end"')}`);
+  /* ---------------- injectoarele Delphi cu electrovalvă */
+  MOT.X.forEach((x, i) => {
+    s += tub(`M${x},118 L${x},124 C${x},132 ${x + 22},128 ${x + 22},138 L${x + 22},146`, 5) + hex(x + 22, 150, 6);
+    s += c("inj", `<g filter="${u("umbra")}"><rect x="${x - 11}" y="122" width="22" height="34" rx="3" fill="${u("negruV")}" stroke="#000"/>${mufa(x - 9, 108, 18, 14, 2, "#33383e")}<rect x="${x - 8}" y="104" width="10" height="5" rx="1" fill="#e9e9e2" stroke="#999"/>
+      <rect x="${x - 12}" y="156" width="24" height="10" fill="${u("otelV")}" stroke="#4b5157"/>${hex(x, 170, 12, false)}<rect x="${x - 8}" y="178" width="16" height="34" fill="${u("otelV")}" stroke="#4b5157"/><rect x="${x + 8}" y="144" width="10" height="12" fill="${u("otelV")}"/>
+      <rect x="${x - 5}" y="212" width="10" height="20" fill="${u("otelV")}" stroke="#4b5157"/><path d="M${x - 3},232 L${x},238 L${x + 3},232z" fill="#4b5157"/></g>
+      <path id="${id("jet" + i)}" d="M${x},238 L${x - 26},250 M${x},238 L${x - 10},252 M${x},238 L${x + 10},252 M${x},238 L${x + 26},250" stroke="#fff7c9" stroke-width="2.4" stroke-linecap="round" opacity="0"/>
+      <circle cx="${x + 32}" cy="190" r="9" fill="#1b1e22"/><text x="${x + 32}" y="194" font-size="10" font-weight="800" text-anchor="middle" fill="#fff">${i + 1}</text>`);
+  });
+  s += tub("M590,106 Q596,100 600,104 M610,104 L680,104 M700,104 L770,104 M790,104 L860,104 M880,104 Q890,104 890,108", 4, ["#050607", "#1d2024", "#4b5157"]);
+  s += T(524, 100, "retur", 'font-size="8.5" text-anchor="end" opacity=".8"');
+  /* ---------------- ECU, cablajul, priza OBD */
+  s += `<path d="M196,92 C260,92 300,40 420,40 L900,40 Q952,40 966,76" fill="none" stroke="${u("canelat")}" stroke-width="8"/>${MOT.X.map(x => `<path d="M${x},40 Q${x + 2},70 ${x},108" fill="none" stroke="#1d2024" stroke-width="3"/>`).join("")}<path d="M420,40 Q428,100 428,150" fill="none" stroke="#1d2024" stroke-width="3"/>`;
+  s += c("ecu", `<g filter="${u("umbra")}"><rect x="40" y="44" width="152" height="96" rx="6" fill="${u("ecu")}" stroke="#5f666d"/>${Array.from({ length: 9 }, (_, k) => `<rect x="${52 + k * 15}" y="98" width="8" height="38" rx="2" fill="#8a929a" stroke="#6b737a" stroke-width=".6"/>`).join("")}
+    <rect x="54" y="54" width="50" height="34" rx="3" fill="${u("negru")}" stroke="#000"/><rect x="110" y="54" width="70" height="34" rx="3" fill="${u("negru")}" stroke="#000"/><rect x="58" y="50" width="42" height="6" rx="2" fill="#5c626a"/><rect x="114" y="50" width="62" height="6" rx="2" fill="#5c626a"/>
+    ${surub(46, 50, 3.5)}${surub(186, 50, 3.5)}${surub(46, 134, 3.5)}${surub(186, 134, 3.5)}<rect x="120" y="66" width="50" height="16" fill="#fff" opacity=".9"/><text x="145" y="74" font-size="6" text-anchor="middle" fill="#222" font-weight="800">DELPHI DCM1.2</text><text x="145" y="80" font-size="4.5" text-anchor="middle" fill="#444">8200xxxxxx · K9K</text></g>
+    ${T(116, 156, "calculator motor (ECU)", 'text-anchor="middle"')}`);
+  s += c("obd", `<path d="M58,178 L126,178 L118,206 L66,206z" fill="${u("negru")}" stroke="#000"/>${Array.from({ length: 8 }, (_, k) => `<rect x="${66 + k * 7}" y="183" width="3" height="7" fill="#c9a227"/><rect x="${69 + k * 6}" y="194" width="3" height="7" fill="#c9a227"/>`).join("")}${T(92, 222, "priza OBD (J1962)", 'text-anchor="middle"')}`);
+  s += `<path id="${id("obd-cab")}" d="M58,192 C30,192 22,226 4,236" fill="none" stroke="#1d4ed8" stroke-width="6" stroke-linecap="round" opacity="0"/>`;
+  s += `<g id="${id("cleste")}" opacity="0"><path d="M601,70 a9,9 0 1 1 -1,0" fill="none" stroke="#ff8a1f" stroke-width="5"/><rect x="606" y="60" width="30" height="12" rx="4" fill="#ff8a1f" stroke="#7a3d00"/><text x="621" y="69" font-size="7" font-weight="800" text-anchor="middle" fill="#3a1d00">60 A</text><path d="M636,66 C660,66 662,20 700,20" fill="none" stroke="#111" stroke-width="3"/></g>`;
   // legenda
-  s += `<g font-size="9" fill="currentColor"><path d="M20,14 h22" stroke="#4a7fc0" stroke-width="4" stroke-dasharray="6 4"/><text x="46" y="17">alimentare (4…6 bar)</text><path d="M160,14 h22" stroke="#9cc3ef" stroke-width="3" stroke-dasharray="5 5"/><text x="186" y="17">retur</text><path d="M230,14 h22" stroke="#7a828a" stroke-width="5"/><text x="256" y="17">înaltă presiune (culoarea din rampă = p)</text><path d="M470,14 h22" stroke="#2b2f35" stroke-width="5"/><text x="496" y="17">cablaj ECU</text></g>`;
+  s += `<g font-size="9.5" fill="currentColor" transform="translate(240 14)"><path d="M0,0 h22" stroke="#22262b" stroke-width="7" stroke-linecap="round"/><path d="M0,0 h22" stroke="#7fb3ff" stroke-width="1.6" stroke-dasharray="3 4"/><text x="28" y="3.5">furtun joasă presiune (4…6 bar)</text><path d="M200,0 h22" stroke="#bcd8ff" stroke-width="2" stroke-dasharray="3 4"/><text x="228" y="3.5">retur</text><path d="M276,0 h22" stroke="#a3abb3" stroke-width="5"/><text x="304" y="3.5">conductă de oțel – înaltă presiune</text><path d="M500,0 h22" stroke="#4a7fc0" stroke-width="5" opacity=".6"/><text x="528" y="3.5">culoarea din rampă = presiunea</text></g>`;
   return s;
 }
-function actualizeazaSchema() {
+function actualizeazaSchema(dt = 0) {
   const sv = $("#svg-schema"); if (!sv) return;
   const q = n => sv.querySelector("#cr-" + n);
-  if (!q("rampa-p")) { sv.innerHTML = schemaSVG("cr"); }
+  if (!q("rampa-p")) { sv.innerHTML = schemaSVG("cr"); sim.thV = sim.thV || 0; }
   const k = cl(sim.p / 1500, 0, 1), cul = `rgb(${Math.round(60 + 195 * k)},${Math.round(120 - 80 * k)},${Math.round(200 - 170 * k)})`;
   q("rampa-p").setAttribute("fill", cul);
-  const misc = sim.merge || sim.cr, rev = sim.t * Math.max(sim.n, 0) / 60;
-  q("jp").setAttribute("stroke-dashoffset", misc ? String(-(sim.t * (20 + sim.n / 40)) % 1000) : "0");
-  q("ret").setAttribute("stroke-dashoffset", misc ? String(-(sim.t * (12 + sim.n / 80)) % 1000) : "0");
-  q("excentric").setAttribute("transform", `rotate(${(rev * 360) % 360} 330 212)`);
-  const th = rev * 2 * Math.PI;
-  [0, 1, 2, 3].forEach(i => { const ph = i === 0 || i === 3 ? 0 : Math.PI; q("pist" + i).setAttribute("transform", `translate(0 ${misc ? (14 * (1 - Math.cos(th + ph)) / 2 + 2 * (1 - Math.cos(2 * (th + ph))) / 4).toFixed(1) : 0})`); });
-  const faza = (rev / 2) % 1, ord = [0, 2, 3, 1], cil = ord[Math.floor(faza * 4)], inQ = (faza * 4) % 1;
-  [0, 1, 2, 3].forEach(i => q("jet" + i).setAttribute("opacity", sim.merge && i === cil && inQ < 0.35 ? "0.85" : "0"));
-  q("nivel").setAttribute("y", "292");
+  const misc = (sim.merge || sim.cr) && sim.n > 5;
+  sim.thV = ((sim.thV || 0) + (misc ? sim.n / 60 * 360 / MOT.LENT * dt : 0)) % 720;      // unghiul afișat (încetinit), ciclul de 720°
+  const th = sim.thV;
+  q("jp").setAttribute("stroke-dashoffset", String(-(th * 0.6) % 1000));
+  q("ret").setAttribute("stroke-dashoffset", String(-(th * 0.35) % 1000));
+  q("roataP").setAttribute("transform", `rotate(${(th / 2) % 360} 350 280)`);          // pompa: 1/2 din turația arborelui cotit (raportul curelei 1:2)
+  q("roataC").setAttribute("transform", `rotate(${th % 360} 520 366)`);
+  MOT.X.forEach((x, i) => {
+    const { phi, ypin, xm, ym } = pozaMec(i, th);
+    q("pist" + i).setAttribute("transform", `translate(0 ${(ypin - MOT.crown).toFixed(2)})`);
+    ["biela", "biela2"].forEach(n => { const e = q(n + i); e.setAttribute("x1", x); e.setAttribute("y1", ypin.toFixed(2)); e.setAttribute("x2", xm.toFixed(2)); e.setAttribute("y2", ym.toFixed(2)); });
+    q("mp" + i).setAttribute("cx", xm.toFixed(2)); q("mp" + i).setAttribute("cy", ym.toFixed(2));
+    q("arb" + i).setAttribute("transform", `rotate(${(phi % 360).toFixed(1)} ${x} ${MOT.yc})`);
+    // supapele: evacuarea deschisă ≈ 140…380°, admisia ≈ 340…580° (față de PMI la sfârșitul compresiei)
+    const ridic = (f, a0, a1) => f > a0 && f < a1 ? 7 * Math.sin(Math.PI * (f - a0) / (a1 - a0)) : 0;
+    q("supe" + i).setAttribute("transform", `translate(0 ${ridic(phi, 140, 380).toFixed(2)})`);
+    q("supa" + i).setAttribute("transform", `translate(0 ${ridic(phi, 340, 580).toFixed(2)})`);
+    // injecția (pilot + principală) în jurul PMI și arderea
+    const inj = sim.merge && (phi > 696 || phi < 10), ard = sim.merge && phi >= 2 && phi < 70;
+    q("jet" + i).setAttribute("opacity", inj ? "0.95" : "0");
+    const fl = q("flac" + i);
+    if (ard) { const top = MOT.deck - 4, bot = ypin - MOT.crown; fl.setAttribute("d", `M${x - 33},${bot} L${x - 33},${MOT.deck} Q${x},${top - 18} ${x + 33},${MOT.deck} L${x + 33},${bot}z`); fl.setAttribute("opacity", (1 - (phi - 2) / 68).toFixed(2)); }
+    else fl.setAttribute("opacity", "0");
+  });
   q("obd-cab").setAttribute("opacity", sim.obd ? "1" : "0");
   q("cleste").setAttribute("opacity", sim.cleste ? "1" : "0");
   sv.querySelectorAll("[data-comp]").forEach(g => g.classList.toggle("ident", sim.ident.has(g.dataset.comp)));
@@ -458,7 +515,7 @@ const HTML_TEORIE = `
 <p>Determinarea caracteristicii presiunii în rampă în funcție de turație, a răspunsului dinamic al reglajului de presiune (timp de răspuns, suprareglaj) și a caracteristicii regulatorului de debit; vizualizarea profilului injecției multiple și a modului în care numărul de injecții pe ciclu variază cu regimul.</p>
 <h2>3.2. Noțiuni teoretice</h2>
 <p>La sistemul common-rail generarea presiunii este separată de injecție: pompa de înaltă presiune alimentează o rampă comună, din care injectoarele comandate electric injectează de mai multe ori pe ciclu. ECU citește presiunea cerută dintr-o hartă, în funcție de turație și de debitul injectat, și o reglează în buclă închisă pe baza senzorului de presiune din rampă (semnal ≈ 0,5…4,5 V), acționând regulatorul de debit de la pompă (IMV, comandă PWM) și, la unele sisteme, un regulator de presiune pe rampă.</p>
-<figure><svg viewBox="0 0 900 360" class="fig-svg schema-fig" role="img" aria-label="Fig. 3.1">${schemaSVG("fig")}</svg><figcaption>Fig. 3.1. Schema sistemului common-rail și punctele de măsură (în simulator schema este animată și se poate da clic pe componente)</figcaption></figure>
+<figure><svg viewBox="0 0 1000 440" class="fig-svg schema-fig" role="img" aria-label="Fig. 3.1">${schemaSVG("fig")}</svg><figcaption>Fig. 3.1. Schema sistemului common-rail și punctele de măsură (în simulator schema este animată și se poate da clic pe componente)</figcaption></figure>
 <p>Calitatea reglajului se apreciază prin răspunsul la o variație bruscă a presiunii cerute: timpul de răspuns t<sub>r</sub> (până la atingerea a 90 % din variația cerută), suprareglajul σ și eroarea staționară.</p>
 <div class="ec"><span>σ = (p<sub>max</sub> − p<sub>cerut</sub>)/p<sub>cerut</sub>·100 [%]</span><span class="nr">(3.1)</span></div>
 <div class="ec"><span>Δp = (p<sub>real</sub> − p<sub>cerut</sub>)/p<sub>cerut</sub>·100 [%]</span><span class="nr">(3.2)</span></div>
@@ -588,7 +645,7 @@ Cadru.porneste({
     <div class="card sim-scena scena saa3-scena">
       <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <h3 style="margin:2.2rem 0 .3rem">Schema sistemului common-rail – standul 1.5 dCi</h3>
-      <svg id="svg-schema" viewBox="0 0 900 360" role="img" aria-label="Schema sistemului common-rail"></svg>
+      <svg id="svg-schema" viewBox="0 0 1000 440" role="img" aria-label="Schema sistemului common-rail"></svg>
       <p class="nota" id="comp-info2">Clic pe o componentă pentru descrierea ei.</p>
       <div class="saa3-afis"><div><span>Stare</span><b id="af-st">—</b></div><div><span>Turație [rot/min]</span><b id="af-n">0</b></div><div><span>Lichid [°C]</span><b id="af-T">—</b></div><div><span>p cerută [bar]</span><b id="af-pc">—</b></div><div><span>p reală [bar]</span><b id="af-p">—</b></div><div><span>IMV [%]</span><b id="af-imv">—</b></div></div>
       <div class="instr" data-panou="obd" hidden><canvas id="cv-log" height="280" aria-label="Înregistrarea testerului OBD"></canvas><p id="log-cit"></p></div>
@@ -612,7 +669,7 @@ Cadru.porneste({
       const dt = Math.min(0.05, dt0 || 0.016); pas(dt);
       if (sim.osc.run && performance.now() - (this._to || 0) > 250) { this._to = performance.now(); achizitieOsc(); }
       if (!vizibil) return;
-      if (performance.now() - (this._ts || 0) > 50) { this._ts = performance.now(); actualizeazaSchema(); }
+      actualizeazaSchema(dt);
       const pn = PASI[pasActiv].panou;
       if (pn === "obd" && !sim.log.stop) desenLog();
       if (pn === "osc" && sim.osc.run && performance.now() - (this._tv || 0) > 250) { this._tv = performance.now(); desenOsc(); }
