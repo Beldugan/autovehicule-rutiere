@@ -562,6 +562,67 @@ function inregFiltre(e) {
   if (ok) msg(`Tabelul 2.4: σ brut ${fx(v[0][1], 2)} LSB; medie mobilă N = ${fw.N}: σ ${fx(v[1][1], 2)} LSB, întârziere ${v[1][2]} ms; exponențial α = ${String(fw.a).replace(".", ",")}: σ ${fx(v[2][1], 2)} LSB, întârziere ${v[2][2]} ms (fereastra: ${r.n} eșantioane).`);
 }
 
+/* ------------------------------------------------------------------ pașii lucrării (panoul din dreapta) */
+const pe = (t, r, c) => Cadru.D.t[t][r][c] !== "";
+const sonda = (id, netw) => net(sursaSonda(id)) === netw;
+const PASI = [
+  { t: "Divizoarele de tensiune", tab: "Tabelul 2.1", zona: [20, 20, 1080, 760], pini: ["v12", "v5", "div12", "div5"], schita: "stm_div",
+    banda: "Pasul 1 · Multimetrul (sonda roșie V) măsoară U<sub>in</sub> la bornele sursei și U<sub>out</sub> pe nodurile divizoarelor (marcate cu portocaliu).",
+    instr: ["Porniți simularea (schița <i>stm32_divizor</i>).", "Trageți sonda <b>V</b> pe borna <b>+12 V</b> → înregistrați U<sub>in</sub>.", "Mutați sonda pe nodul divizorului 12 V (între R1 și R2) → înregistrați U<sub>out</sub>.", "Repetați pentru +5 V și divizorul 5 V. Verificați că nodurile nu depășesc 3,3 V; pentru alt rezistor opriți simularea și dați clic pe el."],
+    ver: () => [[sim.run, "simularea pornită"], [["v12", "v5", "div12", "div5"].includes(net(sim.dmm.s)), "sonda V pe o bornă a sursei sau pe nodul unui divizor"]],
+    prog: () => [["d12", "Uin"], ["d12", "Um"], ["d5", "Uin"], ["d5", "Um"]].filter(([r, c]) => pe("t21", r, c)).length, tot: 4,
+    buton: ["● U (multimetru) → Tabelul 2.1", () => inregDiv] },
+  { t: "Filtrul RC", tab: "Tabelul 2.2", zona: [20, 20, 960, 700], pini: ["genBB", "rc"], schita: null,
+    banda: "Pasul 2 · CH1 (galben) pe intrarea filtrului, CH2 (albastru) pe condensator. Osciloscopul măsoară automat Vpp pe ambele canale.",
+    instr: ["Generatorul pornit (OUTPUT), frecvența cu ◀ ▶.", "Sonda <b>1</b> pe intrarea filtrului (capătul din stânga al R), sonda <b>2</b> pe condensator.", "Alegeți T/div astfel încât să se vadă 1–3 perioade (apare „Freq”).", "Înregistrați la 20, 100, 159, 500 și 2000 Hz. Urmăriți cum scade și se întârzie semnalul de pe CH2."],
+    ver: () => [[sim.run && sim.gen, "simularea și generatorul pornite"], [sonda("ch0", "gen"), "CH1 pe intrarea filtrului"], [sonda("ch1", "rc"), "CH2 pe condensator"], [MD.FREC.includes(fGen()), `frecvența ${fGen()} Hz este una din cele 5 cerute`], [!!(sim.osc.acq && Number.isFinite(sim.osc.acq.m[0].f)), "cel puțin o perioadă pe ecran (Freq afișat)"]],
+    prog: () => MD.FREC.filter(f => pe("t22", "f" + f, "Uout")).length, tot: 5,
+    buton: ["● U<sub>in</sub>, U<sub>out</sub> Vpp → Tabelul 2.2", () => inregRC] },
+  { t: "Aliasing", tab: "Tabelul 2.3", zona: [20, 190, 1280, 600], pini: ["genO", "sw0o", "PA0"], schita: "stm_alias",
+    banda: "Pasul 3 · Generatorul → S1 (pe GEN) → PA0. STM32 eșantionează cu 1 kHz; plotterul de sub planșă arată cele 200 de eșantioane: semnalul pare de altă frecvență.",
+    instr: ["Opriți simularea, alegeți schița <i>stm32_esantionare</i> (FS = 1000) și porniți-o.", "Comutatorul S1 pe <b>GEN</b>.", "La 100, 900 și 1100 Hz: în plotter trageți cursorul A pe un maxim și B pe un maxim mai depărtat; indicați câte perioade cuprind.", "Înregistrați frecvența aparentă și comparați-o cu |f − k·f<sub>s</sub>|."],
+    ver: () => [[sim.run && (sim.fw || {}).prog === "stm_alias", "rulează stm32_esantionare"], [(sim.fw || {}).fs === 1000, "FS = 1000 Hz"], [sim.sw0 === "gen", "S1 pe GEN"], [MD.FAL.includes(fGen()), `frecvența ${fGen()} Hz este 100, 900 sau 1100 Hz`]],
+    prog: () => MD.FAL.filter(f => pe("t23", "f" + f, "fap")).length, tot: 3,
+    buton: ["● f aparentă (cursoare) → Tabelul 2.3", () => inregAlias] },
+  { t: "Filtrul RC înaintea ADC", tab: "Tabelul 2.3 (ultima coloană)", zona: [20, 190, 1280, 600], pini: ["rc", "sw0o", "PA0"], schita: "stm_alias",
+    banda: "Pasul 4 · S1 pe RC: ADC-ul primește semnalul filtrat. Comparați amplitudinea eșantioanelor (Vpp în plotter) la 100, 900 și 1100 Hz.",
+    instr: ["Aceeași schiță (FS = 1000); comutați S1 pe <b>RC</b>.", "La 100, 900 și 1100 Hz așteptați setul nou de eșantioane și înregistrați amplitudinea vârf-vârf.", "Observați: aliasul de 100 Hz rămâne vizibil, doar atenuat – filtrul RC de ordinul 1 nu este suficient ca anti-aliasing."],
+    ver: () => [[sim.run && (sim.fw || {}).prog === "stm_alias" && (sim.fw || {}).fs === 1000, "rulează stm32_esantionare cu FS = 1000"], [sim.sw0 === "rc", "S1 pe RC"], [MD.FAL.includes(fGen()), `frecvența ${fGen()} Hz este 100, 900 sau 1100 Hz`]],
+    prog: () => MD.FAL.filter(f => pe("t23", "f" + f, "amp")).length, tot: 3,
+    buton: ["● amplitudine (plotter) → Tabelul 2.3", () => inregAlias] },
+  { t: "Filtre numerice", tab: "Tabelul 2.4", zona: [370, 380, 930, 420], pini: ["pa1n", "PA1"], schita: "stm_filtre",
+    banda: "Pasul 5 · Motorul (S2) cuplează zgomot pe firul PA1; S3 aplică o treaptă de 1 V. Plotterul: gri = brut, albastru = medie mobilă, portocaliu = exponențial.",
+    instr: ["Opriți simularea, alegeți <i>stm32_filtre</i> cu T<sub>s</sub> = 10, fixați N și α, porniți.", "Porniți motorul (S2) și așteptați ≈ 6 s fără să atingeți nimic.", "Comutați treapta (S3), așteptați ≈ 2 s și înregistrați: se completează rândurile „fără filtru”, media N și exponențialul α.", "Repetați pentru (N; α) = (4; 0,5), (8; 0,2), (16; 0,05)."],
+    ver: () => { const fw = sim.fw || {}; const a = fw.prog === "stm_filtre" ? analizaFiltre() : { er: "x" }; return [[sim.run && fw.prog === "stm_filtre", "rulează stm32_filtre"], [fw.Ts === 10, "T<sub>s</sub> = 10 ms"], [sim.motor, "motorul pornit (S2)"], [!a.er, a.er && fw.prog === "stm_filtre" ? a.er : "zgomot înregistrat și treaptă aplicată"]]; },
+    prog: () => Object.keys(MD.FILTRE).filter(k => pe("t24", k, "sig")).length, tot: 7,
+    buton: ["● σ și întârzierea → Tabelul 2.4", () => inregFiltre] }
+];
+let pasActiv = 0;
+function construiestePasi() {
+  $("#pasi").innerHTML = PASI.map((p, i) => `<li class="pas" data-pas="${i}"><button type="button" class="pas-cap"><span class="pas-nr">${i + 1}</span><span>${p.t}<br><small style="font-weight:400;color:var(--text-sec)">${p.tab}</small></span><span class="pas-prog"></span></button>
+    <div class="pas-corp"><ol>${p.instr.map(x => `<li>${x}</li>`).join("")}</ol><ul class="pas-ver"></ul>
+    <div class="pas-but"><button type="button" class="secundar" data-vezi="${i}">🔍 Arată pe planșă</button><button type="button" class="primar lat" data-inreg="${i}">${p.buton[0]}</button></div></div></li>`).join("");
+  $$("#pasi .pas-cap").forEach(b => b.addEventListener("click", () => alegePas(+b.closest(".pas").dataset.pas, true)));
+  $$("#pasi [data-vezi]").forEach(b => b.addEventListener("click", () => alegePas(+b.dataset.vezi, true)));
+  $$("#pasi [data-inreg]").forEach(b => b.addEventListener("click", e => { PASI[+b.dataset.inreg].buton[1]()(e); actualizeazaPasi(); }));
+  alegePas(0, false);
+}
+function alegePas(i, zoom) {
+  pasActiv = i; const p = PASI[i];
+  $$("#pasi .pas").forEach(el => el.classList.toggle("activ", +el.dataset.pas === i));
+  $$("#tk-svg .tk-pin").forEach(r => r.classList.toggle("tinta", p.pini.includes(r.dataset.pin)));
+  $("#tk-pas-banda").innerHTML = p.banda;
+  if (zoom) seteazaVB(p.zona.slice());
+  if (p.schita && !sim.run && sim.sketch !== p.schita) { sim.sketch = p.schita; afiseazaCod(); }
+  actualizeazaPasi();
+}
+function actualizeazaPasi() {
+  if (!$("#pasi")) return;
+  PASI.forEach((p, i) => { const el = $(`#pasi [data-pas="${i}"]`), n = p.prog(); el.querySelector(".pas-prog").textContent = `${n}/${p.tot}`; el.classList.toggle("gata", n >= p.tot); });
+  const v = PASI[pasActiv].ver();
+  $(`#pasi [data-pas="${pasActiv}"] .pas-ver`).innerHTML = v.map(([ok, t]) => `<li class="${ok ? "ok" : ""}">${t}</li>`).join("");
+}
+
 /* ------------------------------------------------------------------ calculele determinărilor */
 function calculeazaMAM2(D) {
   const t = D.t, cel = { t21: {}, t22: {}, t23: {}, t24: {} }, rele = { t21: {}, t22: {} };
@@ -713,35 +774,54 @@ const CSS = `<style>
 .tk-bara button { border:1px solid #cfd4da; background:#fff; color:#333; border-radius:4px; padding:.32rem .7rem; font:600 .82rem system-ui,sans-serif; cursor:pointer; }
 .tk-bara button.activ { background:#e8f1fb; border-color:#1477d1; color:#0d5ea8; }
 .tk-bara .tk-start { background:#2e9e44; border-color:#2e9e44; color:#fff; } .tk-bara .tk-start.ruleaza { background:#d6452f; border-color:#d6452f; }
-.tk-corp { display:flex; min-height:560px; background:#fbfbfb; }
-.tk-plansa { position:relative; flex:1 1 auto; min-width:0; }
+.tk-plansa { position:relative; background:#fbfbfb; border-bottom:1px solid #e3e3e3; }
 #tk-svg { width:100%; height:auto; aspect-ratio:1300/790; display:block; touch-action:none; user-select:none; font-family:system-ui,sans-serif; }
 .tk-pin { fill:transparent; stroke:transparent; cursor:crosshair; } .tk-pin:hover, .tk-pin.aproape { fill:rgba(20,119,209,.35); stroke:#1477d1; stroke-width:1.2; }
 .tk-comp { cursor:pointer; }
-.tk-ajutor { margin:0 .6rem .3rem; font:11px system-ui,sans-serif; color:#888; pointer-events:none; }
+.tk-ajutor { margin:.3rem .6rem 0; font:11px system-ui,sans-serif; color:#888; pointer-events:none; }
 .tk-insp { position:absolute; right:.6rem; top:.6rem; width:270px; background:#fff; border:1px solid #d8dde3; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.15); font:12.5px system-ui,sans-serif; color:#333; }
 .tk-insp select { font:12px system-ui; }
 .tk-insp-t { display:flex; justify-content:space-between; align-items:center; padding:.5rem .6rem; font-weight:700; border-bottom:1px solid #eee; } .tk-insp-t button { border:0; background:none; cursor:pointer; color:#777; }
 .tk-insp-r { display:flex; justify-content:space-between; gap:.6rem; padding:.3rem .6rem; } .tk-insp-r span { color:#777; } .tk-insp-r b { font-weight:600; text-align:right; }
-.tk-cod { flex:0 0 390px; max-width:42%; border-left:1px solid #e3e3e3; background:#fff; display:flex; flex-direction:column; }
+.tk-jos:has(.tk-cod[hidden]) { grid-template-columns:1fr; }
+.tk-jos { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); border-top:1px solid #e3e3e3; }
+.tk-cod { border-left:1px solid #e3e3e3; background:#fff; display:flex; flex-direction:column; min-width:0; }
 .tk-cod[hidden] { display:none; }
 .tk-cod-sus { display:flex; gap:.4rem; padding:.4rem .5rem; border-bottom:1px solid #eee; align-items:center; font:12px system-ui,sans-serif; color:#555; } .tk-cod-sus select { font:12px system-ui,sans-serif; padding:.2rem; border:1px solid #cfd4da; border-radius:4px; background:#fff; color:#222; max-width:100%; }
-#tk-cod { flex:1 1 auto; margin:0; padding:.5rem .3rem; overflow:auto; background:#fff; color:#1f1f1f; font:11.5px/1.5 ui-monospace,Consolas,"Courier New",monospace; white-space:pre; min-height:200px; max-height:330px; }
+#tk-cod { margin:0; padding:.5rem .3rem; overflow:auto; background:#fff; color:#1f1f1f; font:11.5px/1.5 ui-monospace,Consolas,"Courier New",monospace; white-space:pre; max-height:260px; }
 .cd-ln { display:inline-block; width:2.2em; color:#a8a8a8; text-align:right; margin-right:.8em; user-select:none; }
 .cd-k { color:#0b62b5; font-weight:600; } .cd-s { color:#b2502b; } .cd-c { color:#6a8759; font-style:italic; } .cd-n { color:#7a3fb0; }
 .cd-f { min-width:5.5ch; background:#fff8d6; color:#5b3d00; border:1px solid #e0b84a; border-radius:3px; font:inherit; padding:0 .2rem; } .cd-f:disabled { background:#f1f1f1; color:#777; border-color:#ccc; }
 .tk-blocat { background:#fff4e5; color:#8a5300; font:12px system-ui,sans-serif; padding:.35rem .6rem; border-bottom:1px solid #f1d7a8; }
 .tk-ser-bara { display:flex; gap:.4rem; padding:.35rem .5rem; border-top:1px solid #eee; } .tk-ser-bara button { border:1px solid #cfd4da; background:#fff; border-radius:4px; padding:.2rem .6rem; font:12px system-ui,sans-serif; cursor:pointer; color:#333; } .tk-ser-bara button.activ { background:#e8f1fb; border-color:#1477d1; }
-#tk-serial { margin:0; flex:1 1 auto; min-height:120px; max-height:260px; overflow:auto; background:#fff; border-top:1px solid #eee; color:#222; padding:.4rem .6rem; font:12px/1.4 ui-monospace,Consolas,monospace; }
-#tk-plotw { border-top:1px solid #e3e3e3; padding:.35rem .6rem .5rem; background:#fff; color:#333; font:11.5px system-ui,sans-serif; }
+#tk-serial { margin:0; flex:1 1 auto; min-height:90px; max-height:150px; overflow:auto; background:#fff; border-top:1px solid #eee; color:#222; padding:.4rem .6rem; font:12px/1.4 ui-monospace,Consolas,monospace; }
+#tk-plotw { padding:.35rem .6rem .5rem; background:#fff; color:#333; font:11.5px system-ui,sans-serif; }
 .plot-cap { display:flex; flex-wrap:wrap; gap:.3rem .8rem; align-items:center; margin-bottom:.3rem; } .plot-cap span { color:#777; } .plot-cap label { margin-left:auto; white-space:nowrap; display:inline-flex; gap:.3rem; align-items:center; }
 #tk-plot { width:100%; display:block; cursor:ew-resize; touch-action:none; border:1px solid #e3e3e3; }
 #plot-cit { margin:.3rem 0 0; min-height:2.6em; }
 .fw { font-size:.8rem; } .fw b { font-family:ui-monospace,monospace; }
 pre.cod { background:#1e1e1e; color:#d4d4d4; padding:.7rem .9rem; border-radius:6px; overflow:auto; font:12.5px/1.45 ui-monospace,Consolas,monospace; }
 .fig-svg { width:100%; max-width:680px; height:auto; color:var(--text); }
-.sim-grila:fullscreen .tk-corp, .sim-grila.ecran-plin .tk-corp { min-height:calc(100vh - 5rem); }
-@media (max-width:900px){ .tk-corp { flex-direction:column; } .tk-cod { max-width:none; flex-basis:auto; border-left:0; border-top:1px solid #e3e3e3; } #tk-svg { min-height:380px; } }
+#osc-cit { margin:.15rem .6rem .3rem; font:12px ui-monospace,Consolas,monospace; color:#555; min-height:1.2em; }
+.tk-pas-banda { position:absolute; left:.6rem; bottom:.5rem; max-width:min(520px,60%); background:rgba(20,119,209,.93); color:#fff; border-radius:6px; padding:.4rem .6rem; font:12.5px/1.35 system-ui,sans-serif; box-shadow:0 3px 10px rgba(0,0,0,.2); pointer-events:none; }
+.tk-pas-banda:empty { display:none; }
+.tk-pin.tinta { fill:rgba(255,152,0,.35); stroke:#ff6d00; stroke-width:2; animation:pulsPin 1.1s ease-in-out infinite; }
+@keyframes pulsPin { 50% { stroke-width:4.5; fill:rgba(255,152,0,.7); } }
+.tk-pasi .pasi { list-style:none; margin:.4rem 0; padding:0; display:grid; gap:.45rem; }
+.pas { border:1px solid var(--linie); border-radius:8px; background:var(--suprafata); }
+.pas.activ { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.pas-cap { width:100%; display:flex; gap:.5rem; align-items:center; text-align:left; background:none; border:0; padding:.5rem .6rem; font:600 .9rem system-ui,sans-serif; color:var(--text); cursor:pointer; }
+.pas-nr { flex:0 0 1.6rem; height:1.6rem; border-radius:50%; display:grid; place-items:center; background:var(--suprafata-2); font-size:.8rem; }
+.pas.gata .pas-nr { background:#2e9e44; color:#fff; } .pas.activ .pas-nr { background:var(--accent); color:#fff; }
+.pas-prog { margin-left:auto; font:600 .75rem system-ui; color:var(--text-sec); white-space:nowrap; }
+.pas-corp { padding:0 .6rem .6rem; font-size:.86rem; } .pas:not(.activ) .pas-corp { display:none; }
+.pas-corp ol { margin:.2rem 0 .4rem; padding-left:1.2rem; } .pas-corp li { margin:.15rem 0; }
+.pas-ver { list-style:none; padding:0 !important; margin:.3rem 0 .5rem !important; font-size:.82rem; }
+.pas-ver li::before { content:"○ "; color:var(--text-sec); } .pas-ver li.ok::before { content:"✓ "; color:#2e9e44; font-weight:700; } .pas-ver li.ok { color:var(--text-sec); }
+.pas-but { display:flex; flex-direction:column; gap:.35rem; }
+.sim-grila:fullscreen .sim-scena.tk, .sim-grila.ecran-plin .sim-scena.tk { display:block; }
+.sim-grila:fullscreen #tk-svg, .sim-grila.ecran-plin #tk-svg { height:calc(100vh - 21rem); min-height:320px; aspect-ratio:auto; }
+@media (max-width:900px){ .tk-jos { grid-template-columns:1fr; } .tk-cod { border-left:0; border-top:1px solid #e3e3e3; } .tk-pas-banda { position:static; max-width:none; border-radius:0; } }
 </style>`;
 Cadru.porneste({
   disc: "MAM1", nr: 2, cod: "mam1-l2",
@@ -811,33 +891,29 @@ Cadru.porneste({
         <button type="button" id="tk-codb" class="activ">{ } Cod</button>
         <button type="button" id="tk-start" class="tk-start">▶ Pornește simularea</button>
       </div>
-      <div class="tk-corp">
-        <div class="tk-plansa">${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div>
-          <p class="tk-ajutor">Rotița = zoom · tragere pe fundal = deplasare · trageți sondele (V, 1, 2) pe pini · clic pe comutatoare (S1, S2, S3) · clic pe un rezistor = valoarea · ◀ ▶ frecvența generatorului</p>
-          <div id="tk-plotw"><div class="plot-cap"><b>Plotter serial</b> <span>(Arduino IDE / PlatformIO) – clic sau tragere pe grafic pentru cursoarele A și B</span>
-            <label>Perioade între cursoare <select id="plot-per">${Array.from({ length: 20 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("")}</select></label></div>
-            <canvas id="tk-plot" aria-label="Plotterul serial"></canvas><p id="plot-cit"></p></div></div>
+      <div class="tk-plansa">${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div>
+        <div class="tk-pas-banda" id="tk-pas-banda"></div></div>
+      <p class="tk-ajutor">Rotița = zoom · tragere pe fundal = deplasare · trageți sondele (V, 1, 2) pe pini · clic pe comutatoare (S1, S2, S3) · clic pe un rezistor = valoarea · ◀ ▶ frecvența generatorului</p>
+      <p class="nota" id="osc-cit"></p>
+      <div class="tk-jos">
+        <div id="tk-plotw"><div class="plot-cap"><b>Plotter serial</b> <span>clic sau tragere pe grafic = cursoarele A și B</span>
+          <label>Perioade între cursoare <select id="plot-per">${Array.from({ length: 20 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("")}</select></label></div>
+          <canvas id="tk-plot" aria-label="Plotterul serial"></canvas><p id="plot-cit"></p></div>
         <div class="tk-cod" id="tk-codp">
-          <div class="tk-cod-sus"><select disabled><option>Text</option></select><select disabled><option>STM32 Blue Pill</option></select></div>
-          <div class="tk-cod-sus"><label>Schiță <select id="tk-sk"></select></label></div>
+          <div class="tk-cod-sus"><b>Cod – STM32 Blue Pill</b><label style="margin-left:auto">Schiță <select id="tk-sk"></select></label></div>
           <div id="tk-blocat" class="tk-blocat" hidden>Opriți simularea pentru a modifica codul.</div>
           <pre id="tk-cod"></pre>
-          <div class="tk-ser-bara"><b style="font:600 12px system-ui;align-self:center">Monitor serial</b></div>
+          <div class="tk-ser-bara"><b>Monitor serial</b></div>
           <pre id="tk-serial"></pre>
         </div>
       </div>
-      <p class="nota" id="osc-cit" style="margin:.35rem 0 0"></p>
     </div>
-    <aside class="card sim-comenzi">
-      <h2>Programul în execuție</h2>
-      <p class="fw">STM32F103: <b id="fw-stm">—</b></p>
-      <h2>Înregistrare în tabele</h2>
-      <button type="button" class="primar lat" id="btn-t21">● U (multimetru) → Tabelul 2.1</button>
-      <button type="button" class="primar lat" id="btn-t22">● U<sub>in</sub>, U<sub>out</sub> Vpp (osciloscop) → Tabelul 2.2</button>
-      <button type="button" class="primar lat" id="btn-t23">● f aparentă / amplitudine (plotter) → Tabelul 2.3</button>
-      <button type="button" class="primar lat" id="btn-t24">● σ și întârzierea (plotter) → Tabelul 2.4</button>
+    <aside class="card sim-comenzi tk-pasi">
+      <h2>Desfășurarea lucrării</h2>
+      <p class="fw">Program încărcat: <b id="fw-stm">—</b></p>
+      <ol class="pasi" id="pasi"></ol>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
-      <p class="nota">Valorile se trec în tabele numai din aparate (multimetru, măsurătorile osciloscopului, plotterul serial cu cursoare), cu simularea pornită.</p>
+      <p class="nota">Valorile intră în tabele numai din aparate, cu simularea pornită. „Arată pe planșă” mărește zona de lucru și marchează punctele de măsură.</p>
     </aside>
   </div>`,
     init(C) {
@@ -846,8 +922,7 @@ Cadru.porneste({
       $("#tk-start").addEventListener("click", pornesteSim);
       $("#tk-codb").addEventListener("click", () => { const p = $("#tk-codp"); p.hidden = !p.hidden; $("#tk-codb").classList.toggle("activ", !p.hidden); });
       $("#tk-fit").addEventListener("click", () => seteazaVB(VB0.slice()));
-      $("#btn-t21").addEventListener("click", inregDiv); $("#btn-t22").addEventListener("click", inregRC);
-      $("#btn-t23").addEventListener("click", inregAlias); $("#btn-t24").addEventListener("click", inregFiltre);
+      construiestePasi();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       deseneazaOsc(); citesteDMM();
       C.mesaj("Porniți simularea și măsurați cu multimetrul +12 V, +5 V și nodurile divizoarelor (Tabelul 2.1).", "");
@@ -864,7 +939,7 @@ Cadru.porneste({
       $("#ledTX").setAttribute("fill", sim.run && acum - sim.tx < 60 ? "#ffd04a" : "#5a4a1a");
       if (sim.motor && sim.run) $("#motorAx").setAttribute("transform", `rotate(${(acum * 1.2) % 360} ${BX + 480} ${BY + 230})`);
       if (acum - (this._ts || 0) > 300) {
-        this._ts = acum; avertizari();
+        this._ts = acum; avertizari(); actualizeazaPasi();
         if (sim.run) { const t = Math.floor((acum - sim.t0) / 1000); $("#tk-timp").textContent = `Timp de simulare: ${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; }
         C.stare(1, sim.run ? "simulare pornită" : "simulare oprită", sim.run ? "inc" : ""); C.stare(2, sim.run && sim.fw ? `STM32: ${PROG[sim.fw.prog].titlu}` : "");
       }
