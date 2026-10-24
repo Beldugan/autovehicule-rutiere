@@ -36,7 +36,7 @@ const sim = {
   testInj: 0, testT: 0, ventilator: false, coduri: [], vac: 0, pompaVid: false, defectDemo: "none", acc: 0,
   osc: { tdiv: 2e-3, ruleaza: true, c1: 2, c2: 7, benzi: true, buf: [], t0: 0, perioade: 1,
     // 4 canale: CH1 = componenta selectată (pe ea se face declanșarea); poz = poziția nivelului de 0 V, în diviziuni față de centru
-    ch: [{ c: "ckp", on: true, vdiv: 2, poz: 0 }, { c: "cmp", on: false, vdiv: 2, poz: -2 }, { c: "l1", on: false, vdiv: 0.2, poz: -2 }, { c: "inj1", on: false, vdiv: 10, poz: -2 }] }
+    ch: [{ c: "ckp", on: true, vdiv: 2, poz: 0 }, { c: "cmp", on: false, vdiv: 2, poz: -2 }, { c: "l1", on: false, vdiv: 0.2, poz: -2 }, { c: "inj1", on: false, vdiv: 10, poz: -3 }] }
 };
 function P() { return Cadru.P; }
 function defect() { return MOD.eval ? P().defect : sim.defectDemo; }
@@ -54,7 +54,7 @@ function semnal(c, t) {
       const A = P().kckp * sim.rpm / 1000 * (d === "ckp_gap" ? 0.35 : 1);
       if (k >= 58) return A * 0.15 * Math.sin(2 * Math.PI * (k - 58) / 2);            // golul (2 dinți lipsă)
       const amp = k < 1 || k > 57 ? 1.6 : 1;
-      return A * amp * Math.sin(2 * Math.PI * k);
+      return A * amp * (Math.sin(2 * Math.PI * k) + 0.3 * Math.sin(4 * Math.PI * k)) / 1.18;   // dinte: flanc de trecere prin zero abrupt, formă asimetrică
     }
     case "ect": return MD.tensiune("ect", { T: sim.ect }, pr()) + (Math.random() - 0.5) * 0.004;
     case "iat": return MD.tensiune("iat", { T: sim.iat }, pr()) + (Math.random() - 0.5) * 0.004;
@@ -67,14 +67,18 @@ function semnal(c, t) {
       if (!sim.merge || sim.rpm < 50) return ub;
       if (sim.testInj === i + 1 || (d === "inj3_open" && i === 2)) return ub;     // fără comandă / bobină întreruptă
       const T = 120 / sim.rpm, ti = timpInj() / 1000, ph = ((t + i * T / 4 * [0, 2, 3, 1][i]) % T + T) % T;
-      if (ph < ti) return 0.15;
-      const dt = ph - ti;
-      return ub + 52 * Math.exp(-dt / 0.00012) - 2.5 * Math.exp(-dt / 0.0006) * Math.cos(dt * 2 * Math.PI * 1800);
+      return SEMNALE.injectorMPI(ph, ti, ub, { R: 14.5 + 0.4 * i, tAc: 0.6e-3 + 0.03e-3 * i });
     }
     case "cmp": { if (!sim.merge || sim.rpm < 50) return 4.8; const ph = ((sim.rpm / 120) * t) % 1; return ph < 0.5 ? 0.25 : 4.85; }
     case "knock": { if (!sim.merge) return 0; const T = 120 / sim.rpm, ph = ((t % (T / 4)) + T / 4) % (T / 4); return Math.exp(-ph / 0.0012) * (0.15 + sim.rpm / 6000) * Math.sin(2 * Math.PI * 7000 * ph) + (Math.random() - 0.5) * 0.02; }
-    case "clap": return 6.5 + 1.5 * Math.sign(Math.sin(t * 2 * Math.PI * 2000)) * (sim.merge ? 1 : 0);
-    case "can": return 12.6 - (sim.merge && sim.ect > 70 ? (Math.sin(t * 2 * Math.PI * 16) > 0.4 ? 12.4 : 0) : 0);
+    case "clap": {        // borna M+ a motorului clapetei (punte H, 2 kHz); factorul de umplere ține clapeta contra arcului
+      const ub = sim.merge ? 13.9 : 12.4, T = 1 / 2000, ph = ((t % T) + T) % T, dc = 0.12 + 0.0032 * sim.tps;
+      return SEMNALE.puncteH(ph, T, Math.min(0.95, dc), ub);
+    }
+    case "can": {         // electrovalva canistrei: PWM 16 Hz pe masă, activă numai cu motorul cald și bucla λ închisă
+      const ub = sim.merge ? 13.9 : 12.4; if (!(sim.merge && sim.ect > 70)) return ub;
+      const T = 1 / 16, ph = ((t % T) + T) % T; return SEMNALE.pwmMasa(ph, T, 0.3, ub);
+    }
   }
   return 0;
 }
@@ -238,8 +242,8 @@ const TDIV = [0.5e-3, 1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 50e-3, 0.1, 0.2, 0.5, 1];
 const VDIV = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20];
 function fmtT(s) { return s >= 1 ? fmt(s, 2) + " s" : s >= 1e-3 ? fmt(s * 1000, s >= 0.1 ? 0 : 2) + " ms" : fmt(s * 1e6, 0) + " µs"; }
 const CULORI_CH = ["#ffe14d", "#4fd6ff", "#ff6bd6", "#6dff8e"];
-const POZDEF = { ckp: 0, knock: 0, clap: -1 };       // poziția implicită a nivelului de 0 V (semnalele alternative la mijloc)
-const VDEF = { ckp: 2, cmp: 2, ect: 1, iat: 1, map: 1, tps: 1, l1: 0.2, l2: 0.2, inj1: 10, inj2: 10, inj3: 10, inj4: 10, clap: 2, can: 5, knock: 0.5 };
+const POZDEF = { ckp: 0, knock: 0, clap: -2, can: -3, inj1: -3, inj2: -3, inj3: -3, inj4: -3 };       // poziția implicită a nivelului de 0 V (semnalele alternative la mijloc)
+const VDEF = { ckp: 2, cmp: 2, ect: 1, iat: 1, map: 1, tps: 1, l1: 0.2, l2: 0.2, inj1: 10, inj2: 10, inj3: 10, inj4: 10, clap: 5, can: 10, knock: 0.5 };
 function achizitie() {
   const o = sim.osc, N = 1200, T = o.tdiv * 10;
   let t0 = sim.t - T;
@@ -247,7 +251,7 @@ function achizitie() {
     const f = sim.rpm; if (f > 0) { const per = 1 / f; t0 = Math.floor((sim.t - T) / per) * per; }
   }
   if (/^inj/.test(sim.sel) && sim.merge && sim.rpm > 50 && o.tdiv < 0.1) { const per = 120 / sim.rpm; t0 = Math.floor((sim.t - T) / per) * per - o.tdiv; }
-  o.buf = o.ch.map(ch => { if (!ch.on) return null; const b = new Float32Array(N); for (let i = 0; i < N; i++) b[i] = semnal(ch.c, t0 + T * i / (N - 1)); return b; });
+  o.buf = o.ch.map(ch => { if (!ch.on) return null; const b = new Float32Array(N); for (let i = 0; i < N; i++) b[i] = SEMNALE.achizitie(semnal(ch.c, t0 + T * i / (N - 1)), ch.vdiv, 12, 8, ch.poz); return b; });
   o.t0 = t0;
 }
 function oscPeEcran(cv) { const fe = document.fullscreenElement || document.webkitFullscreenElement; return (fe && fe.contains(cv)) || !!cv.closest(".ecran-plin"); }

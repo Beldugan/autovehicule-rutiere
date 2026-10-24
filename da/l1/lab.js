@@ -36,20 +36,36 @@ const FB = MD.FBIT;
 function hash(n) { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }
 function perioadaCadru(b) { return Math.max(MD.NBITI + 3, Math.round(MD.NBITI / (MD.incarcare(P(), b) / 100))); }      // [biți]
 function perioadaFD() { return 130e-6 / (MD.incarcare(P(), "sasiu") / 100); }                                         // [s]
+const CADRE = new Map();
+/** cadrul standard cu 8 octeți (1 = dominant): SOF, ID, RTR, IDE, r0, DLC, date, CRC – cu biți de umplere –, apoi delimitatorul CRC, ACK, EOF și pauza */
+function cadru(k, b) {
+  const cheie = b + k; let c = CADRE.get(cheie); if (c) return c;
+  const id = Math.floor(hash(k * 7 + 3 + b.length) * 2048), raw = [1];
+  for (let j = 10; j >= 0; j--) raw.push(id & (1 << j) ? 0 : 1);
+  raw.push(1, 1, 1, 0, 1, 1, 1);                                                    // RTR, IDE, r0 dominanți; DLC = 8 (1000)
+  for (let j = 0; j < 64 + 15; j++) raw.push(hash(k * 131 + j + b.length * 1000) < 0.5 ? 1 : 0);
+  c = SEMNALE.umplere(raw, raw.length).slice(0, MD.NBITI - 10);
+  c.push(0, 1, 0); while (c.length < MD.NBITI) c.push(0);
+  if (CADRE.size > 400) CADRE.clear(); CADRE.set(cheie, c); return c;
+}
 function bitDom(i, b) {
   const Tf = perioadaCadru(b), k = Math.floor(i / Tf), p = i - k * Tf;
-  if (p >= MD.NBITI) return 0;
-  if (p === 0 || p === MD.NBITI - 10) return 1;                         // SOF, ACK
-  if (p >= MD.NBITI - 9) return 0;                                      // delimitatori + EOF
-  if (p <= 11) return (Math.floor(hash(k * 7 + 3 + b.length) * 2048) & (1 << (11 - p))) ? 0 : 1;
-  return hash(k * 131 + p + b.length * 1000) < 0.5 ? 1 : 0;
+  return p >= MD.NBITI ? 0 : cadru(k, b)[p];
 }
 /** {v, vp, dt}: bitul curent, cel anterior și timpul scurs de la ultimul front [s] */
 function bitLa(t, b) {
   if (b !== "sasiu") { const i = Math.floor(t * FB); return { v: bitDom(i, b), vp: bitDom(i - 1, b), dt: (t * FB - i) / FB }; }
   const Tp = perioadaFD(), k = Math.floor(t / Tp), tt = t - k * Tp, A = 2e-6, D = 0.5e-6;
-  const arb = i => i === 0 ? 1 : (i <= 11 ? ((Math.floor(hash(k * 7 + 9) * 2048) & (1 << (11 - i))) ? 0 : 1) : hash(k * 131 + i) < 0.5 ? 1 : 0);
-  const dat = j => hash(k * 977 + j) < 0.5 ? 1 : 0;
+  let fd = CADRE.get("fd" + k);
+  if (!fd) {
+    const r = [1], id = Math.floor(hash(k * 7 + 9) * 2048);
+    for (let j = 10; j >= 0; j--) r.push(id & (1 << j) ? 0 : 1);
+    for (let j = 12; j < 30; j++) r.push(hash(k * 131 + j) < 0.5 ? 1 : 0);
+    for (let j = 0; j < 80; j++) r.push(hash(k * 977 + j) < 0.5 ? 1 : 0);
+    const u = SEMNALE.umplere(r, r.length); fd = [u.slice(0, 30), u.slice(30, 110)];
+    if (CADRE.size > 400) CADRE.clear(); CADRE.set("fd" + k, fd);
+  }
+  const arb = i => fd[0][i] || 0, dat = j => fd[1][j] || 0;
   if (tt >= 130e-6) return { v: 0, vp: 0, dt: 1 };
   if (tt < 60e-6) { const i = Math.floor(tt / A); return { v: arb(i), vp: i ? arb(i - 1) : 0, dt: tt - i * A }; }
   if (tt < 100e-6) { const j = Math.floor((tt - 60e-6) / D); return { v: dat(j), vp: j ? dat(j - 1) : arb(29), dt: tt - 60e-6 - j * D }; }
@@ -201,7 +217,7 @@ function achizitie() {
     if (b === "sasiu") { const Tp = perioadaFD(); t0 = Math.floor(t0 / Tp) * Tp - o.tdiv; }
     else { const Tf = perioadaCadru(b), i = Math.floor(t0 * FB), k = Math.floor(i / Tf); t0 = (k * Tf) / FB - o.tdiv; }
   }
-  o.buf = o.ch.map(ch => { if (!ch.on) return null; const b = new Float32Array(N); for (let i = 0; i < N; i++) { const t = t0 + T * i / (N - 1); b[i] = ch.c === "d" ? semnal("h", t) - semnal("l", t) : semnal(ch.c, t); } return b; });
+  o.buf = o.ch.map(ch => { if (!ch.on) return null; const b = new Float32Array(N); for (let i = 0; i < N; i++) { const t = t0 + T * i / (N - 1); b[i] = SEMNALE.achizitie(ch.c === "d" ? semnal("h", t) - semnal("l", t) : semnal(ch.c, t), ch.vdiv, 12, 8, ch.poz); } return b; });
   o.t0 = t0;
 }
 function deseneazaOsc() {

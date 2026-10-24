@@ -170,7 +170,7 @@ function achizitie() {
     if (sg.tip === "isr") { const T = 1e-3; const k = Math.floor((t - lat * 1e-6) / T); const st = (stareInit + (k + 1)) % 2; return st ? MD.uPin(P(), "mega", 1) : 0.006; }
     return 0;
   };
-  for (let c = 0; c < 2; c++) for (let i = 0; i <= N; i++) { const t = t0 + i * dt; pts[c].push(!PIN[o.ch[c].s] ? null : valoare(s[c], t)); }
+  for (let c = 0; c < 2; c++) for (let i = 0; i <= N; i++) { const t = t0 + i * dt; pts[c].push(!PIN[o.ch[c].s] ? null : SEMNALE.achizitie(valoare(s[c], t), o.ch[c].vdiv, 8, 8, o.ch[c].poz)); }
   // măsurătorile automate
   const m = {};
   if (s1.tip === "pwm") { m.f = 1 / s1.T * (1 + (Math.random() - 0.5) * 4e-5); m.dc = s1.ton / s1.T * 100 + (Math.random() - 0.5) * 0.04; m.vavg = s1.ton / s1.T * s1.v; }

@@ -194,7 +194,7 @@ function achizitie() {
   for (let c = 0; c < 2; c++) {
     const n = net(o.ch[c].s); if (!PIN[o.ch[c].s]) { for (let i = 0; i <= N; i++) pts[c].push(null); continue; }
     let mn = 1e9, mx = -1e9, s = 0;
-    for (let i = 0; i <= N; i++) { const v = nodV(n, t0 + i * dt) + (Math.random() - 0.5) * 0.004; pts[c].push(v); mn = Math.min(mn, v); mx = Math.max(mx, v); s += v; }
+    for (let i = 0; i <= N; i++) { const v = nodV(n, t0 + i * dt) + (Math.random() - 0.5) * 0.004; pts[c].push(SEMNALE.achizitie(v, o.ch[c].vdiv, 8, 8, o.ch[c].poz)); mn = Math.min(mn, v); mx = Math.max(mx, v); s += v; }
     const per = ["gen", "rc", "pa0"].includes(n) && sim.gen && sim.run;
     if (per) { const A = n === "gen" || (n === "pa0" && sim.sw0 === "gen") ? VPP : VPP * MD.H(P(), f); mn = OFF - A / 2; mx = OFF + A / 2; }
     m[c] = { vpp: (mx - mn) * (1 + (Math.random() - 0.5) * 0.002), vavg: s / (N + 1), f: per && W * f >= 1 ? f * (1 + (Math.random() - 0.5) * 2e-4) : NaN };

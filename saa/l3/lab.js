@@ -187,7 +187,8 @@ function desenOsc() {
   if (!o.prof) { g.fillStyle = "#9fe6c0"; g.fillText("Motor oprit – fără comenzi ale injectorului.", X0 + 200, 130); return; }
   const t0 = o.prof[0][0] - o.tdiv, X = t => X0 + (t - t0) / W * (X1 - X0), Y = I => Y1 - (I + 5) / 30 * (Y1 - Y0);
   g.strokeStyle = "#ffd23f"; g.lineWidth = 1.5; g.beginPath();
-  for (let i = 0; i <= 1400; i++) { const t = t0 + W * i / 1400, I = curent(t, o.prof); i ? g.lineTo(X(t), Y(I)) : g.moveTo(X(t), Y(I)); } g.stroke();
+  if (o.run || !o.urma || o.urma.prof !== o.prof || o.urma.tdiv !== o.tdiv) { const v = new Float32Array(1401); for (let i = 0; i <= 1400; i++) v[i] = SEMNALE.achizitie(curent(t0 + W * i / 1400, o.prof), 3.75, 12, 8, -10 / 3.75); o.urma = { prof: o.prof, tdiv: o.tdiv, v }; }
+  for (let i = 0; i <= 1400; i++) { const t = t0 + W * i / 1400, I = o.urma.v[i]; i ? g.lineTo(X(t), Y(I)) : g.moveTo(X(t), Y(I)); } g.stroke();
   g.strokeStyle = "rgba(255,255,255,.25)"; g.beginPath(); g.moveTo(X0, Y(0)); g.lineTo(X1, Y(0)); g.stroke();
   [["A", o.A, "#4fd6ff"], ["B", o.B, "#ff6bd6"]].forEach(([n, t, c]) => { const x = X(t0 + t); g.strokeStyle = c; g.setLineDash([5, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, Y0); g.lineTo(x, Y1); g.stroke(); g.setLineDash([]); g.fillStyle = c; g.fillRect(x - 7, Y0, 14, 12); g.fillStyle = "#111"; g.textAlign = "center"; g.fillText(n, x, Y0 + 10); g.textAlign = "left"; });
   const dt = Math.abs(o.B - o.A);

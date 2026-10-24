@@ -37,9 +37,7 @@ function semnal(c, t) {
   if (c === "bat") return ub + (Math.random() - 0.5) * 0.04;
   if (!sim.motor || sim.n < 50 || sim.ti <= 0) return ub;
   const T = 120 / sim.n, ti = sim.ti / 1000, ph = (((t - FAZA[c] * T) % T) + T) % T;
-  if (ph < ti) return 0.15;
-  const dt = ph - ti;
-  return ub + 52 * Math.exp(-dt / 0.00012) - 2.5 * Math.exp(-dt / 0.0006) * Math.cos(dt * 2 * Math.PI * 1800);
+  return SEMNALE.injectorMPI(ph, ti, ub, { R: 14.2 + 0.3 * FAZA[c], tAc: 0.6e-3 + 0.025e-3 * FAZA[c] });
 }
 
 /* ------------------------------------------------------------------ dinamica motorului */
@@ -244,7 +242,7 @@ function achizitie() {
   let t0 = sim.t - T;
   const c1 = o.ch[0].c;
   if (/^inj/.test(c1) && sim.motor && sim.n > 50 && o.tdiv < 0.1) { const per = 120 / sim.n, of = FAZA[c1] * per; t0 = Math.floor((sim.t - T - of) / per) * per + of - o.tdiv; }   // declanșare pe comanda injectorului de pe CH1
-  o.buf = o.ch.map(ch => { if (!ch.on) return null; const b = new Float32Array(N); for (let i = 0; i < N; i++) b[i] = semnal(ch.c, t0 + T * i / (N - 1)); return b; });
+  o.buf = o.ch.map(ch => { if (!ch.on) return null; const b = new Float32Array(N); for (let i = 0; i < N; i++) b[i] = SEMNALE.achizitie(semnal(ch.c, t0 + T * i / (N - 1)), ch.vdiv, 12, 8, ch.poz); return b; });
   o.t0 = t0;
 }
 function oscPeEcran(cv) { const fe = document.fullscreenElement || document.webkitFullscreenElement; return (fe && fe.contains(cv)) || !!cv.closest(".ecran-plin"); }
