@@ -81,40 +81,106 @@ const COMP = {
   ecu: ["Calculatorul motorului (ECU Delphi DCM)", "Citește turația (CKP), sarcina (pedala, MAF), temperaturile și presiunea din rampă; comandă IMV, injectoarele, EGR și turbosuflanta."],
   obd: ["Priza de diagnoză OBD", "Testerul citește presiunea cerută / reală, comanda IMV, turația și temperatura combustibilului; înregistrează datele."]
 };
-function schemaSVG() {
-  const p = sim.p, k = cl(p / 1500, 0, 1), cul = `rgb(${Math.round(60 + 195 * k)},${Math.round(120 - 80 * k)},${Math.round(200 - 170 * k)})`;
-  const inj = regInj(), faza = (sim.t * Math.max(sim.n, 1) / 120) % 1, act = sim.merge ? Math.floor(faza * 4) : -1;
-  const c = (id, s) => `<g class="cr-comp${sim.ident.has(id) ? " ident" : ""}" data-comp="${id}">${s}</g>`;
-  let s = `<rect x="0" y="0" width="900" height="300" fill="none"/>`;
-  // conductele de joasă presiune și retur
-  s += `<path d="M95,250 L95,170 L175,170" fill="none" stroke="#3a7bd5" stroke-width="5"/><path d="M215,170 L285,170" fill="none" stroke="#3a7bd5" stroke-width="5"/>`;
-  s += `<path d="M330,215 L330,270 L60,270 L60,250" fill="none" stroke="#7fb3ff" stroke-width="3" stroke-dasharray="7 5"/><path d="M455,135 L455,120 M545,135 L545,120 M635,135 L635,120 M725,135 L725,120 M455,120 L725,120 L770,120 L770,278 L60,278 L60,252" fill="none" stroke="#7fb3ff" stroke-width="3" stroke-dasharray="7 5"/>`;
-  // înalta presiune
-  s += `<path d="M375,175 L400,175 L400,60 L420,60" fill="none" stroke="${cul}" stroke-width="7"/>`;
-  [455, 545, 635, 725].forEach((x, i) => { s += `<path d="M${x},70 L${x},100" stroke="${cul}" stroke-width="5"/>`; });
-  s += c("rez", `<rect x="25" y="210" width="110" height="60" rx="8" fill="#d7dbe0" stroke="#7a8088"/><rect x="29" y="236" width="102" height="30" fill="#e8c46a" opacity=".75"/><text x="80" y="228" text-anchor="middle" font-size="11" fill="#333">rezervor</text>`);
-  s += c("filtru", `<rect x="175" y="145" width="40" height="55" rx="6" fill="#f2f2f2" stroke="#777"/><text x="195" y="215" text-anchor="middle" font-size="10" fill="currentColor">filtru</text>`);
-  s += c("pjp", `<circle cx="300" cy="170" r="16" fill="#9fb3c8" stroke="#555"/><text x="300" y="174" text-anchor="middle" font-size="9" fill="#111">PJP</text>`);
-  s += c("pip", `<rect x="318" y="140" width="62" height="74" rx="10" fill="#8d949c" stroke="#555"/><text x="349" y="230" text-anchor="middle" font-size="10" fill="currentColor">pompa ÎP</text><g transform="translate(349 177) rotate(${(sim.t * sim.n * 3) % 360})"><path d="M-14,0 L14,0 M0,-14 L0,14" stroke="#333" stroke-width="3"/></g>`);
-  s += c("imv", `<rect x="318" y="118" width="34" height="22" rx="3" fill="#2b2f35"/><text x="335" y="133" text-anchor="middle" font-size="9" fill="#ffd23f">IMV</text>`);
-  s += c("rampa", `<rect x="420" y="45" width="330" height="26" rx="13" fill="${cul}" stroke="#333"/><text x="585" y="40" text-anchor="middle" font-size="11" fill="currentColor">rampa comună</text>`);
-  s += c("senz", `<rect x="750" y="49" width="30" height="18" rx="3" fill="#2b2f35"/><text x="765" y="90" text-anchor="middle" font-size="9" fill="currentColor">senzor p</text>`);
-  [455, 545, 635, 725].forEach((x, i) => {
-    const on = act === [0, 2, 3, 1][i] && sim.merge;
-    s += c("inj", `<rect x="${x - 9}" y="100" width="18" height="44" rx="4" fill="${on ? "#ffb02e" : "#c9cdd2"}" stroke="#555"/><path d="M${x - 4},144 L${x},156 L${x + 4},144z" fill="#555"/><text x="${x}" y="172" text-anchor="middle" font-size="10" fill="currentColor">inj. ${i + 1}</text>${on ? `<path d="M${x},158 l-10,26 h20z" fill="#ffd23f" opacity=".6"/>` : ""}`);
+function schemaSVG(P = "cr") {
+  const id = n => `${P}-${n}`, u = n => `url(#${P}-${n})`;
+  const c = (k, s) => `<g class="cr-comp" data-comp="${k}">${s}</g>`;
+  const T = (x, y, t, o = "") => `<text x="${x}" y="${y}" font-size="9.5" fill="currentColor" ${o}>${t}</text>`;
+  const gr = (n, st, vert = true) => `<linearGradient id="${id(n)}" x1="0" y1="0" x2="${vert ? 0 : 1}" y2="${vert ? 1 : 0}">${st.map(([o, cl]) => `<stop offset="${o}" stop-color="${cl}"/>`).join("")}</linearGradient>`;
+  let s = `<defs>
+    ${gr("alu", [[0, "#e4e8ec"], [0.45, "#b9c0c7"], [1, "#858d96"]])}${gr("alu2", [[0, "#cfd5db"], [1, "#9aa3ac"]], false)}
+    ${gr("otel", [[0, "#f1f3f5"], [0.5, "#a9b0b8"], [1, "#6c737b"]])}${gr("fonta", [[0, "#8a9097"], [1, "#5b6168"]])}
+    ${gr("chiul", [[0, "#c7ccd1"], [1, "#9ba2a9"]])}${gr("plastic", [[0, "#3b4047"], [1, "#16191d"]])}
+    ${gr("filtru", [[0, "#f3efe4"], [0.5, "#ddd6c4"], [1, "#b9b19c"]], false)}${gr("mot", [[0, "#f6d77a"], [1, "#c99a25"]])}
+    ${gr("ecu", [[0, "#d9dde1"], [1, "#9ea5ad"]])}
+    <pattern id="${id("canelat")}" width="4" height="6" patternUnits="userSpaceOnUse"><rect width="4" height="6" fill="#1c1f23"/><rect width="4" height="2" fill="#30353b"/></pattern>
+    <filter id="${id("umbra")}" x="-10%" y="-10%" width="130%" height="130%"><feDropShadow dx="1.5" dy="2" stdDeviation="1.6" flood-opacity=".35"/></filter>
+    <marker id="${id("sag")}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10z" fill="#4a7fc0"/></marker>
+  </defs>`;
+  // ---------------- motorul în secțiune: blocul, cilindrii, pistoanele, chiulasa
+  s += `<g filter="${u("umbra")}"><path d="M395,205 L815,205 L815,300 L790,322 L420,322 L395,300z" fill="${u("fonta")}" stroke="#3d4247"/>`;
+  [480, 570, 660, 750].forEach((x, i) => { s += `<rect x="${x - 34}" y="208" width="68" height="92" fill="#2a2e33" stroke="#1b1e22"/><g id="${id("pist" + i)}"><rect x="${x - 31}" y="226" width="62" height="34" rx="3" fill="${u("alu")}" stroke="#555"/><path d="M${x - 31},232 h62 M${x - 31},237 h62 M${x - 31},242 h62" stroke="#666" stroke-width="1.2"/><path d="M${x - 14},${226} q14,9 28,0" fill="#6b7178"/><rect x="${x - 6}" y="258" width="12" height="40" fill="#7d848b"/></g>`; });
+  s += `<path d="M380,128 L830,128 L830,205 L380,205z" fill="${u("chiul")}" stroke="#5f666d"/><path d="M372,96 Q372,84 386,84 L824,84 Q838,84 838,96 L838,128 L372,128z" fill="#2f3439" stroke="#15181b"/>`;
+  s += `<text x="605" y="111" text-anchor="middle" font-size="12" font-weight="800" fill="#c9cfd5" letter-spacing="3">dCi</text>`;
+  [480, 570, 660, 750].forEach(x => { s += `<path d="M${x - 30},205 q30,-16 60,0" fill="#1b1e22" opacity=".8"/>`; });
+  s += `</g>`;
+  s += T(440, 316, "bloc motor K9K – secțiune prin cilindri (ordinea de injecție 1-3-4-2)", `font-size="9" fill="#e9edf1" opacity=".85"`);
+  // ---------------- curea de distribuție, roata pompei, roata arborelui cotit
+  s += `<g><path d="M302,224 L362,326 M358,222 L398,322" stroke="#141414" stroke-width="5"/><circle cx="380" cy="320" r="20" fill="#2a2e33" stroke="#111" stroke-width="4"/><circle cx="380" cy="320" r="6" fill="#888"/>
+    <circle cx="330" cy="212" r="31" fill="#1d2024" stroke="#2c3036" stroke-width="3"/></g>`;
+  s += T(398, 346, "curea de distribuție", 'font-size="8" opacity=".75"');
+  // ---------------- rezervorul (plastic, cu unitatea de nivel și fereastră de secțiune)
+  s += c("rez", `<path d="M18,262 Q18,248 32,248 L150,248 Q166,248 166,262 L166,326 Q166,340 150,340 L32,340 Q18,340 18,326z" fill="${u("plastic")}" stroke="#0c0d0f" filter="${u("umbra")}"/>
+    <rect x="30" y="268" width="122" height="62" rx="6" fill="#0d1014" stroke="#555" stroke-dasharray="2 2"/><rect id="${id("nivel")}" x="31" y="292" width="120" height="37" fill="${u("mot")}" opacity=".85"/>
+    <ellipse cx="92" cy="248" rx="24" ry="6" fill="#111" stroke="#666"/><rect x="82" y="236" width="8" height="12" fill="#8a9097"/><rect x="96" y="236" width="8" height="12" fill="#8a9097"/><rect x="66" y="240" width="12" height="8" rx="2" fill="#2e7d32"/>
+    <path d="M150,250 L162,226 L172,226" fill="none" stroke="#111" stroke-width="9"/><rect x="168" y="219" width="12" height="14" rx="2" fill="#222"/>
+    ${T(92, 354, "rezervor + unitatea de nivel", 'text-anchor="middle"')}`);
+  // ---------------- pompa de amorsare manuală (pară) și filtrul
+  s += c("filtru", `<path d="M200,96 Q200,88 208,88 L246,88 Q254,88 254,96 L254,178 Q254,190 242,190 L212,190 Q200,190 200,178z" fill="${u("filtru")}" stroke="#8a826e" filter="${u("umbra")}"/>
+    <rect x="196" y="82" width="62" height="12" rx="3" fill="#2a2e33"/><circle cx="214" cy="88" r="4" fill="#666"/><circle cx="240" cy="88" r="4" fill="#666"/>
+    <ellipse cx="227" cy="72" rx="13" ry="10" fill="#202327" stroke="#000"/><path d="M219,66 q8,-6 16,0" stroke="#3a3f45" fill="none"/>
+    <rect x="216" y="190" width="22" height="12" rx="2" fill="#1b1e22"/><rect x="223" y="202" width="8" height="8" fill="#c62828"/><rect x="236" y="194" width="10" height="8" rx="1" fill="#2e7d32"/>
+    <rect x="205" y="120" width="44" height="40" rx="2" fill="none" stroke="#b5ab92" stroke-dasharray="3 2"/><text x="227" y="144" text-anchor="middle" font-size="8" fill="#6d6553" font-weight="700">DELPHI</text>
+    ${T(222, 224, "filtru motorină", 'text-anchor="middle"')}${T(222, 235, "(separator apă)", 'text-anchor="middle" font-size="8" opacity=".75"')}`);
+  // ---------------- conductele de joasă presiune (alimentare, animate) și returul
+  s += `<path id="${id("jp")}" d="M86,236 L86,150 L200,150 M254,150 L292,150 L292,176" fill="none" stroke="#4a7fc0" stroke-width="4.5" stroke-dasharray="8 6" stroke-linecap="round"/>`;
+  s += `<path id="${id("ret")}" d="M296,246 L296,300 L176,300 L176,292 L166,292 M450,92 L450,78 L380,78 L380,58 L120,58 L120,236" fill="none" stroke="#9cc3ef" stroke-width="3" stroke-dasharray="5 6" stroke-linecap="round"/>`;
+  // ---------------- pompa Delphi DFP1 cu IMV și senzorul de temperatură
+  s += c("pip", `<g filter="${u("umbra")}"><path d="M282,176 L366,176 Q374,176 374,184 L374,236 Q374,246 364,246 L292,246 Q282,246 282,236z" fill="${u("alu")}" stroke="#5f666d"/>
+    <circle cx="330" cy="212" r="22" fill="${u("alu2")}" stroke="#6d757d"/><g id="${id("excentric")}"><circle cx="330" cy="212" r="15" fill="none" stroke="#5f666d" stroke-width="2"/><path d="M330,197 v30 M315,212 h30" stroke="#5f666d" stroke-width="3"/></g>
+    <rect x="352" y="182" width="16" height="10" fill="${u("otel")}" stroke="#555"/><path d="M286,190 h8 M286,200 h8 M286,224 h8" stroke="#7a828a"/></g>
+    ${T(290, 336, "pompa ÎP Delphi DFP1", 'text-anchor="middle"')}${T(290, 347, "(cu pompa de transfer)", 'text-anchor="middle" font-size="8" opacity=".75"')}`);
+  s += c("pjp", `<path d="M282,196 L270,196 L270,228 L282,228" fill="${u("alu2")}" stroke="#5f666d"/><circle cx="276" cy="212" r="7" fill="#6c737b"/>`);
+  s += c("imv", `<rect x="296" y="152" width="22" height="26" rx="3" fill="#202328" stroke="#000"/><rect x="299" y="142" width="16" height="12" rx="2" fill="#2b2f35"/><rect x="302" y="145" width="3" height="5" fill="#c9a227"/><rect x="309" y="145" width="3" height="5" fill="#c9a227"/>${T(278, 140, "IMV", 'font-weight="700"')}`);
+  s += `<rect x="340" y="164" width="10" height="13" rx="2" fill="#1b1e22"/>`;   // senzorul de temperatură a motorinei
+  // ---------------- conducta de înaltă presiune pompă → rampă
+  s += `<path id="${id("ip1")}" d="M368,186 C392,186 392,140 396,110 C398,90 404,66 422,66" fill="none" stroke="${u("otel")}" stroke-width="5.5"/>`;
+  // ---------------- rampa comună cu senzorul de presiune
+  s += c("rampa", `<rect x="420" y="54" width="352" height="22" rx="11" fill="${u("otel")}" stroke="#5c636a" filter="${u("umbra")}"/><rect id="${id("rampa-p")}" x="424" y="61" width="344" height="8" rx="4" fill="#4a7fc0" opacity=".85"/>
+    ${[480, 570, 660, 750].map(x => `<rect x="${x - 8}" y="73" width="16" height="9" rx="2" fill="${u("otel")}" stroke="#555"/>`).join("")}<rect x="430" y="48" width="14" height="8" fill="#8a9097"/><rect x="740" y="48" width="14" height="8" fill="#8a9097"/>
+    ${T(600, 44, "rampa comună (≤ 1600 bar)", 'text-anchor="middle"')}`);
+  s += c("senz", `<rect x="772" y="58" width="16" height="14" fill="${u("otel")}" stroke="#555"/><rect x="788" y="55" width="22" height="20" rx="3" fill="#202328"/><rect x="810" y="58" width="12" height="14" rx="2" fill="#2b2f35"/>${T(800, 46, "senzor p rampă", 'text-anchor="middle"')}`);
+  // ---------------- conductele rampă → injectoare și injectoarele Delphi
+  [480, 570, 660, 750].forEach((x, i) => {
+    s += `<path id="${id("ip" + (i + 2))}" d="M${x},82 L${x},90 C${x},98 ${x + 16},96 ${x + 16},104 L${x + 16},112" fill="none" stroke="${u("otel")}" stroke-width="4"/>`;
+    s += c("inj", `<g id="${id("inj" + i)}"><rect x="${x - 8}" y="96" width="16" height="32" rx="2" fill="#1d2024" stroke="#000"/><rect x="${x - 6}" y="88" width="12" height="9" rx="2" fill="#2b2f35"/><rect x="${x - 3.5}" y="90" width="2" height="5" fill="#c9a227"/><rect x="${x + 1.5}" y="90" width="2" height="5" fill="#c9a227"/>
+      <rect x="${x + 8}" y="108" width="10" height="7" fill="${u("otel")}" stroke="#555"/><rect x="${x - 7}" y="128" width="14" height="44" fill="${u("otel")}" stroke="#555"/><rect x="${x - 4}" y="172" width="8" height="26" fill="${u("alu")}" stroke="#555"/><path d="M${x - 3},198 L${x},205 L${x + 3},198z" fill="#555"/>
+      <path id="${id("jet" + i)}" d="M${x},205 L${x - 18},228 Q${x},234 ${x + 18},228z" fill="#fff6c4" opacity="0"/></g>
+      ${T(x - 20, 152, `${i + 1}`, 'font-size="10" font-weight="700" fill="#1b1e22"')}`);
   });
-  s += `<rect x="430" y="186" width="310" height="58" rx="8" fill="none" stroke="currentColor" opacity=".35"/><text x="585" y="236" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">motorul 1.5 dCi – cilindrii 1…4 (ordinea 1-3-4-2)</text>`;
-  s += c("ecu", `<rect x="805" y="150" width="80" height="70" rx="6" fill="#b7bcc2" stroke="#555"/><text x="845" y="182" text-anchor="middle" font-size="11" fill="#111" font-weight="700">ECU</text><text x="845" y="198" text-anchor="middle" font-size="9" fill="#222">Delphi DCM</text>`);
-  s += `<path d="M780,58 L845,58 L845,150" fill="none" stroke="#2e8b57" stroke-width="1.5" stroke-dasharray="3 3"/><path d="M805,200 L790,200 L790,290 L300,290 L300,140 L318,129" fill="none" stroke="#c0492b" stroke-width="1.5" stroke-dasharray="3 3"/>`;
-  s += `<path d="M805,185 L480,185 L470,150" fill="none" stroke="#c0492b" stroke-width="1.5" stroke-dasharray="3 3"/>`;
-  s += c("obd", `<rect x="828" y="245" width="36" height="20" rx="3" fill="#2b2f35"/><text x="846" y="282" text-anchor="middle" font-size="9" fill="currentColor">OBD${sim.obd ? " ●" : ""}</text>`);
-  if (sim.obd) s += `<path d="M864,255 C890,255 895,230 900,220" fill="none" stroke="#333" stroke-width="4"/>`;
-  if (sim.cleste) s += `<g><rect x="470" y="176" width="26" height="16" rx="7" fill="#ff8a1f" stroke="#7a3d00"/><text x="483" y="203" text-anchor="middle" font-size="8.5" fill="currentColor">clește</text></g>`;
-  // manometrul rampei
-  const a = (-225 + 270 * cl(p / 2000, 0, 1)) * Math.PI / 180;
-  s += `<circle cx="585" cy="270" r="0"/><g transform="translate(860 70)"><circle r="30" fill="#f6f6f2" stroke="#333" stroke-width="3"/><line x1="0" y1="0" x2="${Math.cos(a) * 24}" y2="${Math.sin(a) * 24}" stroke="#c62828" stroke-width="2.5"/><circle r="3" fill="#222"/><text y="14" text-anchor="middle" font-size="7" fill="#333">bar ×100</text></g>`;
-  s += `<text x="20" y="306" font-size="10" fill="currentColor" opacity=".7">— joasă presiune   ⋯ retur   — înaltă presiune (culoarea: presiunea)   ⋯ semnale ECU</text>`;
+  s += `<path d="M454,100 L454,94 C454,90 458,92 466,92 M466,92 L472,92 M488,92 L562,92 M578,92 L652,92 M668,92 L742,92" fill="none" stroke="#111" stroke-width="2.5"/>`;   // conducta de retur a injectoarelor (leak-off)
+  s += T(450, 103, "retur", 'font-size="8" text-anchor="end" opacity=".8"');
+  // ---------------- ECU Delphi DCM, priza OBD, cablajul
+  s += `<path d="M846,212 C846,150 830,140 800,136 L486,136" fill="none" stroke="${u("canelat")}" stroke-width="7"/><path d="M846,220 C846,270 600,250 330,250 L320,180" fill="none" stroke="${u("canelat")}" stroke-width="5" opacity=".9"/><path d="M846,212 C860,140 840,100 816,82" fill="none" stroke="${u("canelat")}" stroke-width="4"/>`;
+  [480, 570, 660].forEach(x => { s += `<path d="M${x + 6},136 L${x + 6},96" stroke="#2b2f35" stroke-width="2.5"/>`; });
+  s += `<path d="M756,136 L756,96" stroke="#2b2f35" stroke-width="2.5"/>`;
+  s += c("ecu", `<g filter="${u("umbra")}"><rect x="818" y="196" width="72" height="80" rx="4" fill="${u("ecu")}" stroke="#5f666d"/>${[0, 1, 2, 3, 4, 5, 6].map(k => `<rect x="${824 + k * 9.5}" y="250" width="5" height="22" fill="#8c949c"/>`).join("")}
+    <rect x="826" y="202" width="24" height="16" rx="2" fill="#1b1e22"/><rect x="856" y="202" width="28" height="16" rx="2" fill="#1b1e22"/><text x="854" y="236" text-anchor="middle" font-size="9" font-weight="800" fill="#2a2e33">DELPHI</text><text x="854" y="246" text-anchor="middle" font-size="7.5" fill="#333">DCM 1.2</text></g>
+    ${T(854, 290, "ECU", 'text-anchor="middle" font-weight="700"')}`);
+  s += c("obd", `<path d="M822,312 L878,312 L872,334 L828,334z" fill="#1b1e22" stroke="#000"/>${[0, 1, 2, 3, 4, 5, 6, 7].map(k => `<rect x="${829 + k * 5.6}" y="316" width="2.4" height="5" fill="#c9a227"/><rect x="${831 + k * 5}" y="325" width="2.4" height="5" fill="#c9a227"/>`).join("")}${T(850, 348, "priza OBD", 'text-anchor="middle"')}`);
+  s += `<path id="${id("obd-cab")}" d="M878,322 C895,322 898,300 900,292" fill="none" stroke="#1d4ed8" stroke-width="5" opacity="0"/>`;
+  s += `<g id="${id("cleste")}" opacity="0"><path d="M482,124 a10,10 0 1 1 1,0" fill="#ff8a1f" stroke="#7a3d00" stroke-width="2"/><rect x="490" y="112" width="26" height="10" rx="3" fill="#ff8a1f" stroke="#7a3d00"/><path d="M516,117 C540,117 540,150 560,150" fill="none" stroke="#111" stroke-width="2.5"/>${T(500, 156, "clește", 'font-size="8.5" fill="#1b1e22" font-weight="700"')}</g>`;
+  // legenda
+  s += `<g font-size="9" fill="currentColor"><path d="M20,14 h22" stroke="#4a7fc0" stroke-width="4" stroke-dasharray="6 4"/><text x="46" y="17">alimentare (4…6 bar)</text><path d="M160,14 h22" stroke="#9cc3ef" stroke-width="3" stroke-dasharray="5 5"/><text x="186" y="17">retur</text><path d="M230,14 h22" stroke="#7a828a" stroke-width="5"/><text x="256" y="17">înaltă presiune (culoarea din rampă = p)</text><path d="M470,14 h22" stroke="#2b2f35" stroke-width="5"/><text x="496" y="17">cablaj ECU</text></g>`;
   return s;
+}
+function actualizeazaSchema() {
+  const sv = $("#svg-schema"); if (!sv) return;
+  const q = n => sv.querySelector("#cr-" + n);
+  if (!q("rampa-p")) { sv.innerHTML = schemaSVG("cr"); }
+  const k = cl(sim.p / 1500, 0, 1), cul = `rgb(${Math.round(60 + 195 * k)},${Math.round(120 - 80 * k)},${Math.round(200 - 170 * k)})`;
+  q("rampa-p").setAttribute("fill", cul);
+  const misc = sim.merge || sim.cr, rev = sim.t * Math.max(sim.n, 0) / 60;
+  q("jp").setAttribute("stroke-dashoffset", misc ? String(-(sim.t * (20 + sim.n / 40)) % 1000) : "0");
+  q("ret").setAttribute("stroke-dashoffset", misc ? String(-(sim.t * (12 + sim.n / 80)) % 1000) : "0");
+  q("excentric").setAttribute("transform", `rotate(${(rev * 360) % 360} 330 212)`);
+  const th = rev * 2 * Math.PI;
+  [0, 1, 2, 3].forEach(i => { const ph = i === 0 || i === 3 ? 0 : Math.PI; q("pist" + i).setAttribute("transform", `translate(0 ${misc ? (14 * (1 - Math.cos(th + ph)) / 2 + 2 * (1 - Math.cos(2 * (th + ph))) / 4).toFixed(1) : 0})`); });
+  const faza = (rev / 2) % 1, ord = [0, 2, 3, 1], cil = ord[Math.floor(faza * 4)], inQ = (faza * 4) % 1;
+  [0, 1, 2, 3].forEach(i => q("jet" + i).setAttribute("opacity", sim.merge && i === cil && inQ < 0.35 ? "0.85" : "0"));
+  q("nivel").setAttribute("y", "292");
+  q("obd-cab").setAttribute("opacity", sim.obd ? "1" : "0");
+  q("cleste").setAttribute("opacity", sim.cleste ? "1" : "0");
+  sv.querySelectorAll("[data-comp]").forEach(g => g.classList.toggle("ident", sim.ident.has(g.dataset.comp)));
 }
 
 /* ------------------------------------------------------------------ testerul OBD cu înregistrare și cursoare */
@@ -392,7 +458,7 @@ const HTML_TEORIE = `
 <p>Determinarea caracteristicii presiunii în rampă în funcție de turație, a răspunsului dinamic al reglajului de presiune (timp de răspuns, suprareglaj) și a caracteristicii regulatorului de debit; vizualizarea profilului injecției multiple și a modului în care numărul de injecții pe ciclu variază cu regimul.</p>
 <h2>3.2. Noțiuni teoretice</h2>
 <p>La sistemul common-rail generarea presiunii este separată de injecție: pompa de înaltă presiune alimentează o rampă comună, din care injectoarele comandate electric injectează de mai multe ori pe ciclu. ECU citește presiunea cerută dintr-o hartă, în funcție de turație și de debitul injectat, și o reglează în buclă închisă pe baza senzorului de presiune din rampă (semnal ≈ 0,5…4,5 V), acționând regulatorul de debit de la pompă (IMV, comandă PWM) și, la unele sisteme, un regulator de presiune pe rampă.</p>
-<figure><svg viewBox="0 0 900 312" class="fig-svg schema-fig" role="img" aria-label="Fig. 3.1">${schemaSVG()}</svg><figcaption>Fig. 3.1. Schema sistemului common-rail și punctele de măsură (în simulator schema este animată și se poate da clic pe componente)</figcaption></figure>
+<figure><svg viewBox="0 0 900 360" class="fig-svg schema-fig" role="img" aria-label="Fig. 3.1">${schemaSVG("fig")}</svg><figcaption>Fig. 3.1. Schema sistemului common-rail și punctele de măsură (în simulator schema este animată și se poate da clic pe componente)</figcaption></figure>
 <p>Calitatea reglajului se apreciază prin răspunsul la o variație bruscă a presiunii cerute: timpul de răspuns t<sub>r</sub> (până la atingerea a 90 % din variația cerută), suprareglajul σ și eroarea staționară.</p>
 <div class="ec"><span>σ = (p<sub>max</sub> − p<sub>cerut</sub>)/p<sub>cerut</sub>·100 [%]</span><span class="nr">(3.1)</span></div>
 <div class="ec"><span>Δp = (p<sub>real</sub> − p<sub>cerut</sub>)/p<sub>cerut</sub>·100 [%]</span><span class="nr">(3.2)</span></div>
@@ -522,7 +588,7 @@ Cadru.porneste({
     <div class="card sim-scena scena saa3-scena">
       <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <h3 style="margin:2.2rem 0 .3rem">Schema sistemului common-rail – standul 1.5 dCi</h3>
-      <svg id="svg-schema" viewBox="0 0 900 312" role="img" aria-label="Schema sistemului common-rail"></svg>
+      <svg id="svg-schema" viewBox="0 0 900 360" role="img" aria-label="Schema sistemului common-rail"></svg>
       <p class="nota" id="comp-info2">Clic pe o componentă pentru descrierea ei.</p>
       <div class="saa3-afis"><div><span>Stare</span><b id="af-st">—</b></div><div><span>Turație [rot/min]</span><b id="af-n">0</b></div><div><span>Lichid [°C]</span><b id="af-T">—</b></div><div><span>p cerută [bar]</span><b id="af-pc">—</b></div><div><span>p reală [bar]</span><b id="af-p">—</b></div><div><span>IMV [%]</span><b id="af-imv">—</b></div></div>
       <div class="instr" data-panou="obd" hidden><canvas id="cv-log" height="280" aria-label="Înregistrarea testerului OBD"></canvas><p id="log-cit"></p></div>
@@ -536,7 +602,7 @@ Cadru.porneste({
     </aside>
   </div>`,
     init(C) {
-      $("#svg-schema").innerHTML = schemaSVG();
+      actualizeazaSchema();
       construiestePasi(); legaLog(); legaOsc();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       C.mesaj("Urmați pașii din panoul „Desfășurarea lucrării”.", "");
@@ -546,7 +612,7 @@ Cadru.porneste({
       const dt = Math.min(0.05, dt0 || 0.016); pas(dt);
       if (sim.osc.run && performance.now() - (this._to || 0) > 250) { this._to = performance.now(); achizitieOsc(); }
       if (!vizibil) return;
-      if (performance.now() - (this._ts || 0) > 120) { this._ts = performance.now(); $("#svg-schema").innerHTML = schemaSVG(); }
+      if (performance.now() - (this._ts || 0) > 50) { this._ts = performance.now(); actualizeazaSchema(); }
       const pn = PASI[pasActiv].panou;
       if (pn === "obd" && !sim.log.stop) desenLog();
       if (pn === "osc" && sim.osc.run && performance.now() - (this._tv || 0) > 250) { this._tv = performance.now(); desenOsc(); }

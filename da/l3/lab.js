@@ -30,6 +30,7 @@ function iDemaror(t) {     // curentul demarorului la antrenare (bujiile montate
 function evenimentCompresie(c) {         // o cursă de compresie a cilindrului c în timpul antrenării cu bujiile scoase
   const C = sim.comp; if (!C.montat || C.c !== c) return;
   C.n++; C.p = Math.max(C.p, MD.compresie(P(), c, C.ulei[c - 1], cond(), C.n) + C.z);
+  const rd = c + (C.ulei[c - 1] ? 4 : 0); C.card = C.card || {}; if (C.n === 1) C.card[rd] = []; C.card[rd].push(C.p);         // urma acului pe diagramă (un pas la fiecare cursă)
 }
 function pMap(reg, t) {
   const p = P(), d = p.defect, b = MD.pCol(p, "ralanti", 0), tt = sim.t;
@@ -50,47 +51,104 @@ function pMap(reg, t) {
   return b;
 }
 
-/* ------------------------------------------------------------------ desenele instrumentelor */
-function svgGauge(cx, cy, r, max, val, et, unit, majore) {
-  const a0 = -225, a1 = 45, ang = v => (a0 + (a1 - a0) * cl(v / max, 0, 1)) * Math.PI / 180;
-  let s = `<circle cx="${cx}" cy="${cy}" r="${r + 8}" fill="#2b2f35"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="#f6f6f2" stroke="#999"/>`;
-  for (let v = 0; v <= max + 1e-9; v += majore / 5) { const a = ang(v), maj = Math.abs(v / majore - Math.round(v / majore)) < 1e-6, l = maj ? 11 : 6;
-    s += `<line x1="${cx + Math.cos(a) * (r - 2)}" y1="${cy + Math.sin(a) * (r - 2)}" x2="${cx + Math.cos(a) * (r - 2 - l)}" y2="${cy + Math.sin(a) * (r - 2 - l)}" stroke="#222" stroke-width="${maj ? 2 : 1}"/>`;
-    if (maj) s += `<text x="${cx + Math.cos(a) * (r - 22)}" y="${cy + Math.sin(a) * (r - 22) + 4}" font-size="${r > 60 ? 11 : 9}" text-anchor="middle" fill="#222">${String(Math.round(v * 10) / 10).replace(".", ",")}</text>`; }
-  const a = ang(val);
-  s += `<text x="${cx}" y="${cy + r * 0.45}" font-size="10" text-anchor="middle" fill="#444">${unit}</text><text x="${cx}" y="${cy + r + 22}" font-size="10.5" text-anchor="middle" fill="currentColor" font-weight="600">${et}</text>`;
-  s += `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(a) * (r - 8)}" y2="${cy + Math.sin(a) * (r - 8)}" stroke="#c62828" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="6" fill="#222"/>`;
+/* ------------------------------------------------------------------ desenele instrumentelor (aparate de atelier) */
+function defsInstr(P) {
+  return `<defs><radialGradient id="${P}-crom" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#c3c9cf"/><stop offset=".8" stop-color="#7c848c"/><stop offset="1" stop-color="#d8dde2"/></radialGradient>
+    <radialGradient id="${P}-cadran" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebe6"/></radialGradient>
+    <linearGradient id="${P}-sticla" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="${P}-alama" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d58a"/><stop offset=".5" stop-color="#c9a043"/><stop offset="1" stop-color="#8a6a1f"/></linearGradient>
+    <linearGradient id="${P}-corp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a5058"/><stop offset="1" stop-color="#25292e"/></linearGradient>
+    <linearGradient id="${P}-capac" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d636a"/><stop offset="1" stop-color="#2f3439"/></linearGradient>
+    <linearGradient id="${P}-card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfaf3"/><stop offset="1" stop-color="#ece8d6"/></linearGradient>
+    <filter id="${P}-umbra" x="-10%" y="-10%" width="130%" height="130%"><feDropShadow dx="1.5" dy="2.5" stdDeviation="2" flood-opacity=".35"/></filter></defs>`;
+}
+/** manometru de atelier: ramă cromată, cadran alb, ac roșu cu contraac; o: {unit, maj, et, marca, benzi:[[v0,v1,cul]], s2:{max, maj, unit}, max2 (acul de maxim)} */
+function svgGauge(P, cx, cy, r, max, val, o = {}) {
+  const a0 = -225, a1 = 45, ang = (v, m = max) => (a0 + (a1 - a0) * cl(v / m, 0, 1)) * Math.PI / 180, pt = (a, rr) => `${(cx + Math.cos(a) * rr).toFixed(1)},${(cy + Math.sin(a) * rr).toFixed(1)}`;
+  const maj = o.maj || max / 10;
+  let s = `<g filter="url(#${P}-umbra)"><circle cx="${cx}" cy="${cy}" r="${r + 9}" fill="url(#${P}-crom)" stroke="#5b6168"/><circle cx="${cx}" cy="${cy}" r="${r + 1.5}" fill="#3a3f45"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${P}-cadran)"/></g>`;
+  (o.benzi || []).forEach(([v0, v1, c]) => { const A = ang(v0), B = ang(v1), lg = (B - A) > Math.PI ? 1 : 0; s += `<path d="M${pt(A, r - 5)} A${r - 5},${r - 5} 0 ${lg} 1 ${pt(B, r - 5)}" fill="none" stroke="${c}" stroke-width="6" opacity=".85"/>`; });
+  for (let v = 0; v <= max + 1e-9; v += maj / 5) {
+    const a = ang(v), M = Math.abs(v / maj - Math.round(v / maj)) < 1e-6, h = Math.abs(v / maj * 2 - Math.round(v / maj * 2)) < 1e-6, l = M ? 10 : h ? 7 : 4.5;
+    s += `<line x1="${pt(a, r - 2).split(",")[0]}" y1="${pt(a, r - 2).split(",")[1]}" x2="${pt(a, r - 2 - l).split(",")[0]}" y2="${pt(a, r - 2 - l).split(",")[1]}" stroke="#151515" stroke-width="${M ? 1.8 : 0.9}"/>`;
+    if (M) { const [x, y] = pt(a, r - 20).split(","); s += `<text x="${x}" y="${+y + 3.5}" font-size="${r > 55 ? 10.5 : 9}" text-anchor="middle" fill="#151515" font-weight="600">${String(Math.round(v * 10) / 10).replace(".", ",")}</text>`; }
+  }
+  if (o.s2) { const m2 = o.s2.max; for (let v = 0; v <= m2 + 1e-9; v += o.s2.maj) { const a = (a0 + (a1 - a0) * cl(v / m2 * (o.s2.f || 1), 0, 1)) * Math.PI / 180; if (v / m2 * (o.s2.f || 1) > 1.0001) break; const [x, y] = pt(a, r * 0.48).split(","); s += `<circle cx="${pt(a, r * 0.6).split(",")[0]}" cy="${pt(a, r * 0.6).split(",")[1]}" r="1" fill="#c62828"/><text x="${x}" y="${+y + 3}" font-size="7" text-anchor="middle" fill="#c62828">${v}</text>`; }
+    s += `<text x="${cx}" y="${cy - r * 0.28}" font-size="7.5" text-anchor="middle" fill="#c62828">${o.s2.unit}</text>`; }
+  s += `<text x="${cx}" y="${cy + r * 0.42}" font-size="10" text-anchor="middle" fill="#222" font-weight="700">${o.unit || "bar"}</text>`;
+  if (o.marca) s += `<text x="${cx}" y="${cy + r * 0.6}" font-size="7" text-anchor="middle" fill="#555" letter-spacing="1">${o.marca}</text>`;
+  if (o.max2 != null) { const a = ang(o.max2); s += `<line x1="${cx}" y1="${cy}" x2="${pt(a, r - 6).split(",")[0]}" y2="${pt(a, r - 6).split(",")[1]}" stroke="#1d4ed8" stroke-width="1.6" opacity=".8"/>`; }
+  const a = ang(val), [nx, ny] = pt(a, r - 6).split(","), [kx, ky] = pt(a + Math.PI, r * 0.18).split(",");
+  s += `<line x1="${kx}" y1="${ky}" x2="${nx}" y2="${ny}" stroke="#c62828" stroke-width="2.6" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="${r * 0.09}" fill="#1b1b1b"/><circle cx="${cx}" cy="${cy}" r="${r * 0.04}" fill="#888"/>`;
+  s += `<path d="M${cx - r * 0.9},${cy - r * 0.2} A${r},${r} 0 0 1 ${cx + r * 0.5},${cy - r * 0.85} L${cx + r * 0.2},${cy - r * 0.55} A${r * 0.7},${r * 0.7} 0 0 0 ${cx - r * 0.6},${cy - r * 0.05}z" fill="url(#${P}-sticla)"/>`;
+  if (o.et) s += `<text x="${cx}" y="${cy + r + 24}" font-size="10.5" text-anchor="middle" fill="${o.culEt || "currentColor"}" font-weight="600">${o.et}</text>`;
   return s;
 }
-function cilindriSVG(sel, opt = {}) {   // vedere de sus a chiulasei: 4 orificii de bujie
-  let s = `<rect x="20" y="20" width="400" height="110" rx="12" fill="#9da3aa" stroke="#6b7178"/><text x="220" y="150" font-size="11" text-anchor="middle" fill="currentColor">chiulasa (vedere de sus) – distribuția în dreapta</text>`;
+function cilindriSVG(P, sel, opt = {}) {   // chiulasa K7J văzută de sus (capacul culbutorilor, puțurile bujiilor)
+  let s = `<g filter="url(#${P}-umbra)"><path d="M14,30 Q14,16 30,16 L412,16 Q428,16 428,30 L428,126 Q428,140 412,140 L30,140 Q14,140 14,126z" fill="url(#${P}-capac)" stroke="#1d2024"/></g>`;
+  for (let k = 0; k < 13; k++) s += `<path d="M${40 + k * 28},24 v8 M${40 + k * 28},124 v8" stroke="#6c737a" stroke-width="3" stroke-linecap="round"/>`;
+  s += `<rect x="370" y="40" width="44" height="22" rx="5" fill="#202328"/><circle cx="392" cy="51" r="7" fill="#c9a227" stroke="#7a5c00"/><text x="392" y="74" font-size="7.5" text-anchor="middle" fill="#cfd5db">bușon ulei</text>`;
   for (let c = 1; c <= 4; c++) {
-    const x = 20 + c * 80, act = c === sel;
-    s += `<g class="cil" data-cil="${c}" style="cursor:pointer"><circle cx="${x}" cy="75" r="30" fill="${act ? "#ffe9a8" : "#c9cdd2"}" stroke="${act ? "#e69500" : "#7a8088"}" stroke-width="${act ? 3 : 1.5}"/><text x="${x}" y="40" font-size="11" text-anchor="middle" fill="#222" font-weight="700">cil. ${c}</text>`;
-    if (!sim.bujii) s += `<circle cx="${x}" cy="75" r="11" fill="#e0e0e0" stroke="#555"/><rect x="${x - 4}" y="62" width="8" height="26" fill="#f5f5f5" stroke="#777"/><text x="${x}" y="114" font-size="9" text-anchor="middle" fill="#333">bujie</text>`;
-    else s += `<circle cx="${x}" cy="75" r="8" fill="#222"/>`;
-    if (opt.ulei && sim.comp.ulei[c - 1]) s += `<path d="M${x + 18},92 q5,8 0,12 q-5,-4 0,-12z" fill="#c9a227"/><text x="${x + 18}" y="122" font-size="8" text-anchor="middle" fill="#7a5c00">ulei</text>`;
-    if (opt.furtun === c) s += `<path d="M${x},75 C${x},170 ${opt.fx},150 ${opt.fx},${opt.fy}" fill="none" stroke="#1b1b1b" stroke-width="6" stroke-linecap="round"/><circle cx="${x}" cy="75" r="9" fill="#c9a043" stroke="#7a5c00"/>`;
+    const x = 20 + c * 76, act = c === sel;
+    s += `<g class="cil" data-cil="${c}" style="cursor:pointer"><circle cx="${x}" cy="78" r="27" fill="${act ? "#5b4a1a" : "#22262b"}" stroke="${act ? "#ffb300" : "#111"}" stroke-width="${act ? 3 : 1.5}"/><circle cx="${x}" cy="78" r="19" fill="#0d0f11"/>
+      <text x="${x}" y="44" font-size="10.5" text-anchor="middle" fill="${act ? "#ffd36b" : "#e6ebf0"}" font-weight="700">cil. ${c}</text>`;
+    if (!sim.bujii) s += `<path d="M${x - 8},70 l8,-5 l8,5 v10 l-8,5 l-8,-5z" fill="#c4cad0" stroke="#555"/><circle cx="${x}" cy="75" r="5" fill="#f2efe6" stroke="#999"/><rect x="${x - 3}" y="52" width="6" height="18" rx="2" fill="#f2efe6" stroke="#999"/><rect x="${x - 4}" y="48" width="8" height="5" rx="1" fill="#9aa1a8"/>`;
+    else s += `<circle cx="${x}" cy="78" r="8" fill="#000" stroke="#7a828a" stroke-dasharray="1.5 1.5"/>`;
+    if (opt.ulei && sim.comp.ulei[c - 1]) s += `<circle cx="${x}" cy="78" r="6" fill="#c9a227" opacity=".85"/><text x="${x}" y="118" font-size="8" text-anchor="middle" fill="#ffd36b">ulei</text>`;
+    if (opt.furtun === c) s += `<path d="M${x},78 C${x},190 ${opt.fx - 60},${opt.fy + 60} ${opt.fx},${opt.fy}" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/><path d="M${x},78 C${x},190 ${opt.fx - 60},${opt.fy + 60} ${opt.fx},${opt.fy}" fill="none" stroke="#3a3f45" stroke-width="2" stroke-dasharray="2 6"/><circle cx="${x}" cy="78" r="10" fill="url(#${P}-alama)" stroke="#6b5214"/><path d="M${x - 6},78 h12 M${x},72 v12" stroke="#6b5214"/>`;
     s += `</g>`;
   }
+  s += `<text x="220" y="158" font-size="10.5" text-anchor="middle" fill="currentColor" paint-order="stroke" style="stroke:var(--suprafata,#fff);stroke-width:5px;stroke-linejoin:round">capacul chiulasei (vedere de sus) – distribuția în dreapta</text>`;
   return s;
 }
 function desenComp() {
   const C = sim.comp, el = $("#svg-comp"); if (!el) return;
-  el.innerHTML = cilindriSVG(C.c, { ulei: true, furtun: C.montat ? C.c : 0, fx: 560, fy: 150 }) + `<g transform="translate(0,0)">${svgGauge(560, 92, 76, 20, C.p, "", "bar", 2)}</g>
-    <text x="560" y="222" font-size="12" text-anchor="middle" fill="currentColor">${C.montat ? `montat în cilindrul ${C.c} · ${C.n} ${C.n === 1 ? "cursă" : "curse"}` : "nemontat"}</text>
-    <text x="560" y="240" font-size="13" text-anchor="middle" fill="currentColor" font-weight="700">${C.montat ? fx(C.p, 1) + " bar" : ""}</text>`;
+  const Pf = "cp", rand = C.c + (C.ulei[C.c - 1] ? 4 : 0), card = C.card || {};
+  let s = defsInstr(Pf) + cilindriSVG(Pf, C.c, { ulei: true, furtun: C.montat ? C.c : 0, fx: 470, fy: 200 });
+  // corpul aparatului (compresograf: manometru + diagramă)
+  s += `<g filter="url(#${Pf}-umbra)"><rect x="452" y="8" width="300" height="276" rx="14" fill="url(#${Pf}-corp)" stroke="#111"/><rect x="452" y="8" width="300" height="22" rx="10" fill="#b71c1c"/></g>
+    <text x="602" y="23" font-size="10.5" text-anchor="middle" fill="#fff" font-weight="800" letter-spacing="1.5">COMPRESOGRAF · MAS 3…20 bar</text>`;
+  s += `<rect x="456" y="194" width="22" height="16" rx="3" fill="url(#${Pf}-alama)"/>`;   // racordul furtunului
+  s += svgGauge(Pf, 548, 104, 60, 20, C.p, { maj: 2, unit: "bar", s2: { max: 300, maj: 50, unit: "psi", f: 1 / 290 * 300 * 1 } });
+  // butoanele: eliberare, avans diagramă
+  s += `<g><circle cx="654" cy="62" r="13" fill="#d32f2f" stroke="#7f1010"/><text x="654" y="66" font-size="8" text-anchor="middle" fill="#fff" font-weight="700">ELIB</text><text x="654" y="88" font-size="8" text-anchor="middle" fill="#cfd5db">eliberare</text>
+    <rect x="684" y="50" width="54" height="24" rx="5" fill="#16191d" stroke="#000"/><text x="711" y="66" font-size="8" text-anchor="middle" fill="#cfd5db">avans ▸</text><text x="711" y="88" font-size="8" text-anchor="middle" fill="#cfd5db">diagramă</text>
+    <text x="696" y="122" font-size="8.5" text-anchor="middle" fill="#cfd5db">rândul activ: ${rand}</text><text x="696" y="134" font-size="8" text-anchor="middle" fill="#9aa3ac">${rand > 4 ? "(umed)" : "(uscat)"}</text></g>`;
+  // diagrama (fișa): 8 rânduri, scala 0…20 bar
+  const X0 = 486, X1 = 742, Y0 = 186, h = 10, Xp = p => X0 + cl(p / 20, 0, 1) * (X1 - X0);
+  s += `<rect x="462" y="168" width="286" height="108" rx="4" fill="#111"/><rect x="466" y="172" width="278" height="100" fill="url(#${Pf}-card)"/>`;
+  for (let v = 0; v <= 20; v += 2) s += `<line x1="${Xp(v)}" y1="${Y0 - 4}" x2="${Xp(v)}" y2="${Y0 + 8 * h}" stroke="${v % 10 ? "#d8b4b4" : "#c27c7c"}" stroke-width="${v % 10 ? 0.6 : 1}"/><text x="${Xp(v)}" y="${Y0 - 6}" font-size="6.5" text-anchor="middle" fill="#9a3b3b">${v}</text>`;
+  for (let r = 1; r <= 8; r++) {
+    const y = Y0 + (r - 0.5) * h, d = card[r];
+    s += `<line x1="${X0}" y1="${Y0 + r * h}" x2="${X1}" y2="${Y0 + r * h}" stroke="#d8b4b4" stroke-width=".5"/><text x="${X0 - 9}" y="${y + 3}" font-size="7" text-anchor="middle" fill="${r === rand && C.montat ? "#b71c1c" : "#555"}" font-weight="700">${r}</text>`;
+    if (d && d.length) { s += `<line x1="${X0}" y1="${y}" x2="${Xp(d[d.length - 1])}" y2="${y}" stroke="#1d2a6b" stroke-width="2"/>`; d.forEach(p => { s += `<line x1="${Xp(p)}" y1="${y - 3.5}" x2="${Xp(p)}" y2="${y + 3.5}" stroke="#1d2a6b" stroke-width="1"/>`; }); }
+  }
+  s += `<text x="${X1}" y="${Y0 + 8 * h + 7}" font-size="6.5" text-anchor="end" fill="#777">rândurile 1–4: uscat · 5–8: umed (cu ulei) · bar</text>`;
+  s += `<text x="220" y="192" font-size="12" text-anchor="middle" fill="currentColor" paint-order="stroke" style="stroke:var(--suprafata,#fff);stroke-width:5px;stroke-linejoin:round">${C.montat ? `montat în cilindrul ${C.c} · ${C.n} ${C.n === 1 ? "cursă" : "curse"}` : "nemontat"}</text><text x="220" y="212" font-size="14" text-anchor="middle" fill="currentColor" font-weight="700" paint-order="stroke" style="stroke:var(--suprafata,#fff);stroke-width:5px;stroke-linejoin:round">${C.montat ? fx(C.p, 1) + " bar" : ""}</text>`;
+  el.innerHTML = s;
   $$("#svg-comp .cil").forEach(g => g.addEventListener("click", () => { if (C.montat) return Cadru.mesajTemporar("Demontați întâi compresometrul.", "atentie"); C.c = +g.dataset.cil; C.p = 0; C.n = 0; desenComp(); actualizeazaPasi(); }));
 }
 function desenLeak() {
   const L = sim.leak, el = $("#svg-leak"); if (!el) return;
-  const pc = pcilCurent();
-  let s = cilindriSVG(L.c, { furtun: L.conectat ? L.c : 0, fx: 640, fy: 150 });
-  s += `<rect x="470" y="10" width="340" height="215" rx="10" fill="#e9ecef" stroke="#9aa0a6"/><text x="640" y="28" font-size="11" text-anchor="middle" fill="#333" font-weight="700">Tester de pierdere de aer</text>`;
-  s += svgGauge(545, 100, 55, 10, L.aplicat ? L.pin : 0, "p_in (intrare)", "bar", 2) + svgGauge(735, 100, 55, 10, L.aplicat ? pc : 0, "p_cil (cilindru)", "bar", 2);
-  s += `<rect x="620" y="98" width="40" height="14" rx="3" fill="#555"/><text x="640" y="125" font-size="8" text-anchor="middle" fill="#333">orificiu calibrat</text><text x="640" y="212" font-size="10" text-anchor="middle" fill="#333">aer comprimat 6…8 bar → regulator</text>`;
-  s += `<text x="220" y="170" font-size="11" text-anchor="middle" fill="currentColor">PMI compresie: ${L.pmi ? "cilindrul " + L.pmi : "—"} · arbore ${L.blocat ? "blocat" : "neblocat"}</text>`;
-  if (L.aplicat) s += `<text x="640" y="245" font-size="13" text-anchor="middle" fill="currentColor" font-weight="700">L = (${fx(L.pin, 2)} − ${fx(pc, 2)})/${fx(L.pin, 2)} = ${fx((L.pin - pc) / L.pin * 100, 1)} %</text>`;
+  const Pf = "lk", pc = pcilCurent(), pin = L.aplicat ? L.pin : 0;
+  let s = defsInstr(Pf) + cilindriSVG(Pf, L.c, { furtun: L.conectat ? L.c : 0, fx: 742, fy: 222 });
+  s += `<g filter="url(#${Pf}-umbra)"><rect x="462" y="8" width="350" height="274" rx="14" fill="url(#${Pf}-corp)" stroke="#111"/><rect x="462" y="8" width="350" height="22" rx="10" fill="#0d47a1"/></g>
+    <text x="637" y="23" font-size="10.5" text-anchor="middle" fill="#fff" font-weight="800" letter-spacing="1.2">TESTER PIERDERE DE AER · 2 MANOMETRE</text>`;
+  // blocul distribuitor (alamă) cu orificiul calibrat
+  s += `<rect x="520" y="190" width="236" height="22" rx="5" fill="url(#${Pf}-alama)" stroke="#6b5214"/><rect x="626" y="193" width="24" height="16" rx="3" fill="#6b5214"/><circle cx="638" cy="201" r="3" fill="#111"/><text x="638" y="224" font-size="8" text-anchor="middle" fill="#cfd5db">orificiu calibrat Ø 1 mm</text>`;
+  // cupla de aer, regulatorul
+  s += `<rect x="470" y="192" width="50" height="18" rx="4" fill="url(#${Pf}-alama)" stroke="#6b5214"/><text x="492" y="224" font-size="8" text-anchor="middle" fill="#cfd5db">aer 6…8 bar</text><path d="M470,201 C440,201 445,250 430,272" fill="none" stroke="#e53935" stroke-width="6" opacity=".9"/>`;
+  const rot = cl(L.pin / 8, 0, 1) * 270 - 135;
+  s += `<g transform="translate(560 248)"><circle r="19" fill="#16191d" stroke="#000"/>${Array.from({ length: 16 }, (_, k) => `<rect x="-1.5" y="-22" width="3" height="5" fill="#3a3f45" transform="rotate(${k * 22.5})"/>`).join("")}<g transform="rotate(${rot})"><rect x="-3" y="-17" width="6" height="12" rx="2" fill="#ffd36b"/></g></g><text x="610" y="252" font-size="8" fill="#cfd5db">◂ regulator p_in</text>`;
+  // racordul de ieșire și furtunul spre adaptorul bujiei
+  s += `<rect x="742" y="212" width="22" height="20" rx="4" fill="url(#${Pf}-alama)" stroke="#6b5214"/>`;
+  // manometrele: intrarea (0…10 bar) și cilindrul (0…10 bar cu banda procentuală raportată la p_in)
+  const benzi = L.aplicat ? [[L.pin * 0.9, L.pin, "#2e9e44"], [L.pin * 0.7, L.pin * 0.9, "#f2b705"], [0, L.pin * 0.7, "#d32f2f"]] : [];
+  s += svgGauge(Pf, 548, 100, 54, 10, pin, { maj: 1, unit: "bar", et: "p_in – intrare", marca: "INPUT", culEt: "#e6ebf0" });
+  s += svgGauge(Pf, 728, 100, 54, 10, L.aplicat ? pc : 0, { maj: 1, unit: "bar", et: "p_cil – cilindru", marca: "CYLINDER", benzi, culEt: "#e6ebf0" });
+  if (L.aplicat) s += `<text x="700" y="274" font-size="7.5" text-anchor="middle" fill="#cfd5db">p_cil: verde L &lt; 10 % · galben 10…30 % · roșu &gt; 30 %</text>`;
+  s += `<text x="220" y="190" font-size="11.5" text-anchor="middle" fill="currentColor" paint-order="stroke" style="stroke:var(--suprafata,#fff);stroke-width:5px;stroke-linejoin:round">PMI compresie: ${L.pmi ? "cilindrul " + L.pmi : "—"} · arbore ${L.blocat ? "blocat" : "neblocat"}</text>`;
+  if (L.aplicat) s += `<text x="220" y="212" font-size="13" text-anchor="middle" fill="currentColor" font-weight="700" paint-order="stroke" style="stroke:var(--suprafata,#fff);stroke-width:5px;stroke-linejoin:round">L = (${fx(L.pin, 2)} − ${fx(pc, 2)})/${fx(L.pin, 2)} = ${fx((L.pin - pc) / L.pin * 100, 1)} %</text>`;
   el.innerHTML = s;
   $$("#svg-leak .cil").forEach(g => g.addEventListener("click", () => { if (L.conectat) return Cadru.mesajTemporar("Deconectați întâi testerul.", "atentie"); L.c = +g.dataset.cil; L.aplicat = false; sim.leak.asc = ""; $("#asc").textContent = ""; desenLeak(); actualizeazaPasi(); }));
 }
@@ -99,38 +157,53 @@ function pcilCurent() {
   if (L.pmi !== L.c) return L.pin * 0.04;
   return L.pin * (1 - MD.pierdere(P(), L.c) / 100) + (L.z || 0);
 }
-function desenAVL() {
+function desenAVL() {      // ecranul programului AVL DiTEST (modulul „Compresie relativă”)
   const cv = $("#cv-avl"); if (!cv) return;
-  const dpr = devicePixelRatio || 1, W = 760, H = 300, sc = (cv.clientWidth || W) / W;
+  const dpr = devicePixelRatio || 1, W = 760, H = 330, sc = (cv.clientWidth || W) / W;
   if (cv.width !== Math.round(W * sc * dpr)) { cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); cv.style.height = Math.round(H * sc) + "px"; }
   const g = cv.getContext("2d"); g.setTransform(dpr * sc, 0, 0, dpr * sc, 0, 0);
-  g.fillStyle = "#0e1a26"; g.fillRect(0, 0, W, H);
-  const X0 = 50, X1 = 740, Y0 = 26, Y1 = 250, Imax = 700;
-  g.strokeStyle = "rgba(140,180,220,.18)"; g.lineWidth = 1; g.font = "10px system-ui"; g.fillStyle = "#9fb3c8";
-  for (let i = 0; i <= 10; i++) { const x = X0 + (X1 - X0) * i / 10; g.beginPath(); g.moveTo(x, Y0); g.lineTo(x, Y1); g.stroke(); }
-  for (let j = 0; j <= 7; j++) { const y = Y0 + (Y1 - Y0) * j / 7; g.beginPath(); g.moveTo(X0, y); g.lineTo(X1, y); g.stroke(); g.textAlign = "right"; g.fillText(Math.round(Imax - Imax * j / 7), X0 - 4, y + 3); }
-  g.textAlign = "left"; g.fillStyle = "#e9f2ff"; g.font = "bold 12px system-ui"; g.fillText("AVL DiTEST · Compresie relativă (curentul demarorului)", 10, 16);
-  g.font = "10px system-ui"; g.fillStyle = "#9fb3c8"; g.fillText("120 ms/div · 100 A/div · sincronizare: cilindrul 1", 470, 16);
-  const B = sim.avl.buf; if (!B.length) { g.fillStyle = "#9fb3c8"; g.font = "12px system-ui"; g.fillText(sim.clesteI ? "Antrenați motorul cu demarorul (injecția dezactivată)." : "Montați cleștele de curent pe cablul demarorului.", 230, 140); return; }
-  // fereastră de 1,2 s sincronizată pe cilindrul 1 (ultima cursă a cilindrului 1 aflată la cel puțin 1,2 s de capăt sau prima)
-  const p = P(), Tcic = 120 / p.nCr, tEnd = B[B.length - 1][0];
-  const tS = Math.max(0, tEnd - 1.2); void Tcic;
+  // fereastra aplicației
+  g.fillStyle = "#eef1f5"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#0b2a4a"; g.fillRect(0, 0, W, 26); g.fillStyle = "#fff"; g.font = "800 12px system-ui"; g.textAlign = "left"; g.fillText("AVL DiTEST", 10, 17);
+  g.font = "11px system-ui"; g.fillStyle = "#c9d6e4"; g.fillText("Motor › Benzină › Compresie relativă (curentul demarorului)", 92, 17);
+  g.textAlign = "right"; g.fillText(`U bat ${fx(P().ubat, 2)} V   ·   cleste ${sim.clesteI ? "1000 A ●" : "—"}`, W - 10, 17);
+  [["Măsurare", 1], ["Rezultat", !!sim.avl.rez], ["Setări", 0]].forEach(([t, a], i) => { g.fillStyle = a ? "#fff" : "#d5dce5"; g.fillRect(10 + i * 92, 30, 88, 20); g.fillStyle = a ? "#0b2a4a" : "#5d6b7a"; g.font = "600 10.5px system-ui"; g.textAlign = "center"; g.fillText(t, 54 + i * 92, 44); });
+  const X0 = 52, X1 = 520, Y0 = 62, Y1 = 270, Imax = 700;
+  g.fillStyle = "#fff"; g.fillRect(X0, Y0, X1 - X0, Y1 - Y0); g.strokeStyle = "#b7c2ce"; g.strokeRect(X0, Y0, X1 - X0, Y1 - Y0);
+  g.strokeStyle = "#e3e8ee"; g.lineWidth = 1; g.font = "9.5px system-ui"; g.fillStyle = "#5d6b7a";
+  for (let i = 1; i < 10; i++) { const x = X0 + (X1 - X0) * i / 10; g.beginPath(); g.moveTo(x, Y0); g.lineTo(x, Y1); g.stroke(); }
+  for (let j = 0; j <= 7; j++) { const y = Y0 + (Y1 - Y0) * j / 7; if (j && j < 7) { g.beginPath(); g.moveTo(X0, y); g.lineTo(X1, y); g.stroke(); } g.textAlign = "right"; g.fillText(Math.round(Imax - Imax * j / 7), X0 - 4, y + 3); }
+  g.save(); g.translate(14, (Y0 + Y1) / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("I [A]", 0, 0); g.restore();
+  g.textAlign = "center"; g.fillText("t – fereastră 1,2 s (120 ms/div)", (X0 + X1) / 2, Y1 + 14);
+  const B = sim.avl.buf;
+  // panoul de rezultat (bare pe cilindri, ca în raportul DiTEST)
+  const PX = 540, PW = 210; g.fillStyle = "#fff"; g.fillRect(PX, Y0, PW, Y1 - Y0); g.strokeStyle = "#b7c2ce"; g.strokeRect(PX, Y0, PW, Y1 - Y0);
+  g.fillStyle = "#0b2a4a"; g.font = "700 11px system-ui"; g.textAlign = "left"; g.fillText("Compresie relativă [%]", PX + 8, Y0 + 16);
+  const r = sim.avl.rez, yb0 = Y0 + 34, yb1 = Y1 - 34, Yb = v => yb1 - v / 100 * (yb1 - yb0);
+  g.strokeStyle = "#e3e8ee"; g.font = "9px system-ui"; g.fillStyle = "#5d6b7a"; g.textAlign = "right";
+  [0, 25, 50, 75, 100].forEach(v => { g.beginPath(); g.moveTo(PX + 30, Yb(v)); g.lineTo(PX + PW - 8, Yb(v)); g.stroke(); g.fillText(v, PX + 26, Yb(v) + 3); });
+  g.strokeStyle = "#d32f2f"; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(PX + 30, Yb(90)); g.lineTo(PX + PW - 8, Yb(90)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = "#d32f2f"; g.textAlign = "right"; g.fillText("- - limită 90 %", PX + PW - 8, Y0 + 28);
+  for (let i = 0; i < 4; i++) {
+    const x = PX + 40 + i * 42, c = r ? (r.I[i] - r.I0) / Math.max(...r.I.map(v => v - r.I0)) * 100 : 0;
+    g.fillStyle = "#edf1f5"; g.fillRect(x, yb0, 30, yb1 - yb0);
+    if (r) { g.fillStyle = c < 90 ? "#d32f2f" : "#2e9e44"; g.fillRect(x, Yb(c), 30, yb1 - Yb(c)); g.fillStyle = "#1b2733"; g.font = "700 10px system-ui"; g.textAlign = "center"; g.fillText(Math.round(c), x + 15, Yb(c) - 4); g.font = "9px system-ui"; g.fillStyle = "#5d6b7a"; g.fillText(Math.round(r.I[i]) + " A", x + 15, yb1 + 24); }
+    g.fillStyle = "#0b2a4a"; g.font = "700 10.5px system-ui"; g.textAlign = "center"; g.fillText(`Cil ${i + 1}`, x + 15, yb1 + 12);
+  }
+  // bara de stare
+  g.fillStyle = "#dfe5ec"; g.fillRect(0, H - 26, W, 26); g.fillStyle = "#1b2733"; g.font = "11px system-ui"; g.textAlign = "left";
+  g.fillText(r ? `I₀ (antrenare fără compresie) = ${Math.round(r.I0)} A · sincronizare pe cilindrul 1 (ordinea 1-3-4-2)` : sim.cr ? "Achiziție… țineți demarorul acționat (injecția dezactivată)." : sim.clesteI ? "Gata de măsurare: antrenați motorul 3…5 s." : "Montați cleștele de curent pe cablul demarorului (săgeata spre demaror).", 10, H - 9);
+  if (!B.length) { g.fillStyle = "#8795a3"; g.font = "12px system-ui"; g.textAlign = "center"; g.fillText("— fără semnal —", (X0 + X1) / 2, (Y0 + Y1) / 2); g.textAlign = "left"; return; }
+  const p = P(), tEnd = B[B.length - 1][0], tS = Math.max(0, tEnd - 1.2);
   const Xt = t => X0 + (t - tS) / 1.2 * (X1 - X0), Yi = I => Y1 - I / Imax * (Y1 - Y0);
-  g.strokeStyle = "#ffd23f"; g.lineWidth = 1.6; g.beginPath(); let s0 = false;
-  B.forEach(([t, I]) => { if (t < tS || t > tS + 1.2) return; const x = Xt(t), y = Math.max(Y0, Yi(I)); s0 ? g.lineTo(x, y) : g.moveTo(x, y); s0 = true; }); g.stroke();
-  // marcajele cilindrilor (după sincronizare)
+  g.save(); g.beginPath(); g.rect(X0, Y0, X1 - X0, Y1 - Y0); g.clip();
+  g.strokeStyle = "#1452a8"; g.lineWidth = 1.5; g.beginPath(); let s0 = false;
+  B.forEach(([t, I]) => { if (t < tS || t > tS + 1.2) return; const x = Xt(t), y = Yi(I); s0 ? g.lineTo(x, y) : g.moveTo(x, y); s0 = true; }); g.stroke();
   if (sim.sync && tEnd > 0.4) {
     const thDeg = 360 * p.nCr / 60;
-    for (let k = 0; k < 40; k++) { const tk = (k * 180 + 150) / thDeg; if (tk < tS || tk > tS + 1.2 || tk > tEnd) continue; const cil = MD.ORDINE[k % 4]; g.fillStyle = cil === 1 ? "#ff8a3d" : "#7fd1ff"; g.font = "bold 11px system-ui"; g.textAlign = "center"; g.fillText(cil, Xt(tk), Y0 + 12); }
-    g.textAlign = "left";
+    for (let k = 0; k < 40; k++) { const tk = (k * 180 + 150) / thDeg; if (tk < tS || tk > tS + 1.2 || tk > tEnd) continue; const cil = MD.ORDINE[k % 4], x = Xt(tk); g.fillStyle = cil === 1 ? "#e65100" : "#0b2a4a"; g.beginPath(); g.arc(x, Y0 + 12, 8, 0, 7); g.fill(); g.fillStyle = "#fff"; g.font = "bold 10px system-ui"; g.textAlign = "center"; g.fillText(cil, x, Y0 + 15.5); }
   }
-  const r = sim.avl.rez;
-  g.fillStyle = "#9fb3c8"; g.font = "11px system-ui"; g.fillText(r ? `I₀ = ${Math.round(r.I0)} A` : sim.cr ? "achiziție…" : "", X0, Y1 + 18);
-  if (r) {
-    const mx = Math.max(...r.I.map(v => v - r.I0));
-    r.I.forEach((v, i) => { const c = (v - r.I0) / mx * 100, x = 200 + i * 135; g.fillStyle = "#24384d"; g.fillRect(x, Y1 + 8, 120, 34); g.fillStyle = c < 90 ? "#ff6b6b" : "#6bdc8b"; g.fillRect(x, Y1 + 8, 120 * c / 100, 34);
-      g.fillStyle = "#fff"; g.font = "bold 11px system-ui"; g.fillText(`cil. ${i + 1}: ${Math.round(v)} A · ${fx(c, 1)} %`, x + 4, Y1 + 29); });
-  }
+  g.restore(); g.textAlign = "left";
 }
 function desenMAP() {
   const cv = $("#cv-map"); if (!cv) return;
@@ -610,9 +683,9 @@ Cadru.porneste({
       <div id="motor3d"><p class="nota">Se încarcă motorul 3D…</p></div>
       <div class="da3-afis"><div><span>Stare</span><b id="af-st">—</b></div><div><span>Turație [rot/min]</span><b id="af-n">0</b></div><div><span>Lichid de răcire [°C]</span><b id="af-T">—</b></div><div><span>Injecția</span><b id="af-inj">—</b></div><div><span>Bujiile</span><b id="af-buj">—</b></div></div>
       <div class="instr" data-panou="prep"><h3>Pregătirea standului</h3><p>Motorul K7J este cald (a funcționat înainte de lucrare). Verificați echipamentul de protecție și tensiunea bateriei: la o baterie descărcată turația de antrenare scade și toate măsurările de compresie ies mai mici.</p><p class="nota">Pașii următori folosesc stația AVL (compresia relativă), compresometrul, testerul de pierdere de aer și senzorul MAP. Alegeți pasul în panoul din dreapta.</p></div>
-      <div class="instr" data-panou="avl" hidden><h3>Stația AVL DiTEST – curentul demarorului</h3><canvas id="cv-avl" height="300" aria-label="Curentul demarorului"></canvas></div>
-      <div class="instr" data-panou="comp" hidden><h3>Compresometrul</h3><svg id="svg-comp" viewBox="0 0 680 250" role="img" aria-label="Chiulasa și compresometrul"></svg><p class="nota">Clic pe un cilindru pentru a-l alege. Manometrul are ventil de reținere: păstrează valoarea maximă până la eliberare.</p></div>
-      <div class="instr" data-panou="leak" hidden><h3>Testerul de pierdere de aer</h3><svg id="svg-leak" viewBox="0 0 820 255" role="img" aria-label="Testerul de pierdere de aer"></svg></div>
+      <div class="instr" data-panou="avl" hidden><h3>Stația AVL DiTEST – curentul demarorului</h3><canvas id="cv-avl" height="330" aria-label="Curentul demarorului"></canvas></div>
+      <div class="instr" data-panou="comp" hidden><h3>Compresograful (manometru cu diagramă)</h3><svg id="svg-comp" viewBox="0 0 760 290" role="img" aria-label="Chiulasa și compresometrul"></svg><p class="nota">Clic pe un cilindru pentru a-l alege. Aparatul are ventil de reținere: acul rămâne la valoarea maximă până la eliberare (ELIB). Stiletul trasează pe diagramă câte un pas la fiecare cursă de compresie – rândurile 1–4 pentru testul uscat, 5–8 pentru cel umed.</p></div>
+      <div class="instr" data-panou="leak" hidden><h3>Testerul de pierdere de aer</h3><svg id="svg-leak" viewBox="0 0 820 285" role="img" aria-label="Testerul de pierdere de aer"></svg></div>
       <div class="instr" data-panou="map" hidden><h3>Presiunea din colector (MAP / vacuumetru)</h3><canvas id="cv-map" height="250" aria-label="Presiunea din colector în timp"></canvas></div>
       <div class="instr" data-panou="diag" hidden><h3>Rezumatul măsurărilor</h3><div id="rezumat" class="tabel-scroll"></div></div>
     </div>
