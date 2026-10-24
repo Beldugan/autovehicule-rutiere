@@ -446,3 +446,28 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .rand-butoane.regimuri button[aria-pressed="true"] { background: var(--accent); color: var(--pe-accent); border-color: var(--accent); }
 .rand-butoane.mic button { font-size: .76rem; padding: .3rem .4rem; }
 #cv-obd { width: 100%; display: block; border-radius: 6px; margin-top: .4rem; touch-action: none; }
+
+/* atelierul senzorilor (DA L2) */
+.v3d-catalog .v3d-comenzi, .v3d-catalog .v3d-hud { display: none; }
+.sz-bara { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin-bottom: .6rem; }
+.sz-bara select { max-width: 100%; padding: .3rem; }
+.sz-grila { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.sz-detalii h3 { margin: 0; }
+.sz-3d { position: relative; height: 340px; border-radius: 10px; background: radial-gradient(circle at 50% 35%, #f5f7fa, #c9ced5); overflow: hidden; margin: .5rem 0; }
+[data-theme="dark"] .sz-3d { background: radial-gradient(circle at 50% 35%, #3a414b, #161a1f); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sz-3d { background: radial-gradient(circle at 50% 35%, #3a414b, #161a1f); } }
+.sz-3d canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.sz-ajutor { position: absolute; left: .6rem; bottom: .4rem; font-size: .75rem; color: #666; pointer-events: none; }
+.sz-mufa { text-align: center; margin: .3rem 0; }
+.sz-faramufa { padding: .6rem; border: 1px dashed var(--linie); border-radius: 8px; font-size: .88rem; }
+.sz-pini td { text-align: left; font-size: .84rem; }
+.sz-fir { display: inline-block; width: .9em; height: .9em; border-radius: 50%; vertical-align: -1px; border: 1px solid rgba(0,0,0,.35); margin-right: .1em; }
+.sz-teste { display: grid; gap: 1rem; }
+.sz-test h4 { margin: 0 0 .3rem; }
+.sz-pasi { font-size: .88rem; margin: .2rem 0 .5rem; }
+.sz-stari { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .4rem; }
+.sz-stari button { font-size: .8rem; padding: .25rem .6rem; }
+.sz-stari button.activ { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sz-banc { width: 100%; max-width: 820px; display: block; margin: 0 auto; }
+.sz-concl { margin: .4rem 0 0; font-size: .9rem; border-left: 3px solid var(--accent); padding-left: .6rem; }
+@media (max-width: 900px) { .sz-grila { grid-template-columns: 1fr; } .sz-3d { height: 280px; } }

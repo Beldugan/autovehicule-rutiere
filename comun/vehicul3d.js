@@ -124,7 +124,7 @@ function geometrieAnvelopa() {
 /* ------------------------------------------------------------------ crearea scenei */
 export function creeaza(gazda, optiuni = {}) {
   const sistem = optiuni.sistem || "frana";
-  gazda.classList.add("v3d");
+  gazda.classList.add("v3d"); if (optiuni.catalog) gazda.classList.add("v3d-catalog");
   gazda.innerHTML = `
     <div class="v3d-scena"><canvas></canvas><div class="v3d-etichete"></div>
       <div class="v3d-hud"></div>
@@ -456,7 +456,7 @@ export function creeaza(gazda, optiuni = {}) {
   }
   raf = requestAnimationFrame(bucla);
   return {
-    stare: st,
+    stare: st, selecteaza: k => S.selecteaza && S.selecteaza(k),
     distruge() { cancelAnimationFrame(raf); window.removeEventListener("keydown", tasta); window.removeEventListener("keyup", tasta); window.removeEventListener("schimbare-tema", laTema); renderer.dispose(); }
   };
 }
@@ -1009,7 +1009,7 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   }
   function aplicaSistem(st) {
     D.forEach(d => {
-      const vis = d.s === st.sist;
+      const vis = optiuni.catalog || d.s === st.sist;
       if (mot.comp[d.k]) { if (ASCUNDE.includes(d.k)) mot.comp[d.k].visible = vis; }
       else if (grupuri[d.k]) grupuri[d.k].visible = vis;
     });
@@ -1187,7 +1187,7 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   let cv = null;
   function api(a) {
     API = a;
-    cv = document.createElement("canvas"); cv.className = "v3d-osc"; a.scena.appendChild(cv);
+    if (!optiuni.catalog) { cv = document.createElement("canvas"); cv.className = "v3d-osc"; a.scena.appendChild(cv); }
     // selectarea senzorului prin clic în scenă
     const ray = new THREE.Raycaster(), m = new THREE.Vector2(); let jos = null;
     a.canvas.addEventListener("pointerdown", e => { jos = [e.clientX, e.clientY]; });
@@ -1195,10 +1195,10 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       if (!jos || Math.hypot(e.clientX - jos[0], e.clientY - jos[1]) > 5) return;
       const r = a.canvas.getBoundingClientRect(); m.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
       ray.setFromCamera(m, a.camera);
-      const sist = (S0 || stare).sist, ale = k => DK[k] && DK[k].s === sist;
+      const sist = (S0 || stare).sist, ale = k => DK[k] && (optiuni.catalog || DK[k].s === sist);
       const tinte = prinderi.filter(o => ale(o.userData.c)).concat(Object.entries(grupuri).filter(([k]) => ale(k)).map(([, g]) => g));
       const hit = ray.intersectObjects(tinte, true)[0];
-      if (hit) { let o = hit.object; while (o && !o.userData.c) o = o.parent; if (o && LISTA[o.userData.c] && S0) { S0.sel = o.userData.c; S0.buf = []; if (elSel) elSel.value = S0.sel; } }
+      if (hit) { let o = hit.object; while (o && !o.userData.c) o = o.parent; if (o && LISTA[o.userData.c] && S0) { S0.sel = o.userData.c; S0.buf = []; if (optiuni.catalog) S0.sist = DK[S0.sel].s; if (elSel) elSel.value = S0.sel; if (optiuni.laSelectare) optiuni.laSelectare(S0.sel); } }
     });
   }
   // osciloscopul cu 4 canale: bază de timp comună, fiecare canal activ pe banda lui, cu domeniul propriu de tensiune
@@ -1253,7 +1253,8 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       <div>λ <b>${f(lambda(st, st.t), 2)}</b> V · t<sub>i</sub> <b>${f(st.ti || 0, 2)}</b> ms</div>
       ${st.fuelCut ? '<div class="v3d-abs">injecție întreruptă (frână de motor)</div>' : ""}${st.brk > 0.05 ? '<div class="v3d-blocare">frânare</div>' : ""}`;
   }
-  return { motor: mot, etichete: et, html, leaga, pas, hud, stare, api, dupaRandare,
+  function selecteaza(k) { if (!S0 || !DK[k]) return; S0.sel = k; S0.sist = DK[k].s; S0.buf = []; arata(k); }
+  return { motor: mot, etichete: et, html, leaga, pas, hud, stare, api, dupaRandare, selecteaza,
     camere: { motor: [[3.3, 1.7, 1.4], [1.75, 0.6, 0]], roataABS: [[XF + 0.4, 0.55, -ZR - 1.1], [XF, 0.38, -ZR + 0.1]], pedale: [[0.25, 1.2, -1.4], [1.05, 0.55, -0.3]], dedesubt: [[1.6, -1.8, 1.6], [1.4, 0.2, 0]] },
     camereButoane: [["motor", "motorul"], ["roataABS", "roata (ABS)"], ["pedale", "pedalier"], ["dedesubt", "de dedesubt"]],
     cameraInitiala: [[4.3, 2.1, 3.2], [1.4, 0.55, 0]] };

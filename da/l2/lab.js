@@ -591,6 +591,7 @@ Cadru.porneste({
     dupa: `<p class="nota">Modelele semnalelor: CKP f = n (roată 60−2), CMP un impuls la două rotații, ABS f = 48·v/(2πr), MAP 0,5…4,5 V, APP două piste, λ cu salt, injectorul cu vârful inductiv la închidere. Valorile sunt tipice, nu cele individuale de pe stand.</p>`,
     optiuni: () => ({ sistem: "senzori" })
   },
+  atelierSenzori: { intro: `<p>Alegeți senzorul din listă sau dați clic pe el în macheta autoturismului. În dreapta apar modelul 3D al senzorului real, mufa cu numerotarea pinilor și funcția fiecărui pin. Dedesubt sunt verificările: alegeți starea senzorului (bun sau unul dintre defecte) și urmăriți ce indică aparatul.</p>` },
   referat: {
     scop: "Identificarea tipului de semnal al senzorilor, compararea datelor live cu măsurarea directă, verificarea actuatorilor și diagnosticarea unui defect introdus pe standul K7J.",
     relatii: "n = 60·f/z; &nbsp; R(T) = R₂₅·e<sup>B(1/T − 1/T₂₅)</sup>; &nbsp; U<sub>s</sub> = U<sub>ref</sub>·R/(R + R<sub>p</sub>); &nbsp; p = a·U + b; &nbsp; f<sub>λ</sub> = N<sub>c</sub>/(2Δt); &nbsp; k<sub>tot</sub> = (1 + STFT/100)(1 + LTFT/100).",

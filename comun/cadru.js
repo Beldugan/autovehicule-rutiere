@@ -56,6 +56,7 @@ const Cadru = {
     const d = PORTAL.discipline[LAB.disc];
     const tabs = [["sim", "Simulator"]];
     if (LAB.vehicul3d) tabs.push(["v3d", LAB.vehicul3d.titluTab || "Pe autovehicul (3D)"]);
+    if (LAB.atelierSenzori) tabs.push(["sz", LAB.atelierSenzori.titluTab || "Senzorii (3D)"]);
     tabs.push(["det", "Determinări"]);
     tabs.push(["teorie", "Teorie"], ["probleme", "Exemplu și probleme"]);
     if (LAB.continut.aplicatii) tabs.push(["aplicatii", LAB.continut.aplicatii.titluTab || "Aplicații la autovehicul"]);
@@ -83,6 +84,7 @@ const Cadru = {
     <div class="card formule-vii" id="card-formule" hidden><h2>Calcul în timp real</h2><div id="formule-vii" class="formule-grila"></div></div>
   </section>
   ${LAB.vehicul3d ? `<section id="tab-v3d" class="tab"><div class="card"><h2>${LAB.vehicul3d.titlu || "Sistemul pe autovehicul"}</h2>${LAB.vehicul3d.intro || ""}<div id="v3d-gazda"><p class="nota">Se încarcă modelul 3D…</p></div>${LAB.vehicul3d.dupa || ""}</div></section>` : ""}
+  ${LAB.atelierSenzori ? `<section id="tab-sz" class="tab"><div class="card"><h2>${LAB.atelierSenzori.titlu || "Senzorii autovehiculului: construcție, mufă și verificare"}</h2>${LAB.atelierSenzori.intro || ""}<div id="sz-gazda"><p class="nota">Se încarcă atelierul senzorilor…</p></div></div></section>` : ""}
   <section id="tab-det" class="tab">
     <div class="card">
       <h2>Date de lucru</h2>
@@ -360,8 +362,13 @@ const Cadru = {
     if (id === "det") this.recalculeaza();
     if (id === "v3d" && !this._v3d) {
       this._v3d = true;
-      import(BAZA_COMUN + "vehicul3d.js?v=19").then(m => { this.v3d = m.creeaza($("#v3d-gazda"), LAB.vehicul3d.optiuni ? LAB.vehicul3d.optiuni(this) : {}); })
+      import(BAZA_COMUN + "vehicul3d.js?v=20").then(m => { this.v3d = m.creeaza($("#v3d-gazda"), LAB.vehicul3d.optiuni ? LAB.vehicul3d.optiuni(this) : {}); })
         .catch(e => { $("#v3d-gazda").innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}). Este necesar un browser cu WebGL.</p>`; });
+    }
+    if (id === "sz" && !this._sz) {
+      this._sz = true;
+      import(BAZA_COMUN + "senzori3d.js?v=1").then(m => { this.sz = m.creeaza($("#sz-gazda"), LAB.atelierSenzori.optiuni || {}); })
+        .catch(e => { $("#sz-gazda").innerHTML = `<p class="nota">Atelierul senzorilor nu a putut fi încărcat (${esc(e.message)}). Este necesar un browser cu WebGL.</p>`; });
     }
     if (id === "referat") this.genReferat();
     this.redeseneaza();
