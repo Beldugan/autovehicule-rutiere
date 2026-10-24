@@ -1001,7 +1001,12 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   Object.entries(ancoraObj).forEach(([k, o]) => { const sf = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), mPrins); sf.userData.c = k; sf.position.y = -0.03; o.add(sf); prinderi.push(sf); });
   // componentele motorului care sunt doar senzori se ascund când e ales alt sistem (injectorul și clapeta rămân, fac parte din motor)
   const ASCUNDE = ["ckp", "cmp", "map", "iat", "knock", "ect", "l1", "l2"];
-  let elSel = null, elSist = null;
+  let elSel = null, elSist = null, elFisa = null, fisaK = null;
+  function fisa(k) {   // fișa din catalogul senzorilor (comun/catalog-senzori.js, dacă pagina îl încarcă)
+    const C = globalThis.CATALOG_SENZORI; if (!elFisa || !C || fisaK === k) return; fisaK = k; const x = C.dupaK[k];
+    elFisa.hidden = !x; if (!x) return; const T = C.TIPURI[x.tip];
+    elFisa.innerHTML = `<b>Fișa senzorului</b><span><i>Principiu:</i> ${x.princ}</span><span><i>Semnal:</i> <span style="color:var(--accent)">${C.svgTip(x.tip, 56)}</span> ${T.n} – ${x.val}</span><span><i>Verificare:</i> ${x.verif}</span>`;
+  }
   function aplicaSistem(st) {
     D.forEach(d => {
       const vis = d.s === st.sist;
@@ -1030,6 +1035,7 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       <button type="button" data-s-act="vezi">Arată senzorul</button>
       <span class="v3d-et">sau clic stânga pe senzor, în machetă</span>
     </div>
+    <div class="v3d-grup v3d-fisa" data-s-fisa hidden></div>
     <div class="v3d-grup v3d-osc-cmd">
       <b>Osciloscop</b>
       <label>Timp/div <select data-s="tdiv"><option value="auto">automat (după CH1)</option>${[2e-5, 1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 0.1, 0.2, 0.6, 1].map(v => `<option value="${v}">${fmtT(v)}</option>`).join("")}</select></label>
@@ -1051,7 +1057,7 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     const sel = cmd.querySelector('[data-s="sel"]'); sel.addEventListener("change", () => { st.sel = sel.value; st.buf = []; });
     const ss = cmd.querySelector('[data-s="sist"]');
     ss.addEventListener("change", () => { st.sist = ss.value; sel.innerHTML = optiuniSist(st.sist); st.sel = sel.value; st.buf = []; aplicaSistem(st); });
-    elSel = sel; elSist = ss; aplicaSistem(st);
+    elSel = sel; elSist = ss; elFisa = cmd.querySelector("[data-s-fisa]"); aplicaSistem(st);
     if (optiuni.selInitial && DK[optiuni.selInitial]) { st.sel = optiuni.selInitial; st.sist = DK[st.sel].s; ss.value = st.sist; sel.innerHTML = optiuni.sistSel || optiuniSist(st.sist); sel.value = st.sel; aplicaSistem(st); }
     (optiuni.canale || []).forEach((k, j) => { if (DK[k] && st.ch[j + 1]) { st.ch[j + 1].k = k; st.ch[j + 1].on = true; } });
     cmd.querySelector('[data-s-act="vezi"]').addEventListener("click", () => arata(st.sel));
@@ -1206,6 +1212,7 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     return `U = ${f(semnal(k, st, st.t), 2)} V`;
   }
   function dupaRandare(st) {
+    fisa(st.sel);
     if (!cv) return;
     const act = canaleActive(st), n = act.length;
     const W = 330, H = n > 1 ? 120 + 62 * n : 170, dpr = window.devicePixelRatio || 1, sc = (cv.clientWidth || W) / W;   // desenat în 330×H, scalat la mărimea afișată

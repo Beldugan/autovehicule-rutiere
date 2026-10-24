@@ -484,6 +484,7 @@ const HTML_TEORIE = `
 <p>Injectorul este o bobină alimentată permanent cu +12 V, a cărei masă este comutată de ECU. Injectoarele de injecție indirectă au rezistență mare (≈ 12…17 Ω). Pe oscilogramă se văd nivelul de alimentare, coborârea la ≈ 0 V pe durata comenzii și vârful inductiv la închidere. Clapeta electronică se verifică prin compararea poziției cerute cu cea reală și prin testul activ.</p>
 <figure><img src="img/fig2_5.jpg" alt="Fig. 2.5 Semnalul CKP pe osciloscop" loading="lazy"><figcaption>Fig. 2.5. Semnalul senzorului inductiv de turație la ralanti (800 rot/min) afișat pe osciloscop (2 ms/div, 1 V/div)</figcaption></figure>
 <p class="nota">ECU se verifică numai după ce senzorii, actuatorii, alimentarea și masele sunt în regulă.</p>
+${typeof CATALOG_SENZORI !== "undefined" ? CATALOG_SENZORI.html() : ""}
 <h2>2.4. Modul de lucru (în simulator)</h2>
 <ol><li>Conectați testerul (X431) și urmăriți datele live: turația, temperaturile, presiunea din colector, clapeta, sondele λ, timpul de injecție, STFT și LTFT. Citiți codurile de defect.</li>
 <li>Senzorul de turație: cu contactul decuplat și conectorul desfăcut, măsurați rezistența bobinei; recuplați, porniți motorul și vizualizați semnalul la ralanti; opriți imaginea, plasați cursoarele peste un număr cunoscut de perioade și calculați frecvența și turația.</li>

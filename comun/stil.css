@@ -329,6 +329,10 @@ div.lucrare { opacity: .75; }
 .v3d-grup { display: flex; flex-wrap: wrap; gap: .45rem .8rem; align-items: center; }
 .v3d-grup label { display: inline-flex; gap: .35rem; align-items: center; font-size: .88rem; }
 .v3d-grup input[type=range] { width: 9rem; }
+.v3d-fisa { flex-direction: column; align-items: flex-start; gap: .2rem; font-size: .84rem; border-left: 3px solid var(--accent); padding-left: .6rem; }
+.v3d-fisa i { font-style: normal; color: var(--text-sec); }
+.catalog-senzori td, .catalog-tip td { text-align: left; vertical-align: top; font-size: .84rem; }
+.catalog-senzori td:nth-child(3), .catalog-tip td:first-child { text-align: center; color: var(--accent); white-space: nowrap; }
 .v3d-grup output { min-width: 3.6rem; font-variant-numeric: tabular-nums; }
 .v3d-et { font-size: .85rem; color: var(--text-sec); }
 .v3d-frana { user-select: none; -webkit-user-select: none; touch-action: none; min-width: 9rem; }
