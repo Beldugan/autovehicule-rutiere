@@ -188,8 +188,7 @@ const Cadru = {
       o = { log: {...date despre citire}, celule: [{t, r, c, v}], mesaj } */
   inregistreaza(ev, o) {
     if (MOD.eval && (!ev || !ev.isTrusted || navigator.webdriver)) { INTEG.netrusted++; salveazaInteg(); this.mesajTemporar("Citirea trebuie înregistrată de student, din aplicație.", "pericol"); return false; }
-    const intrare = Object.assign({ t: new Date().toISOString(), ms: MOD.eval && STUDENT ? Date.now() - Date.parse(STUDENT.start) : null }, o.log || {});
-    this.D.log.push(intrare);
+    [].concat(o.log || {}).forEach(l => this.D.log.push(Object.assign({ t: new Date().toISOString(), ms: MOD.eval && STUDENT ? Date.now() - Date.parse(STUDENT.start) : null }, l)));
     (o.celule || []).forEach(c => { if (this.D.t[c.t] && this.D.t[c.t][c.r]) this.D.t[c.t][c.r][c.c] = c.v; });
     if (MOD.eval) { INTEG.inregistrari++; salveazaInteg(); }
     this.salveaza(); this.reconstruiesteTabele();
