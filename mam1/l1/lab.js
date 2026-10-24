@@ -10,9 +10,9 @@ const fx = (v, n) => fmt(v, n);
 const sim = {
   alfa: 0.5, alfaS: 0.4, buton: false, gen: true, fw: { mega: null, stm: null }, editor: "mega_adc",
   camp: { stare: "HIGH", stareS: "HIGH", val: 128, cs: "1", icr: 799, ocr: 199, isr: "dw" },
-  serial: [], tSer: 0, tx: 0, inc: null, panou: "term",
-  osc: { tdiv: 10e-6, ruleaza: true, ch: [{ s: "pin11", vdiv: 2, poz: -3 }, { s: "off", vdiv: 2, poz: 1 }], acq: null, tAcq: 0 },
-  dmm: { s: "A0", v: 0, tA: 0 }, eventBtn: null
+  serial: { mega: [], stm: [] }, tSer: 0, tx: 0, run: false, placaCod: "mega", sketch: { mega: "mega_gpio", stm: "stm_gpio" }, liber: {}, vb: null,
+  osc: { tdiv: 10e-6, ruleaza: true, ch: [{ s: "nc", vdiv: 2, poz: -3 }, { s: "nc", vdiv: 2, poz: 1 }], acq: null, tAcq: 0 },
+  dmm: { s: "nc", v: 0, tA: 0 }, eventBtn: null
 };
 function P() { return Cadru.P; }
 const PIN_ET = { pin11: "D11 (OC1A)", pin9: "D9 (OC2B)", pin13: "D13 (LED)", pin2: "D2 (INT4)", A0: "A0 (potențiometru)", v5: "5V", PB12: "PB12 (LED STM32)", PA0: "PA0 (potențiometru STM32)", v33: "3V3", off: "—" };
@@ -64,8 +64,8 @@ ${K_("void")} setup() {
   pinMode(${N_("11")}, OUTPUT);
   TCCR1A = _BV(COM1A1) | _BV(WGM11);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | ${sel("cs", [["1", "_BV(CS10)"], ["8", "_BV(CS11)"], ["64", "_BV(CS11) | _BV(CS10)"], ["256", "_BV(CS12)"], ["1024", "_BV(CS12) | _BV(CS10)"]])};   ${C_("// prescaler P")}
-  ICR1  = ${inp("icr", 6)};             ${C_("// TOP")}
-  OCR1A = ${inp("ocr", 6)};             ${C_("// pragul de comparare")}
+  ICR1  = ${inp("icr", 8)};             ${C_("// TOP")}
+  OCR1A = ${inp("ocr", 8)};             ${C_("// pragul de comparare")}
 }
 ${K_("void")} loop() { }`;
     case "mega_isr": return `${K_("#include")} ${S_("&lt;Arduino.h&gt;")}
@@ -125,9 +125,12 @@ function verificaCod(k) {
 /* ------------------------------------------------------------------ semnalele de pe pini */
 function pinMega() { return sim.fw.mega || {}; }
 /** descrierea semnalului: { tip: "dc", v } sau { tip: "pwm", T, ton, v, faza } sau { tip: "isr" } */
+function net(s) { return PIN[s] ? PIN[s].net : "nc"; }
 function semnal(s) {
   const p = P(), fw = pinMega(), fs = sim.fw.stm || {};
+  if (!sim.run) return { tip: "dc", v: 0 };
   switch (s) {
+    case "led": { const v = semnal("pin13"); return v.tip === "dc" ? { tip: "dc", v: v.v > 2 ? p.vf : 0 } : { tip: "dc", v: p.vf / 2 }; }
     case "v5": return { tip: "dc", v: p.vcc };
     case "v33": return { tip: "dc", v: p.vdd };
     case "A0": return { tip: "dc", v: sim.alfa * p.vcc };
@@ -156,9 +159,9 @@ function latenta(fw) { const p = P(); const j = (Math.random() - 0.5) * 0.38; re
 /** o achiziție a osciloscopului: fereastra de 10 diviziuni, declanșare pe frontul crescător al CH1, 1 div pre-declanșare */
 function achizitie() {
   const o = sim.osc, W = o.tdiv * 10, N = 1200, t0 = -o.tdiv, dt = W / N;
-  const s1 = semnal(o.ch[0].s), fw = pinMega();
+  const s1 = semnal(net(o.ch[0].s)), fw = pinMega();
   const lat = latenta(fw);
-  const pts = [[], []], s = [s1, semnal(o.ch[1].s)];
+  const pts = [[], []], s = [s1, semnal(net(o.ch[1].s))];
   // pentru D2 (generator) ↔ D13 (întrerupere): D13 comută după latență la fiecare front crescător al lui D2
   let stareInit = Math.random() < 0.5 ? 1 : 0;
   const valoare = (sg, t) => {
@@ -167,18 +170,18 @@ function achizitie() {
     if (sg.tip === "isr") { const T = 1e-3; const k = Math.floor((t - lat * 1e-6) / T); const st = (stareInit + (k + 1)) % 2; return st ? MD.uPin(P(), "mega", 1) : 0.006; }
     return 0;
   };
-  for (let c = 0; c < 2; c++) for (let i = 0; i <= N; i++) { const t = t0 + i * dt; pts[c].push(o.ch[c].s === "off" ? null : valoare(s[c], t)); }
+  for (let c = 0; c < 2; c++) for (let i = 0; i <= N; i++) { const t = t0 + i * dt; pts[c].push(!PIN[o.ch[c].s] ? null : valoare(s[c], t)); }
   // măsurătorile automate
   const m = {};
   if (s1.tip === "pwm") { m.f = 1 / s1.T * (1 + (Math.random() - 0.5) * 4e-5); m.dc = s1.ton / s1.T * 100 + (Math.random() - 0.5) * 0.04; m.vavg = s1.ton / s1.T * s1.v; }
-  if (o.ch[0].s === "pin2" && o.ch[1].s === "pin13" && fw.prog === "mega_isr" && sim.gen) m.lat = lat;
+  if (net(o.ch[0].s) === "pin2" && net(o.ch[1].s) === "pin13" && fw.prog === "mega_isr" && sim.gen) m.lat = lat;
   o.acq = { pts, t0, dt, N, m };
 }
 function evenimentButon() {
   // apăsarea butonului: fronturi multiple (vibrația contactelor), capturate dacă CH1 = D2
   const o = sim.osc, fw = pinMega();
   if (fw.prog === "mega_isr") { const k = 3 + Math.floor(Math.random() * 3); sim.n = (sim.n || 0) + k; for (let i = 0; i < k; i++) sim.led13 = !sim.led13; }
-  if (o.ch[0].s !== "pin2" || sim.gen) return;
+  if (net(o.ch[0].s) !== "pin2" || sim.gen) return;
   const W = o.tdiv * 10, N = 1200, t0 = -o.tdiv, dt = W / N, fr = [0]; let t = 0; const nb = 3 + Math.floor(Math.random() * 4);
   for (let i = 0; i < nb * 2 - 1; i++) { t += (40e-6 + Math.random() * 400e-6) * (1 + i * 0.4); fr.push(t); }
   const lat = latenta(fw);
@@ -186,233 +189,359 @@ function evenimentButon() {
   for (let i = 0; i <= N; i++) {
     const tt = t0 + i * dt; let k = fr.filter(x => x <= tt).length; const v1 = k % 2 ? 5 : 0;
     let tog = 0; if (fw.prog === "mega_isr") { for (let j = 0; j < fr.length; j += 2) if (tt >= fr[j] + lat * 1e-6) tog++; }
-    pts[0].push(v1); pts[1].push(o.ch[1].s === "off" ? null : o.ch[1].s === "pin13" ? ((tog % 2) ? MD.uPin(P(), "mega", 1) : 0.006) : valoareDC(o.ch[1].s));
+    pts[0].push(v1); pts[1].push(!PIN[o.ch[1].s] ? null : net(o.ch[1].s) === "pin13" ? ((tog % 2) ? MD.uPin(P(), "mega", 1) : 0.006) : valoareDC(net(o.ch[1].s)));
   }
-  o.acq = { pts, t0, dt, N, m: o.ch[1].s === "pin13" && fw.prog === "mega_isr" ? { lat, bounce: nb } : {} };
-  o.ruleaza = false; $("#osc-run").textContent = "RUN"; deseneazaOsc();
+  o.acq = { pts, t0, dt, N, m: net(o.ch[1].s) === "pin13" && fw.prog === "mega_isr" ? { lat, bounce: nb } : {} };
+  o.ruleaza = false; deseneazaOsc();
 }
 function valoareDC(s) { const sg = semnal(s); return sg.tip === "dc" ? sg.v : 0; }
 
-/* ------------------------------------------------------------------ osciloscopul (stil Rigol DS1074Z Plus) */
+/* ------------------------------------------------------------------ instrumentele (pe planșa de lucru, ca în Tinkercad Circuits) */
 const TDIV = [0.5e-6, 1e-6, 2e-6, 5e-6, 10e-6, 20e-6, 50e-6, 100e-6, 200e-6, 500e-6, 1e-3, 2e-3, 5e-3];
 const VDIV = [0.5, 1, 2, 5];
-const CUL = ["#f5e33b", "#3fd2ff"];
+const CUL = ["#f2d600", "#1fb6ff"];
 function fmtT(s) { return s >= 1e-3 ? fx(s * 1e3, 0) + " ms" : s >= 1e-6 ? fx(s * 1e6, s < 1e-5 ? (s < 1e-6 ? 2 : 1) : 0).replace(",0", "") + " µs" : fx(s * 1e9, 0) + " ns"; }
 function fmtF(f) { return f >= 1000 ? fx(f / 1000, 4) + " kHz" : fx(f, 2) + " Hz"; }
+// ecranul osciloscopului de pe planșă
+const OS = { x: 412, y: 62, w: 392, h: 216 };
 function deseneazaOsc() {
-  const cv = $("#cv-osc"); if (!cv || !cv.getClientRects().length) return;
-  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr;
-  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.fillStyle = "#04070a"; g.fillRect(0, 0, W, H);
-  const dx = W / 10, dy = H / 8; g.strokeStyle = "rgba(160,170,180,.22)"; g.lineWidth = 1;
-  for (let i = 0; i <= 10; i++) { g.beginPath(); g.moveTo(i * dx, 0); g.lineTo(i * dx, H); g.stroke(); }
-  for (let j = 0; j <= 8; j++) { g.beginPath(); g.moveTo(0, j * dy); g.lineTo(W, j * dy); g.stroke(); }
-  g.strokeStyle = "rgba(200,210,220,.45)"; g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
-  const o = sim.osc, a = o.acq;
-  // marcajul declanșării
-  g.fillStyle = "#ff9b3d"; g.beginPath(); g.moveTo(dx, 0); g.lineTo(dx - 5, -1); g.lineTo(dx, 9); g.lineTo(dx + 5, -1); g.fill();
-  if (a) for (let c = 1; c >= 0; c--) {
-    const ch = o.ch[c]; if (ch.s === "off") continue;
-    const y0 = H / 2 - ch.poz * dy;
-    g.fillStyle = CUL[c]; g.font = "bold 11px ui-monospace,monospace"; g.fillText(String(c + 1), 3, y0 + 4); g.beginPath(); g.moveTo(12, y0); g.lineTo(18, y0 - 4); g.lineTo(18, y0 + 4); g.fill();
-    g.strokeStyle = CUL[c]; g.lineWidth = 1.6; g.beginPath();
-    a.pts[c].forEach((v, i) => { const x = i / a.N * W, y = y0 - v / ch.vdiv * dy; i ? g.lineTo(x, y) : g.moveTo(x, y); });
-    g.stroke();
+  const g = $("#osc-urme"); if (!g) return;
+  const o = sim.osc, a = o.acq, dx = OS.w / 10, dy = OS.h / 8;
+  let s = "";
+  if (a && sim.run) for (let c = 1; c >= 0; c--) {
+    const ch = o.ch[c]; if (!PIN[ch.s]) continue;
+    const y0 = OS.y + OS.h / 2 - ch.poz * dy;
+    let d = ""; a.pts[c].forEach((v, i) => { if (v === null) return; const x = OS.x + i / a.N * OS.w, y = Math.max(OS.y, Math.min(OS.y + OS.h, y0 - v / ch.vdiv * dy)); d += (d ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1); });
+    s += `<path d="${d}" fill="none" stroke="${CUL[c]}" stroke-width="1.6"/><path d="M${OS.x - 1},${y0} l-7,-4 v8 z" fill="${CUL[c]}"/>`;
   }
-  // bara de stare și măsurători
-  const m = a ? a.m : {}, lin = [];
-  if (m.f) lin.push(`Freq(1) = ${fmtF(m.f)}`, `+Duty(1) = ${fx(m.dc, 2)} %`, `Vavg(1) = ${fx(m.vavg, 3)} V`);
-  if (m.lat) lin.push(`Delay(1↑→2) = ${fx(m.lat, 2)} µs`);
-  if (m.bounce) lin.push(`fronturi D2: ${m.bounce * 2 - 1} (vibrația contactelor)`);
-  $("#osc-cit").textContent = lin.join("   ·   ") || (a ? "Nicio măsurătoare automată pentru semnalele afișate." : "");
-  $("#osc-stare").textContent = `${o.ruleaza ? "RUN" : "STOP"} · H ${fmtT(o.tdiv)}/div · CH1 ${fx(o.ch[0].vdiv, 1)} V/div · CH2 ${fx(o.ch[1].vdiv, 1)} V/div · T ↑ CH1 2,50 V · 1 GSa/s`;
+  g.innerHTML = s;
+  const m = a && sim.run ? a.m : {}, lin = [];
+  if (m.f) lin.push(`Freq ${fmtF(m.f)}`, `+Duty ${fx(m.dc, 2)} %`, `Vavg ${fx(m.vavg, 3)} V`);
+  if (m.lat) lin.push(`Delay 1↑→2 ${fx(m.lat, 2)} µs`);
+  if (m.bounce) lin.push(`${m.bounce * 2 - 1} fronturi pe D2 (vibrație)`);
+  $("#osc-m").textContent = lin.join("  ·  ");
+  $("#osc-h").textContent = `${o.ruleaza ? "RUN" : "STOP"}   H ${fmtT(o.tdiv)}/div   CH1 ${fx(o.ch[0].vdiv, 1)} V/div   CH2 ${fx(o.ch[1].vdiv, 1)} V/div`;
+  $("#osc-runb").textContent = o.ruleaza ? "STOP" : "RUN";
+  $("#osc-cit").textContent = lin.join("   ·   ");
 }
-
-/* ------------------------------------------------------------------ multimetrul */
 function citesteDMM() {
-  const s = sim.dmm.s, sg = semnal(s);
+  const el = $("#dmm-v"); if (!el) return;
+  if (!sim.run) { el.textContent = "- - - -"; sim.dmm.v = 0; return; }
+  if (!PIN[sim.dmm.s]) { sim.dmm.v = Math.round((Math.random() - 0.5) * 0.004 * 1000) / 1000; el.textContent = Math.abs(sim.dmm.v).toFixed(3) + " V"; return; }
+  const sg = semnal(PIN[sim.dmm.s].net);
   let v = sg.tip === "dc" ? sg.v : sg.tip === "pwm" ? sg.ton / sg.T * sg.v : sg.tip === "isr" ? MD.uPin(P(), "mega", 1) / 2 : 0;
   v = Math.round((v + (Math.random() - 0.5) * 0.0014) * 1000) / 1000;
-  sim.dmm.v = Math.max(0, v);
-  $("#dmm-v").textContent = sim.dmm.v.toFixed(3);
+  sim.dmm.v = Math.max(0, v); el.textContent = sim.dmm.v.toFixed(3) + " V";
 }
-
-/* ------------------------------------------------------------------ monitorul serial */
 function linieSerial() {
+  if (!sim.run) return;
   const fw = pinMega(), fs = sim.fw.stm || {}, p = P(), out = [];
-  if (fw.prog === "mega_adc") { const U = sim.alfa * p.vcc, N = Math.max(0, Math.min(1023, MD.codADC(p, "mega", U) + (Math.random() < 0.3 ? (Math.random() < 0.5 ? -1 : 1) : 0))); sim.nMega = N; out.push(`[Mega]  N = ${N}   U = ${(N * 5.0 / 1024).toFixed(3)}`); }
-  if (fw.prog === "mega_isr" && fw.isr === "ser" && sim.gen) out.push(`[Mega]  ${(sim.n = (sim.n || 0) + 200)}…`);
-  if (fs.prog === "stm_adc") { const U = sim.alfaS * p.vdd, N = Math.max(0, Math.min(4095, MD.codADC(p, "stm", U) + Math.round((Math.random() - 0.5) * 4))); sim.nStm = N; out.push(`[STM32] N = ${N}   U = ${(N * 3.3 / 4096).toFixed(4)}`); }
+  if (fw.prog === "mega_adc") { const U = sim.alfa * p.vcc, N = Math.max(0, Math.min(1023, MD.codADC(p, "mega", U) + (Math.random() < 0.3 ? (Math.random() < 0.5 ? -1 : 1) : 0))); sim.nMega = N; out.push(["mega", `N = ${N}   U = ${(N * 5.0 / 1024).toFixed(3)}`]); }
+  if (fw.prog === "mega_isr" && fw.isr === "ser" && sim.gen) out.push(["mega", `${(sim.n = (sim.n || 0) + 200)}${sim.n + 1}${sim.n + 2}…`]);
+  if (fs.prog === "stm_adc") { const U = sim.alfaS * p.vdd, N = Math.max(0, Math.min(4095, MD.codADC(p, "stm", U) + Math.round((Math.random() - 0.5) * 4))); sim.nStm = N; out.push(["stm", `N = ${N}   U = ${(N * 3.3 / 4096).toFixed(4)}`]); }
   if (!out.length) return;
-  sim.serial.push(...out); while (sim.serial.length > 14) sim.serial.shift(); sim.tx = performance.now();
-  const el = $("#serial"); if (el && sim.panou === "serial") { el.textContent = sim.serial.join("\n"); el.scrollTop = el.scrollHeight; }
+  out.forEach(([b, l]) => { const a = sim.serial[b]; a.push(l); while (a.length > 200) a.shift(); });
+  sim.tx = performance.now();
+  afiseazaSerial();
 }
+function afiseazaSerial() { const el = $("#tk-serial"); if (!el || el.hidden) return; el.textContent = sim.serial[sim.placaCod].join("\n"); el.scrollTop = el.scrollHeight; }
 
-/* ------------------------------------------------------------------ standul (SVG) */
-const XY = { pin11: [216.7, 50], pin9: [240.1, 50], pin13: [193.3, 50], pin2: [336, 50], A0: [276.5, 232], v5: [213.3, 232], PB12: [586, 279], PA0: [536, 371], v33: [676, 371], off: [0, 0] };
-function standSVG() {
-  let s = `<svg viewBox="0 0 900 430" id="stand" role="img" aria-label="Standul de lucru: Arduino Mega 2560, placa de test, STM32F103, generatorul de semnal" style="width:100%;height:auto;display:block;touch-action:none">
+/* ------------------------------------------------------------------ planșa de lucru (SVG, stil Tinkercad Circuits) */
+// pinii pe care se pot pune sondele: poziție, denumire (ca în Tinkercad), rețeaua electrică
+const PIN = {};
+function pin(id, x, y, et, net) { PIN[id] = { x, y, et, net: net || id }; return `<rect class="tk-pin" data-pin="${id}" x="${x - 3.6}" y="${y - 3.6}" width="7.2" height="7.2" rx="1"/>`; }
+const W_ = (pts, c, w) => `<path d="M${pts.map(p => p.join(",")).join(" L")}" fill="none" stroke="${c}" stroke-width="${w || 3.4}" stroke-linejoin="round" stroke-linecap="round"/>` + `<circle cx="${pts[0][0]}" cy="${pts[0][1]}" r="2.6" fill="${c}"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="2.6" fill="${c}"/>`;
+function header(x, y, n, pas, cul) { let s = `<rect x="${x - 5}" y="${y - 5}" width="${(n - 1) * pas + 10}" height="10" rx="1.5" fill="${cul || "#202020"}"/>`; for (let i = 0; i < n; i++) s += `<rect x="${x + i * pas - 2}" y="${y - 2}" width="4" height="4" fill="#5a5a5a"/>`; return s; }
+function planseSVG() {
+  let s = `<svg id="tk-svg" viewBox="0 0 1300 790" role="img" aria-label="Planșa de lucru: Arduino Mega 2560, placa de test, STM32 Blue Pill, generator de funcții, osciloscop și multimetru">
 <defs>
- <pattern id="gauri" width="9" height="9" patternUnits="userSpaceOnUse"><rect width="9" height="9" fill="#f4f1ea"/><rect x="3" y="3" width="3" height="3" rx=".6" fill="#2e2e2e" opacity=".55"/></pattern>
- <linearGradient id="met" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9bec4"/><stop offset="1" stop-color="#8d939a"/></linearGradient>
- <radialGradient id="ledOn" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#fff2c8"/><stop offset=".35" stop-color="#ff4a3a"/><stop offset="1" stop-color="rgba(255,40,30,0)"/></radialGradient>
- <linearGradient id="buton" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#444"/><stop offset="1" stop-color="#111"/></linearGradient>
+ <filter id="umbra" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000" flood-opacity=".22"/></filter>
+ <pattern id="tk-gauri" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#f3f3f1"/><rect x="3.5" y="3.5" width="3" height="3" fill="#b9b9b5"/></pattern>
+ <radialGradient id="tk-led" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe7c2"/><stop offset=".45" stop-color="rgba(255,60,40,.85)"/><stop offset="1" stop-color="rgba(255,40,30,0)"/></radialGradient>
+ <linearGradient id="tk-cap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#c81e14"/></linearGradient>
 </defs>
-<rect width="900" height="430" rx="10" fill="#9aa1a8"/><rect x="6" y="6" width="888" height="418" rx="8" fill="url(#met)"/>
-<rect x="6" y="250" width="888" height="16" fill="#c9cdd1" stroke="#7b8187"/><text x="14" y="262" font-size="9" fill="#555">șină DIN 35 mm</text>`;
-  // Arduino Mega 2560
-  s += `<g id="mega"><rect x="40" y="40" width="440" height="205" rx="8" fill="#127c9c" stroke="#0b5269" stroke-width="2"/>
-  ${[[52, 52], [52, 232], [468, 52], [468, 232], [400, 120]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="#d9dde1" stroke="#7a8288"/>`).join("")}
-  <rect x="22" y="82" width="52" height="42" rx="3" fill="#c7cbd0" stroke="#6e757b"/><rect x="28" y="90" width="40" height="26" fill="#9aa0a6"/>
-  <rect x="24" y="170" width="54" height="38" rx="4" fill="#1b1b1b"/><circle cx="42" cy="189" r="9" fill="#333"/>
-  <rect x="215" y="105" width="78" height="78" rx="3" fill="#1d1f22"/><circle cx="224" cy="114" r="3" fill="#33373b"/>
-  <text x="254" y="140" fill="#c9ced3" font-size="8" text-anchor="middle" font-family="monospace">ATMEGA2560</text><text x="254" y="152" fill="#9aa0a6" font-size="7" text-anchor="middle" font-family="monospace">16AU 2534</text>
-  <rect x="108" y="96" width="26" height="26" rx="2" fill="#1d1f22"/><text x="121" y="131" fill="#d6edf4" font-size="6" text-anchor="middle">16U2</text>
-  <rect x="150" y="108" width="20" height="8" rx="3" fill="#cfd3d6"/><text x="160" y="126" fill="#d6edf4" font-size="6" text-anchor="middle">16.000</text>
-  <text x="330" y="205" fill="#e8f6fa" font-size="13" font-weight="700" font-family="sans-serif">ARDUINO</text><text x="330" y="220" fill="#e8f6fa" font-size="10" font-family="sans-serif">MEGA 2560</text>
-  <circle cx="440" cy="110" r="4" fill="#3cff4a"/><text x="440" y="125" font-size="6" fill="#e8f6fa" text-anchor="middle">ON</text>
-  <circle id="ledL" cx="250" cy="80" r="3.6" fill="#5a3b0a"/><text x="262" y="83" font-size="6" fill="#e8f6fa">L</text>
-  <circle id="ledTX" cx="150" cy="80" r="3" fill="#4a3a14"/><text x="157" y="83" font-size="6" fill="#e8f6fa">TX</text>
-  <rect x="140" y="44" width="122" height="14" fill="#151515"/><rect x="270" y="44" width="168" height="14" fill="#151515"/>
-  ${Array.from({ length: 10 }, (_, i) => `<rect x="${144 + i * 11.7}" y="48" width="5" height="5" fill="#d8b46a"/>`).join("")}
-  ${Array.from({ length: 14 }, (_, i) => `<rect x="${274 + i * 11.9}" y="48" width="5" height="5" fill="#d8b46a"/>`).join("")}
-  ${["SCL", "SDA", "AREF", "GND", "13", "12", "11", "10", "9", "8"].map((t, i) => `<text x="${146.5 + i * 11.7}" y="66" font-size="5.5" fill="#e8f6fa" text-anchor="middle">${t}</text>`).join("")}${["7", "6", "5", "4", "3", "2", "1", "0", "14", "15", "16", "17", "18", "19"].map((t, i) => `<text x="${276.5 + i * 11.9}" y="66" font-size="6" fill="#e8f6fa" text-anchor="middle">${t}</text>`).join("")}<text x="190" y="76" font-size="6" fill="#e8f6fa">PWM ~ (2…13)   DIGITAL</text>
-  <rect x="160" y="226" width="96" height="14" fill="#151515"/><rect x="270" y="226" width="196" height="14" fill="#151515"/>
-  ${Array.from({ length: 8 }, (_, i) => `<rect x="${164 + i * 11.7}" y="230" width="5" height="5" fill="#d8b46a"/>`).join("")}
-  ${Array.from({ length: 16 }, (_, i) => `<rect x="${274 + i * 11.9}" y="230" width="5" height="5" fill="#d8b46a"/>`).join("")}
-  ${["", "IORF", "RST", "3V3", "5V", "GND", "GND", "VIN"].map((t, i) => `<text x="${166.5 + i * 11.7}" y="223" font-size="5" fill="#e8f6fa" text-anchor="middle">${t}</text>`).join("")}${Array.from({ length: 16 }, (_, i) => `<text x="${276.5 + i * 11.9}" y="223" font-size="5" fill="#e8f6fa" text-anchor="middle">A${i}</text>`).join("")}<text x="330" y="214" font-size="6" fill="#e8f6fa">ANALOG IN</text>
-  <rect x="462" y="70" width="14" height="150" fill="#151515"/></g>`;
-  // placa de test (breadboard) cu potențiometrul, butonul, LED-ul și rezistorul
-  s += `<g><rect x="510" y="30" width="370" height="200" rx="5" fill="url(#gauri)" stroke="#c9c2b3"/>
-  <line x1="514" y1="42" x2="876" y2="42" stroke="#d33" stroke-width="1.4"/><line x1="514" y1="218" x2="876" y2="218" stroke="#23c" stroke-width="1.4"/>
-  <g id="pot" style="cursor:grab"><rect x="545" y="95" width="70" height="70" rx="8" fill="#2c66b8" stroke="#163a6b"/><circle cx="580" cy="130" r="27" fill="#1b2430" stroke="#0b0f14" stroke-width="2"/><circle cx="580" cy="130" r="20" fill="#3a4654"/><line id="potAc" x1="580" y1="130" x2="580" y2="110" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-    <text x="580" y="182" font-size="8" text-anchor="middle" fill="#333">10 kΩ (A0)</text></g>
-  <g id="btn" style="cursor:pointer"><rect x="660" y="150" width="34" height="34" rx="3" fill="#1d1d1d"/><circle id="btnC" cx="677" cy="167" r="10" fill="url(#buton)" stroke="#000"/><text x="677" y="196" font-size="8" text-anchor="middle" fill="#333">buton D2</text></g>
-  <g><rect x="720" y="88" width="36" height="12" rx="5" fill="#e3c99a" stroke="#9c8156"/><rect x="727" y="88" width="3" height="12" fill="#c22"/><rect x="733" y="88" width="3" height="12" fill="#c22"/><rect x="739" y="88" width="3" height="12" fill="#7a4a1b"/><rect x="748" y="88" width="3" height="12" fill="#c9a640"/><text x="738" y="84" font-size="8" text-anchor="middle" fill="#333">220 Ω</text>
-    <circle id="ledG" cx="800" cy="94" r="20" fill="url(#ledOn)" opacity="0"/><path d="M790,94 a10,10 0 0 1 20,0 v12 h-20 z" fill="#c0201a" stroke="#7a1410"/><circle id="ledR" cx="800" cy="94" r="7" fill="#e33" opacity=".25"/><text x="800" y="124" font-size="8" text-anchor="middle" fill="#333">LED D13</text></g>
-  <path d="M213,238 C213,290 530,10 560,108" fill="none" stroke="#d32f2f" stroke-width="3"/><path d="M225,238 C230,300 540,280 600,158" fill="none" stroke="#222" stroke-width="3"/>
-  <path d="M276,238 C276,270 520,250 580,160" fill="none" stroke="#f2c230" stroke-width="3"/>
-  <path d="M193,48 C193,10 690,10 724,94" fill="none" stroke="#ff8a1f" stroke-width="3"/><path d="M336,48 C336,20 650,40 668,152" fill="none" stroke="#2fa84f" stroke-width="3"/></g>`;
-  // STM32 Blue Pill + ST-Link + potențiometrul STM32
-  s += `<g><rect x="500" y="290" width="260" height="78" rx="4" fill="#1f4fbf" stroke="#12307a" stroke-width="2"/>
-  <rect x="505" y="292" width="250" height="9" fill="#151515"/><rect x="505" y="357" width="250" height="9" fill="#151515"/>
-  ${Array.from({ length: 20 }, (_, i) => `<rect x="${509 + i * 12.4}" y="294" width="4" height="4" fill="#d8b46a"/><rect x="${509 + i * 12.4}" y="359" width="4" height="4" fill="#d8b46a"/>`).join("")}
-  <g transform="translate(625 329) rotate(45)"><rect x="-19" y="-19" width="38" height="38" rx="2" fill="#1d1f22"/></g><text x="625" y="332" font-size="6" fill="#c9ced3" text-anchor="middle" font-family="monospace">STM32F103</text>
-  <rect x="486" y="318" width="20" height="22" rx="3" fill="#c7cbd0"/><rect x="560" y="310" width="16" height="10" fill="#e8c21a"/><rect x="560" y="322" width="16" height="10" fill="#e8c21a"/>
-  <circle cx="700" cy="314" r="3" fill="#ff4848"/><circle id="ledS" cx="586" cy="279" r="6" fill="#e33" opacity=".25"/><text x="600" y="282" font-size="7" fill="#333">LED PB12</text>
-  <text x="705" y="345" font-size="9" fill="#dfe8ff" font-weight="700">BLUE PILL</text></g>
-  <g><rect x="780" y="300" width="100" height="40" rx="5" fill="url(#met)" stroke="#555"/><text x="830" y="324" font-size="9" text-anchor="middle" fill="#222" font-weight="700">ST-LINK V2</text><path d="M780,320 C770,330 770,335 760,330" stroke="#555" stroke-width="3" fill="none"/></g>
-  <g id="potS" style="cursor:grab"><rect x="512" y="378" width="40" height="40" rx="5" fill="#2c66b8"/><circle cx="532" cy="398" r="14" fill="#1b2430"/><line id="potSAc" x1="532" y1="398" x2="532" y2="387" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><text x="560" y="402" font-size="8" fill="#333">10 kΩ (PA0)</text></g>
-  <path d="M536,368 C536,374 532,376 532,382" stroke="#f2c230" stroke-width="2.5" fill="none"/>`;
-  // generatorul de semnal
-  s += `<g id="gen" style="cursor:pointer"><rect x="40" y="290" width="230" height="120" rx="6" fill="#d7dade" stroke="#6f767c"/><rect x="52" y="302" width="150" height="54" rx="3" fill="#0c1b12"/>
-  <text id="genT1" x="60" y="324" font-size="15" fill="#6dff8e" font-family="monospace">1.000000 kHz</text><text id="genT2" x="60" y="345" font-size="11" fill="#6dff8e" font-family="monospace">⎍ 5.00 Vpp  +2.50 V</text>
-  <rect x="212" y="306" width="46" height="22" rx="3" fill="#2a2a2a"/><text x="235" y="321" font-size="9" fill="#fff" text-anchor="middle">Output</text>
-  <circle id="genLed" cx="235" cy="340" r="5" fill="#3cff4a"/><text x="60" y="380" font-size="10" fill="#333">Generator de funcții – ieșire pe D2 (50 Ω)</text><text x="60" y="396" font-size="9" fill="#555">clic: pornește / oprește ieșirea</text>
-  <path d="M270,330 C330,330 320,120 336,58" fill="none" stroke="#2fa84f" stroke-width="2" stroke-dasharray="4 3"/></g>`;
-  // marcajele sondelor
-  s += `<g id="sonde"></g></svg>`;
-  return s;
+<rect x="-2000" y="-2000" width="5300" height="4790" fill="#fbfbfb" id="tk-fundal"/>`;
+  // ---- generatorul de funcții
+  s += `<g class="tk-comp" data-comp="gen" filter="url(#umbra)"><rect x="40" y="40" width="300" height="160" rx="8" fill="#e6e6e6" stroke="#b5b5b5"/>
+  <rect x="56" y="56" width="170" height="70" rx="4" fill="#173a2a"/><text id="gen-l1" x="66" y="84" font-size="18" fill="#7dffa0" font-family="monospace">1.000 kHz</text><text id="gen-l2" x="66" y="108" font-size="12" fill="#7dffa0" font-family="monospace">⎍  5.00 Vpp   +2.50 V</text>
+  ${[0, 1, 2].map(i => `<circle cx="${252 + (i % 2) * 40}" cy="${70 + Math.floor(i / 2) * 44}" r="14" fill="#444"/><line x1="${252 + (i % 2) * 40}" y1="${70 + Math.floor(i / 2) * 44}" x2="${252 + (i % 2) * 40}" y2="${58 + Math.floor(i / 2) * 44}" stroke="#ddd" stroke-width="2"/>`).join("")}
+  <g id="gen-out" style="cursor:pointer"><rect x="276" y="104" width="54" height="22" rx="4" fill="#3a3a3a"/><text x="303" y="119" font-size="10" fill="#fff" text-anchor="middle">OUTPUT</text></g><circle id="gen-led" cx="321" cy="136" r="4" fill="#3cff4a"/>
+  <text x="56" y="146" font-size="11" fill="#333" font-weight="700">Generator de funcții</text><text x="56" y="162" font-size="10" fill="#666">Frecvență · Amplitudine · Offset</text>
+  <circle cx="290" cy="180" r="7" fill="#d32f2f"/><circle cx="318" cy="180" r="7" fill="#222"/><text x="290" y="172" font-size="9" text-anchor="middle" fill="#333">+</text><text x="318" y="172" font-size="9" text-anchor="middle" fill="#333">−</text></g>`;
+  // ---- osciloscopul
+  s += `<g class="tk-comp" data-comp="osc" filter="url(#umbra)"><rect x="390" y="30" width="436" height="300" rx="10" fill="#d9d9d9" stroke="#a9a9a9"/>
+  <rect x="${OS.x - 6}" y="${OS.y - 6}" width="${OS.w + 12}" height="${OS.h + 30}" rx="4" fill="#0b0e12"/>
+  ${Array.from({ length: 11 }, (_, i) => `<line x1="${OS.x + i * OS.w / 10}" y1="${OS.y}" x2="${OS.x + i * OS.w / 10}" y2="${OS.y + OS.h}" stroke="rgba(150,170,190,${i === 5 ? .5 : .18})"/>`).join("")}
+  ${Array.from({ length: 9 }, (_, j) => `<line x1="${OS.x}" y1="${OS.y + j * OS.h / 8}" x2="${OS.x + OS.w}" y2="${OS.y + j * OS.h / 8}" stroke="rgba(150,170,190,${j === 4 ? .5 : .18})"/>`).join("")}
+  <path d="M${OS.x + OS.w / 10},${OS.y} l-5,-5 h10 z" fill="#ff9b3d"/>
+  <g id="osc-urme"></g><text id="osc-h" x="${OS.x + 2}" y="${OS.y + OS.h + 11}" font-size="9" fill="#9fb3c8" font-family="monospace"></text><text id="osc-m" x="${OS.x + 2}" y="${OS.y + OS.h + 21}" font-size="9.5" fill="#ffe96b" font-family="monospace"></text>
+  <text x="404" y="47" font-size="10" fill="#333" font-weight="700">Osciloscop – 2 canale</text>
+  ${[["tdiv-", "T/div −", 420], ["tdiv+", "T/div +", 478], ["v1-", "CH1 V −", 548], ["v1+", "CH1 V +", 606], ["v2-", "CH2 V −", 676], ["v2+", "CH2 V +", 734]].map(([k, t, x]) => `<g class="tk-btn" data-ob="${k}" style="cursor:pointer"><rect x="${x}" y="306" width="54" height="18" rx="3" fill="#f4f4f4" stroke="#999"/><text x="${x + 27}" y="319" font-size="9" text-anchor="middle" fill="#222">${t}</text></g>`).join("")}
+  <g class="tk-btn" data-ob="run" style="cursor:pointer"><rect x="770" y="40" width="46" height="20" rx="3" fill="#c62828"/><text id="osc-runb" x="793" y="54" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">STOP</text></g>
+  <circle cx="432" cy="333" r="7" fill="${CUL[0]}" stroke="#555"/><circle cx="474" cy="333" r="7" fill="${CUL[1]}" stroke="#555"/><text x="432" y="349" font-size="9" text-anchor="middle" fill="#333">CH1</text><text x="474" y="349" font-size="9" text-anchor="middle" fill="#333">CH2</text></g>`;
+  // ---- multimetrul
+  s += `<g class="tk-comp" data-comp="dmm" filter="url(#umbra)"><rect x="866" y="36" width="176" height="262" rx="14" fill="#3b3f45"/><rect x="876" y="46" width="156" height="242" rx="10" fill="#4a4f56"/>
+  <rect x="888" y="58" width="132" height="54" rx="4" fill="#bfd0b0" stroke="#222" stroke-width="2"/><text id="dmm-v" x="1012" y="96" font-size="25" fill="#1d2414" text-anchor="end" font-family="monospace" font-weight="700">- - - -</text>
+  ${[["A", 900], ["V", 954], ["Ω", 1008]].map(([t, x]) => `<rect x="${x - 18}" y="128" width="36" height="22" rx="4" fill="${t === "V" ? "#f2b705" : "#6c727a"}"/><text x="${x}" y="143" font-size="12" text-anchor="middle" fill="${t === "V" ? "#222" : "#ddd"}" font-weight="700">${t}</text>`).join("")}
+  <circle cx="954" cy="200" r="38" fill="#2a2d31" stroke="#666"/><line x1="954" y1="200" x2="954" y2="168" stroke="#f2b705" stroke-width="4"/><text x="954" y="252" font-size="10" fill="#ddd" text-anchor="middle">Multimetru · V DC</text>
+  <circle cx="914" cy="276" r="7" fill="#222" stroke="#999"/><circle cx="994" cy="276" r="7" fill="#d32f2f" stroke="#999"/><text x="914" y="266" font-size="8" fill="#ccc" text-anchor="middle">COM</text><text x="994" y="266" font-size="8" fill="#ccc" text-anchor="middle">V</text></g>`;
+  // ---- Arduino Mega 2560
+  const mx = 40, my = 400;
+  s += `<g class="tk-comp" data-comp="mega" filter="url(#umbra)"><rect x="${mx}" y="${my}" width="470" height="222" rx="9" fill="#00878f"/>
+  ${[[14, 14], [14, 208], [456, 14], [456, 208], [380, 110]].map(([x, y]) => `<circle cx="${mx + x}" cy="${my + y}" r="5.5" fill="#fff" stroke="#00656b"/>`).join("")}
+  <rect x="${mx - 16}" y="${my + 40}" width="56" height="46" rx="3" fill="#c9cdd2" stroke="#8a9096"/><rect x="${mx - 12}" y="${my + 140}" width="58" height="40" rx="4" fill="#1b1b1b"/>
+  <rect x="${mx + 190}" y="${my + 70}" width="84" height="84" rx="2" fill="#262626"/><text x="${mx + 232}" y="${my + 110}" fill="#bbb" font-size="8" text-anchor="middle" font-family="monospace">ATMEGA2560</text><text x="${mx + 232}" y="${my + 122}" fill="#888" font-size="7" text-anchor="middle" font-family="monospace">16AU</text>
+  <rect x="${mx + 92}" y="${my + 52}" width="26" height="26" fill="#262626"/><rect x="${mx + 130}" y="${my + 60}" width="22" height="9" rx="3" fill="#dcdcdc"/>
+  <text x="${mx + 300}" y="${my + 185}" fill="#fff" font-size="15" font-weight="800" font-family="sans-serif">ARDUINO</text><text x="${mx + 300}" y="${my + 201}" fill="#fff" font-size="10" font-family="sans-serif">MEGA 2560</text>
+  <circle cx="${mx + 420}" cy="${my + 60}" r="4" fill="#3cff4a"/><text x="${mx + 420}" y="${my + 74}" fill="#fff" font-size="7" text-anchor="middle">ON</text>
+  <rect id="ledL" x="${mx + 180}" y="${my + 34}" width="8" height="5" fill="#6b4a12"/><text x="${mx + 192}" y="${my + 39}" fill="#fff" font-size="7">L</text>
+  <rect id="ledTX" x="${mx + 140}" y="${my + 34}" width="8" height="5" fill="#5a4a1a"/><text x="${mx + 151}" y="${my + 39}" fill="#fff" font-size="7">TX</text>
+  ${header(mx + 150, my + 14, 10, 12)}${header(mx + 285, my + 14, 8, 12)}${header(mx + 150, my + 206, 8, 12)}${header(mx + 265, my + 206, 16, 12)}${header(mx + 452, my + 30, 2, 12).replace('width="22"', 'width="22"')}
+  ${["SCL", "SDA", "AREF", "GND", "13", "12", "~11", "~10", "~9", "~8"].map((t, i) => `<text x="${mx + 150 + i * 12}" y="${my + 30}" font-size="5.6" fill="#fff" text-anchor="middle" transform="rotate(-90 ${mx + 150 + i * 12} ${my + 30})">${t}</text>`).join("")}
+  ${["~7", "~6", "~5", "~4", "~3", "~2", "TX→1", "RX←0"].map((t, i) => `<text x="${mx + 285 + i * 12}" y="${my + 30}" font-size="5.6" fill="#fff" transform="rotate(-90 ${mx + 285 + i * 12} ${my + 30})" text-anchor="end" dx="-1">${t}</text>`).join("")}
+  ${["", "IOREF", "RESET", "3.3V", "5V", "GND", "GND", "Vin"].map((t, i) => `<text x="${mx + 150 + i * 12}" y="${my + 198}" font-size="5.6" fill="#fff" transform="rotate(-90 ${mx + 150 + i * 12} ${my + 198})">${t}</text>`).join("")}
+  ${Array.from({ length: 16 }, (_, i) => `<text x="${mx + 265 + i * 12}" y="${my + 198}" font-size="5.6" fill="#fff" transform="rotate(-90 ${mx + 265 + i * 12} ${my + 198})">A${i}</text>`).join("")}
+  <text x="${mx + 230}" y="${my + 50}" fill="#fff" font-size="8" font-weight="700">DIGITAL (PWM~)</text><text x="${mx + 300}" y="${my + 166}" fill="#fff" font-size="8" font-weight="700">ANALOG IN</text><text x="${mx + 150}" y="${my + 166}" fill="#fff" font-size="8" font-weight="700">POWER</text></g>`;
+  const D = n => [mx + 150 + (13 - n + 4) * 12, my + 14], Dlo = n => [mx + 285 + (7 - n) * 12, my + 14], PWR = i => [mx + 150 + i * 12, my + 206], AN = i => [mx + 265 + i * 12, my + 206];
+  s += pin("pin13", ...D(13), "Pinul digital 13 (LED L, PB7)") + pin("pin11", ...D(11), "Pinul digital 11 ~ (OC1A)") + pin("pin9", ...D(9), "Pinul digital 9 ~ (OC2B)") + pin("pin2", ...Dlo(2), "Pinul digital 2 ~ (INT4)") + pin("A0", ...AN(0), "Pinul analogic A0") + pin("v5", ...PWR(4), "5V") + pin("gndM", ...PWR(5), "GND", "gnd") + pin("v33M", ...PWR(3), "3.3V", "v33");
+  // ---- placa de test (breadboard)
+  const bx = 560, by = 380;
+  s += `<g class="tk-comp" data-comp="bb" filter="url(#umbra)"><rect x="${bx}" y="${by}" width="430" height="280" rx="6" fill="url(#tk-gauri)" stroke="#d2d2cc"/>
+  <line x1="${bx + 10}" y1="${by + 6}" x2="${bx + 420}" y2="${by + 6}" stroke="#e53935" stroke-width="1.5"/><line x1="${bx + 10}" y1="${by + 30}" x2="${bx + 420}" y2="${by + 30}" stroke="#1e63d6" stroke-width="1.5"/>
+  <line x1="${bx + 10}" y1="${by + 250}" x2="${bx + 420}" y2="${by + 250}" stroke="#e53935" stroke-width="1.5"/><line x1="${bx + 10}" y1="${by + 274}" x2="${bx + 420}" y2="${by + 274}" stroke="#1e63d6" stroke-width="1.5"/>
+  <rect x="${bx}" y="${by + 132}" width="430" height="14" fill="#e9e9e4"/>
+  ${Array.from({ length: 30 }, (_, i) => `<text x="${bx + 16 + i * 13.5}" y="${by + 44}" font-size="5.5" fill="#999" text-anchor="middle">${i + 1}</text>`).join("")}</g>`;
+  // potențiometrul (A0)
+  s += `<g class="tk-comp" data-comp="pot"><g id="pot" style="cursor:grab"><rect x="${bx + 52}" y="${by + 70}" width="62" height="58" rx="6" fill="#2c66b8" stroke="#123a75" filter="url(#umbra)"/><circle cx="${bx + 83}" cy="${by + 96}" r="23" fill="#d9dde3" stroke="#7f868e"/><circle cx="${bx + 83}" cy="${by + 96}" r="16" fill="#eef0f3"/><path id="potAc" d="M${bx + 83},${by + 96} l0,-19" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/></g>
+  ${[0, 1, 2].map(i => `<rect x="${bx + 66 + i * 17}" y="${by + 128}" width="4" height="12" fill="#9aa0a6"/>`).join("")}<text x="${bx + 83}" y="${by + 64}" font-size="9" text-anchor="middle" fill="#444">Potențiometru 10 kΩ</text></g>`;
+  // butonul (D2) cu rezistorul de 10 kΩ spre masă
+  s += `<g class="tk-comp" data-comp="btn"><g id="btn" style="cursor:pointer"><rect x="${bx + 270}" y="${by + 150}" width="40" height="40" rx="3" fill="#2b2b2b" filter="url(#umbra)"/><circle id="btnC" cx="${bx + 290}" cy="${by + 170}" r="11" fill="#555" stroke="#111"/></g>
+  ${[[268, 152], [308, 152], [268, 188], [308, 188]].map(([x, y]) => `<rect x="${bx + x}" y="${by + y}" width="4" height="4" fill="#9aa0a6"/>`).join("")}<text x="${bx + 290}" y="${by + 205}" font-size="9" text-anchor="middle" fill="#444">Buton (D2)</text>
+  <rect x="${bx + 316}" y="${by + 214}" width="40" height="11" rx="5" fill="#e8d3a6" stroke="#a88a55"/><rect x="${bx + 322}" y="${by + 214}" width="3" height="11" fill="#7a4a1b"/><rect x="${bx + 328}" y="${by + 214}" width="3" height="11" fill="#222"/><rect x="${bx + 334}" y="${by + 214}" width="3" height="11" fill="#f39c12"/><rect x="${bx + 345}" y="${by + 214}" width="3" height="11" fill="#c9a640"/><text x="${bx + 336}" y="${by + 236}" font-size="8" text-anchor="middle" fill="#444">10 kΩ</text></g>`;
+  // rezistorul de 220 Ω și LED-ul (D13)
+  s += `<g class="tk-comp" data-comp="led"><rect x="${bx + 196}" y="${by + 84}" width="46" height="12" rx="6" fill="#e8d3a6" stroke="#a88a55"/>${[[203, "#c62828"], [210, "#c62828"], [217, "#7a4a1b"], [230, "#c9a640"]].map(([x, c]) => `<rect x="${bx + x}" y="${by + 84}" width="3.4" height="12" fill="${c}"/>`).join("")}
+  <line x1="${bx + 186}" y1="${by + 90}" x2="${bx + 196}" y2="${by + 90}" stroke="#9aa0a6" stroke-width="2"/><line x1="${bx + 242}" y1="${by + 90}" x2="${bx + 262}" y2="${by + 90}" stroke="#9aa0a6" stroke-width="2"/><text x="${bx + 219}" y="${by + 78}" font-size="8" text-anchor="middle" fill="#444">220 Ω</text>
+  <circle id="ledG" cx="${bx + 275}" cy="${by + 80}" r="26" fill="url(#tk-led)" opacity="0"/><path d="M${bx + 265},${by + 90} v-14 a10,10 0 0 1 20,0 v14 z" fill="url(#tk-cap)" stroke="#8a1610"/><path id="ledR" d="M${bx + 265},${by + 90} v-14 a10,10 0 0 1 20,0 v14 z" fill="#ffd1c9" opacity="0"/>
+  <rect x="${bx + 262}" y="${by + 90}" width="26" height="4" fill="#c81e14"/><line x1="${bx + 270}" y1="${by + 94}" x2="${bx + 270}" y2="${by + 106}" stroke="#9aa0a6" stroke-width="2"/><line x1="${bx + 280}" y1="${by + 94}" x2="${bx + 280}" y2="${by + 110}" stroke="#9aa0a6" stroke-width="2"/><text x="${bx + 300}" y="${by + 80}" font-size="9" fill="#444">LED</text></g>`;
+  s += pin("pot", bx + 85, by + 140, "Cursorul potențiometrului (A0)", "A0") + pin("ledA", bx + 270, by + 108, "Anodul LED-ului", "led") + pin("rez", bx + 186, by + 90, "Rezistorul 220 Ω (spre D13)", "pin13") + pin("gndBB", bx + 400, by + 274, "Rândul − (GND)", "gnd") + pin("v5BB", bx + 400, by + 250, "Rândul + (5V)", "v5") + pin("btnD2", bx + 268, by + 192, "Butonul (D2)", "pin2");
+  // ---- STM32 Blue Pill + ST-Link + placa de test mică
+  const px = 1040, py = 440;
+  s += `<g class="tk-comp" data-comp="bp" filter="url(#umbra)"><rect x="${px}" y="${py}" width="232" height="86" rx="4" fill="#1f4fbf"/>${header(px + 12, py + 8, 20, 11.2)}${header(px + 12, py + 78, 20, 11.2)}
+  <g transform="translate(${px + 120} ${py + 43}) rotate(45)"><rect x="-17" y="-17" width="34" height="34" rx="2" fill="#262626"/></g><text x="${px + 120}" y="${py + 46}" font-size="5.5" fill="#bbb" text-anchor="middle" font-family="monospace">STM32F103</text>
+  <rect x="${px - 12}" y="${py + 32}" width="18" height="22" rx="3" fill="#c9cdd2"/><rect x="${px + 50}" y="${py + 26}" width="14" height="9" fill="#f2c94c"/><rect x="${px + 50}" y="${py + 38}" width="14" height="9" fill="#f2c94c"/>
+  <text x="${px + 170}" y="${py + 50}" font-size="10" fill="#e8eeff" font-weight="700">BLUE PILL</text>
+  ${["PB12", "PB13", "PB14", "PB15", "PA8"].map((t, i) => `<text x="${px + 12 + i * 11.2}" y="${py + 22}" font-size="4.6" fill="#fff" transform="rotate(-90 ${px + 12 + i * 11.2} ${py + 22})" text-anchor="end">${t}</text>`).join("")}
+  ${["GND", "GND", "3.3", "NRST", "PB11", "PB10", "PB1", "PB0", "PA7", "PA6", "PA5", "PA4", "PA3", "PA2", "PA1", "PA0"].map((t, i) => `<text x="${px + 12 + (19 - i) * 11.2}" y="${py + 70}" font-size="4.6" fill="#fff" transform="rotate(-90 ${px + 12 + (19 - i) * 11.2} ${py + 70})">${t}</text>`).join("")}</g>
+  <g filter="url(#umbra)"><rect x="${px + 120}" y="${py - 70}" width="110" height="44" rx="6" fill="#b9bec4" stroke="#7f858b"/><text x="${px + 175}" y="${py - 44}" font-size="10" text-anchor="middle" fill="#222" font-weight="700">ST-LINK V2</text></g>
+  <g filter="url(#umbra)"><rect x="${px}" y="${py + 120}" width="232" height="140" rx="5" fill="url(#tk-gauri)" stroke="#d2d2cc"/><line x1="${px + 8}" y1="${py + 128}" x2="${px + 224}" y2="${py + 128}" stroke="#e53935" stroke-width="1.5"/><line x1="${px + 8}" y1="${py + 252}" x2="${px + 224}" y2="${py + 252}" stroke="#1e63d6" stroke-width="1.5"/></g>
+  <g id="potS" style="cursor:grab"><rect x="${px + 28}" y="${py + 160}" width="54" height="50" rx="6" fill="#2c66b8" stroke="#123a75"/><circle cx="${px + 55}" cy="${py + 183}" r="18" fill="#d9dde3" stroke="#7f868e"/><path id="potSAc" d="M${px + 55},${py + 183} l0,-14" stroke="#2b2b2b" stroke-width="3.5" stroke-linecap="round"/></g><text x="${px + 55}" y="${py + 226}" font-size="8" text-anchor="middle" fill="#444">10 kΩ (PA0)</text>
+  <rect x="${px + 120}" y="${py + 176}" width="40" height="11" rx="5" fill="#e8d3a6" stroke="#a88a55"/><text x="${px + 140}" y="${py + 200}" font-size="8" text-anchor="middle" fill="#444">220 Ω</text>
+  <circle id="ledSG" cx="${px + 185}" cy="${py + 170}" r="22" fill="url(#tk-led)" opacity="0"/><path d="M${px + 176},${py + 182} v-12 a9,9 0 0 1 18,0 v12 z" fill="url(#tk-cap)" stroke="#8a1610"/><text x="${px + 200}" y="${py + 168}" font-size="8" fill="#444">LED PB12</text>`;
+  const BPu = i => [px + 12 + i * 11.2, py + 8], BPd = i => [px + 12 + i * 11.2, py + 78];
+  s += pin("PB12", ...BPu(0), "PB12 (ieșire, LED)") + pin("PA0", ...BPd(4), "PA0 (ADC1_IN0)") + pin("v33", ...BPd(17), "3.3V (STM32)") + pin("gndS", ...BPd(19), "GND (STM32)", "gnd");
+  // ---- firele (culorile ca pe stand)
+  const fire = [
+    [[PWR(4), [PWR(4)[0], 700], [600, 700], [600, by + 250]], "#e53935"], [[PWR(5), [PWR(5)[0], 712], [612, 712], [612, by + 274]], "#222"],
+    [[[bx + 66, by + 140], [bx + 66, by + 250]], "#e53935"], [[[bx + 100, by + 140], [bx + 100, by + 274]], "#222"],
+    [[AN(0), [AN(0)[0], 688], [bx + 84, 688], [bx + 84, by + 142]], "#f2c230"],
+    [[D(13), [D(13)[0], 372], [bx + 186, 372], [bx + 186, by + 90]], "#ff8a1f"],
+    [[[bx + 280, by + 110], [bx + 280, by + 30]], "#222"],
+    [[Dlo(2), [Dlo(2)[0], 360], [bx + 268, 360], [bx + 268, by + 150]], "#2fa84f"], [[[bx + 312, by + 150], [bx + 312, by + 6]], "#e53935"],
+    [[[bx + 316, by + 219], [bx + 290, by + 219], [bx + 290, by + 192]], "#9aa0a6"], [[[bx + 356, by + 219], [bx + 370, by + 219], [bx + 370, by + 274]], "#222"],
+    [[[bx + 400, by + 250], [bx + 418, by + 250], [bx + 418, by + 6], [bx + 400, by + 6]], "#e53935"], [[[bx + 400, by + 274], [bx + 424, by + 274], [bx + 424, by + 30], [bx + 400, by + 30]], "#222"],
+    [[[290, 187], [290, 352], [Dlo(2)[0] - 2, 352], [Dlo(2)[0] - 2, my + 14]], "#2fa84f"], [[[318, 187], [318, 340], [bx - 10, 340], [bx - 10, by + 30], [bx + 10, by + 30]], "#222"],
+    [[BPd(17), [BPd(17)[0], py + 128]], "#e53935"], [[BPd(19), [BPd(19)[0], py + 252]], "#222"],
+    [[BPd(4), [BPd(4)[0], py + 105], [px + 55, py + 105], [px + 55, py + 160]], "#f2c230"], [[BPu(0), [BPu(0)[0], py - 18], [px - 20, py - 18], [px - 20, py + 181], [px + 120, py + 181]], "#ff8a1f"],
+    [[[px + 160, py + 181], [px + 176, py + 181]], "#9aa0a6"], [[[px + 194, py + 182], [px + 194, py + 252]], "#222"],
+    [[[px + 135, py - 26], [px + 135, py + 8]], "#6a1b9a", 2.6], [[[px + 150, py - 26], [px + 150, py + 8]], "#00897b", 2.6], [[[px + 165, py - 26], [px + 165, py + 8]], "#222", 2.6], [[[px + 180, py - 26], [px + 180, py + 8]], "#e53935", 2.6]
+  ];
+  s += `<g id="tk-fire" style="pointer-events:none">${fire.map(([p, c, w]) => W_(p, c, w)).join("")}</g>`;
+  // ---- cablurile instrumentelor (masele fixe) și sondele mobile
+  s += `<g style="pointer-events:none">${W_([[914, 283], [914, 330], [bx + 425, 330], [bx + 425, by + 284], [bx + 400, by + 284], [bx + 400, by + 274]], "#222", 2.4)}${W_([[318, 187], [318, 340]], "#222", 2.4)}</g>`;
+  s += `<g id="tk-sonde"></g><g id="tk-tip" style="pointer-events:none" visibility="hidden"><rect rx="4" fill="#2b2b2b" opacity=".92"/><text font-size="11" fill="#fff"></text></g>`;
+  s += `<text id="tk-timp" x="650" y="22" text-anchor="middle" font-size="12" fill="#555"></text>`;
+  return s + `</svg>`;
 }
-function actualizeazaSonde() {
-  const g = $("#sonde"); if (!g) return;
-  const m = [[sim.osc.ch[0].s, CUL[0], "1"], [sim.osc.ch[1].s, CUL[1], "2"], [sim.dmm.s, "#ff4d4d", "V"]];
-  g.innerHTML = m.filter(x => x[0] !== "off" && XY[x[0]]).map(([s, c, t], i) => { const [x, y] = XY[s]; const dy = -22 - i * 4; return `<line x1="${x}" y1="${y}" x2="${x + 8 * i}" y2="${y + dy}" stroke="${c}" stroke-width="2"/><circle cx="${x + 8 * i}" cy="${y + dy}" r="8" fill="${c}" stroke="#000"/><text x="${x + 8 * i}" y="${y + dy + 4}" font-size="10" font-weight="700" text-anchor="middle" fill="#000">${t}</text>`; }).join("");
+// sondele: capătul fix (borna instrumentului) și vârful mobil
+const SONDE = [
+  { id: "dmm", x0: 994, y0: 283, cul: "#d32f2f", et: "V" },
+  { id: "ch0", x0: 432, y0: 340, cul: CUL[0], et: "1" },
+  { id: "ch1", x0: 474, y0: 340, cul: CUL[1], et: "2" }
+];
+const LOC_SONDE = { dmm: [1010, 360], ch0: [430, 372], ch1: [472, 386] };
+function sursaSonda(id) { return id === "dmm" ? sim.dmm.s : sim.osc.ch[+id.slice(2)].s; }
+function seteazaSonda(id, s) { if (id === "dmm") sim.dmm.s = s; else sim.osc.ch[+id.slice(2)].s = s; }
+function capatSonda(sd) { const s = sursaSonda(sd.id); return PIN[s] ? [PIN[s].x, PIN[s].y] : sim.liber[sd.id] || LOC_SONDE[sd.id]; }
+function cale(sd, tx, ty) { const cy = Math.max(sd.y0, ty) + 60; return `M${sd.x0},${sd.y0} C${sd.x0},${cy} ${tx},${cy} ${tx},${ty + 30}`; }
+function desenSonde() {
+  const g = $("#tk-sonde"); if (!g) return;
+  g.innerHTML = SONDE.map(sd => {
+    const [tx, ty] = capatSonda(sd);
+    return `<path id="lead-${sd.id}" d="${cale(sd, tx, ty)}" fill="none" stroke="${sd.cul}" stroke-width="3" opacity=".9" style="pointer-events:none"/>
+      <g class="tk-sonda" data-sonda="${sd.id}" transform="translate(${tx},${ty})" style="cursor:grab"><path d="M0,0 l-4,8 v22 h8 v-22 z" fill="${sd.cul}" stroke="#222" stroke-width="1"/><circle cx="0" cy="36" r="9" fill="${sd.cul}" stroke="#222"/><text x="0" y="40" font-size="10" text-anchor="middle" font-weight="700" fill="#111">${sd.et}</text></g>`;
+  }).join("");
+  $$("#tk-sonde .tk-sonda").forEach(el => legaSonda(el));
 }
-function legaStand() {
+function ptSVG(e) { const svg = $("#tk-svg"), p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+function legaSonda(el) {
+  const id = el.dataset.sonda, sd = SONDE.find(x => x.id === id);
+  el.addEventListener("pointerdown", e => {
+    e.stopPropagation(); el.setPointerCapture(e.pointerId); el.style.cursor = "grabbing"; sim.tragSonda = true;
+    const p0 = ptSVG(e), [tx0, ty0] = capatSonda(sd), dx = p0.x - tx0, dy = p0.y - ty0;
+    const muta = ev => { const p = ptSVG(ev), x = p.x - dx, y = p.y - dy; el.setAttribute("transform", `translate(${x},${y})`); $("#lead-" + id).setAttribute("d", cale(sd, x, y)); evidentiazaPin({ x, y }); };
+    const gata = ev => {
+      el.removeEventListener("pointermove", muta); el.removeEventListener("pointerup", gata); sim.tragSonda = false;
+      const p = ptSVG(ev), x = p.x - dx, y = p.y - dy; let best = null, dmin = 18;
+      Object.entries(PIN).forEach(([k, q]) => { const d = Math.hypot(q.x - x, q.y - y); if (d < dmin) { dmin = d; best = k; } });
+      if (best) seteazaSonda(id, best); else { seteazaSonda(id, "nc"); sim.liber[id] = [x, y]; }
+      evidentiazaPin(null); desenSonde(); achizitie(); deseneazaOsc(); citesteDMM();
+    };
+    el.addEventListener("pointermove", muta); el.addEventListener("pointerup", gata);
+  });
+}
+function evidentiazaPin(p) {
+  $$("#tk-svg .tk-pin").forEach(r => r.classList.remove("aproape"));
+  if (!p) { arataTip(null); return; }
+  let best = null, dmin = 18; Object.entries(PIN).forEach(([k, q]) => { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < dmin) { dmin = d; best = k; } });
+  if (best) { $(`#tk-svg [data-pin="${best}"]`).classList.add("aproape"); arataTip(best); } else arataTip(null);
+}
+function arataTip(k) {
+  const g = $("#tk-tip"); if (!g) return;
+  if (!k) { g.setAttribute("visibility", "hidden"); return; }
+  const q = PIN[k], t = g.querySelector("text"), r = g.querySelector("rect");
+  t.textContent = q.et; t.setAttribute("x", q.x + 12); t.setAttribute("y", q.y - 12);
+  const w = q.et.length * 6.3 + 12; r.setAttribute("x", q.x + 6); r.setAttribute("y", q.y - 26); r.setAttribute("width", w); r.setAttribute("height", 20);
+  g.setAttribute("visibility", "visible");
+}
+// zoom și deplasare (ca în Tinkercad: rotița = zoom, tragere pe fundal = deplasare)
+const VB0 = [0, 0, 1300, 790];
+function seteazaVB(vb) { sim.vb = vb; $("#tk-svg").setAttribute("viewBox", vb.map(v => v.toFixed(1)).join(" ")); }
+function legaPlansa() {
+  const svg = $("#tk-svg"); sim.vb = VB0.slice();
+  svg.addEventListener("wheel", e => {
+    e.preventDefault(); const p = ptSVG(e), k = e.deltaY > 0 ? 1.12 : 1 / 1.12, [x, y, w, h] = sim.vb;
+    const nw = Math.max(260, Math.min(1900, w * k)), nh = nw * h / w;
+    seteazaVB([p.x - (p.x - x) * nw / w, p.y - (p.y - y) * nh / h, nw, nh]);
+  }, { passive: false });
+  let pan = null;
+  $("#tk-fundal").addEventListener("pointerdown", e => { pan = { x: e.clientX, y: e.clientY, vb: sim.vb.slice() }; svg.setPointerCapture(e.pointerId); inspector(null); });
+  svg.addEventListener("pointermove", e => {
+    if (pan) { const r = svg.getBoundingClientRect(), s = pan.vb[2] / r.width; seteazaVB([pan.vb[0] - (e.clientX - pan.x) * s, pan.vb[1] - (e.clientY - pan.y) * s, pan.vb[2], pan.vb[3]]); return; }
+    const t = e.target; if (t.classList && t.classList.contains("tk-pin")) arataTip(t.dataset.pin); else if (!sim.tragSonda) arataTip(null);
+  });
+  svg.addEventListener("pointerup", () => { pan = null; });
+  // potențiometrele
   const unghi = a => -135 + 270 * a;
-  const roteste = (el, a, cx, cy, L) => { const u = unghi(a) * Math.PI / 180; el.setAttribute("x2", cx + Math.sin(u) * L); el.setAttribute("y2", cy - Math.cos(u) * L); };
-  const potRot = () => { roteste($("#potAc"), sim.alfa, 580, 130, 20); roteste($("#potSAc"), sim.alfaS, 532, 398, 11); };
+  const potRot = () => {
+    const a1 = unghi(sim.alfa) * Math.PI / 180, a2 = unghi(sim.alfaS) * Math.PI / 180;
+    $("#potAc").setAttribute("d", `M643,476 l${(Math.sin(a1) * 19).toFixed(1)},${(-Math.cos(a1) * 19).toFixed(1)}`);
+    $("#potSAc").setAttribute("d", `M1095,623 l${(Math.sin(a2) * 14).toFixed(1)},${(-Math.cos(a2) * 14).toFixed(1)}`);
+  };
   potRot();
   const trage = (id, cx, cy, k) => {
     const el = $(id); let act = false;
-    const set = e => { const svg = $("#stand"), r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 900, y = (e.clientY - r.top) / r.height * 430; let u = Math.atan2(x - cx, cy - y) * 180 / Math.PI; u = Math.max(-135, Math.min(135, u)); sim[k] = Math.round((u + 135) / 270 * 1000) / 1000; potRot(); };
-    el.addEventListener("pointerdown", e => { act = true; el.setPointerCapture(e.pointerId); set(e); });
+    const set = e => { const p = ptSVG(e); let u = Math.atan2(p.x - cx, cy - p.y) * 180 / Math.PI; u = Math.max(-135, Math.min(135, u)); sim[k] = Math.round((u + 135) / 270 * 1000) / 1000; potRot(); };
+    el.addEventListener("pointerdown", e => { e.stopPropagation(); act = true; el.setPointerCapture(e.pointerId); set(e); });
     el.addEventListener("pointermove", e => { if (act) set(e); });
     el.addEventListener("pointerup", () => { act = false; });
-    el.addEventListener("wheel", e => { e.preventDefault(); sim[k] = Math.max(0, Math.min(1, sim[k] - Math.sign(e.deltaY) * 0.005)); potRot(); }, { passive: false });
+    el.addEventListener("wheel", e => { e.preventDefault(); e.stopPropagation(); sim[k] = Math.max(0, Math.min(1, sim[k] - Math.sign(e.deltaY) * 0.005)); potRot(); }, { passive: false });
   };
-  trage("#pot", 580, 130, "alfa"); trage("#potS", 532, 398, "alfaS");
+  trage("#pot", 643, 476, "alfa"); trage("#potS", 1095, 623, "alfaS");
   const b = $("#btn");
-  b.addEventListener("pointerdown", () => { sim.buton = true; $("#btnC").setAttribute("r", "8.5"); if (!sim.gen) evenimentButon(); });
-  ["pointerup", "pointerleave"].forEach(ev => b.addEventListener(ev, () => { sim.buton = false; $("#btnC").setAttribute("r", "10"); }));
-  $("#gen").addEventListener("click", () => { sim.gen = !sim.gen; $("#genLed").setAttribute("fill", sim.gen ? "#3cff4a" : "#333"); $("#genT1").setAttribute("opacity", sim.gen ? 1 : 0.25); $("#genT2").setAttribute("opacity", sim.gen ? 1 : 0.25); });
+  b.addEventListener("pointerdown", e => { e.stopPropagation(); sim.buton = true; $("#btnC").setAttribute("r", "9.5"); $("#btnC").setAttribute("fill", "#333"); if (!sim.gen && sim.run) evenimentButon(); });
+  ["pointerup", "pointerleave"].forEach(ev => b.addEventListener(ev, () => { sim.buton = false; $("#btnC").setAttribute("r", "11"); $("#btnC").setAttribute("fill", "#555"); }));
+  $("#gen-out").addEventListener("click", e => { e.stopPropagation(); sim.gen = !sim.gen; genAfis(); achizitie(); deseneazaOsc(); });
+  $$("[data-ob]").forEach(el => el.addEventListener("click", e => {
+    e.stopPropagation(); const k = el.dataset.ob, o = sim.osc;
+    if (k === "run") { o.ruleaza = !o.ruleaza; deseneazaOsc(); return; }
+    if (k.startsWith("tdiv")) { const i = TDIV.indexOf(o.tdiv) + (k.endsWith("+") ? 1 : -1); o.tdiv = TDIV[Math.max(0, Math.min(TDIV.length - 1, i))]; }
+    else { const c = k[1] === "1" ? 0 : 1, i = VDIV.indexOf(o.ch[c].vdiv) + (k.endsWith("+") ? 1 : -1); o.ch[c].vdiv = VDIV[Math.max(0, Math.min(VDIV.length - 1, i))]; }
+    achizitie(); deseneazaOsc();
+  }));
+  $$(".tk-comp").forEach(g => g.addEventListener("click", e => { if (e.target.closest("[data-ob],#gen-out,#pot,#potS,#btn")) return; inspector(g.dataset.comp); }));
+}
+function genAfis() { $("#gen-led").setAttribute("fill", sim.gen ? "#3cff4a" : "#333"); $("#gen-l1").setAttribute("opacity", sim.gen && sim.run ? 1 : 0.25); $("#gen-l2").setAttribute("opacity", sim.gen && sim.run ? 1 : 0.25); }
+// panoul de proprietăți al componentei selectate (ca inspectorul din Tinkercad)
+const INSP = {
+  gen: () => ["Generator de funcții", [["Formă de undă", "dreptunghiulară"], ["Frecvență", "1 kHz"], ["Amplitudine", "5 Vpp"], ["Offset", "2,5 V"], ["Ieșire", sim.gen ? "pornită" : "oprită"]]],
+  osc: () => ["Osciloscop", [["Timp pe diviziune", fmtT(sim.osc.tdiv)], ["CH1", (PIN[sim.osc.ch[0].s] || {}).et || "neconectat"], ["CH2", (PIN[sim.osc.ch[1].s] || {}).et || "neconectat"], ["Declanșare", "front crescător CH1, 2,5 V"]]],
+  dmm: () => ["Multimetru", [["Mod", "tensiune (V)"], ["Sonda roșie", (PIN[sim.dmm.s] || {}).et || "neconectată"], ["Sonda neagră", "GND"]]],
+  mega: () => ["Arduino Mega 2560", [["Microcontroler", "ATmega2560, 16 MHz"], ["Alimentare", "USB (5 V nominal)"], ["Program", sim.fw.mega ? PROG[sim.fw.mega.prog].titlu : "—"]]],
+  bp: () => ["STM32F103C8 „Blue Pill”", [["Nucleu", "ARM Cortex-M3, 72 MHz"], ["Programator", "ST-Link V2"], ["Program", sim.fw.stm ? PROG[sim.fw.stm.prog].titlu : "—"]]],
+  pot: () => ["Potențiometru", [["Rezistență", "10 kΩ"], ["Poziție", fx(sim.alfa * 100, 1) + " %"]]],
+  btn: () => ["Buton", [["Tip", "buton cu 4 terminale"], ["Rezistor de coborâre", "10 kΩ spre GND"]]],
+  led: () => ["LED", [["Culoare", "roșu"], ["Rezistor serie", "220 Ω"]]],
+  bb: () => ["Placă de test", [["Mărime", "jumătate (30 de coloane)"]]]
+};
+function inspector(k) {
+  const el = $("#tk-insp"); if (!el) return;
+  if (!k || !INSP[k]) { el.hidden = true; return; }
+  const [t, r] = INSP[k]();
+  el.innerHTML = `<div class="tk-insp-t">${t}<button type="button" aria-label="Închide">✕</button></div>${r.map(([a, b]) => `<div class="tk-insp-r"><span>${a}</span><b>${b}</b></div>`).join("")}`;
+  el.hidden = false; el.querySelector("button").addEventListener("click", () => { el.hidden = true; });
 }
 function actualizeazaLeduri(acum) {
   const fw = pinMega(), fs = sim.fw.stm || {};
   let v = 0;
-  if (fw.prog === "mega_gpio") v = fw.stare ? 1 : 0; else if (fw.prog === "mega_isr") v = sim.gen ? 0.5 : (sim.led13 ? 1 : 0);
-  $("#ledR").setAttribute("opacity", 0.25 + 0.75 * v); $("#ledG").setAttribute("opacity", v * 0.9); $("#ledL").setAttribute("fill", v ? `rgba(255,190,40,${0.4 + 0.6 * v})` : "#5a3b0a");
-  $("#ledTX").setAttribute("fill", acum - sim.tx < 60 ? "#ffd04a" : "#4a3a14");
-  $("#ledS").setAttribute("opacity", fs.prog === "stm_gpio" && fs.stare ? 1 : 0.25);
+  if (sim.run) { if (fw.prog === "mega_gpio") v = fw.stare ? 1 : 0; else if (fw.prog === "mega_isr") v = sim.gen ? 0.5 : (sim.led13 ? 1 : 0); }
+  $("#ledR").setAttribute("opacity", v * 0.7); $("#ledG").setAttribute("opacity", v * 0.95); $("#ledL").setAttribute("fill", v ? "#ffc23a" : "#6b4a12");
+  $("#ledTX").setAttribute("fill", sim.run && acum - sim.tx < 60 ? "#ffd04a" : "#5a4a1a");
+  $("#ledSG").setAttribute("opacity", sim.run && fs.prog === "stm_gpio" && fs.stare ? 0.95 : 0);
 }
 
-/* ------------------------------------------------------------------ editorul și compilarea */
+/* ------------------------------------------------------------------ editorul de cod și simularea (ca în Tinkercad) */
 function afiseazaCod() {
-  const k = sim.editor;
-  $("#cd-titlu").textContent = `${PROG[k].titlu} › src › main.cpp`;
-  $("#cd-cod").innerHTML = cod(k).split("\n").map((l, i) => `<span class="cd-ln">${i + 1}</span>${l}`).join("\n");
-  $$("#cd-cod [data-cf]").forEach(el => el.addEventListener("change", () => { sim.camp[el.dataset.cf] = el.tagName === "SELECT" ? el.value : num(el.value); }));
-  $$("#cd-lista button").forEach(b => b.classList.toggle("activ", b.dataset.p === k));
-  $("#cd-env").textContent = PROG[k].placa === "mega" ? "env:megaatmega2560" : "env:bluepill_f103c8";
+  const pl = sim.placaCod, k = sim.sketch[pl];
+  $("#tk-sk").innerHTML = Object.entries(PROG).filter(([, p]) => p.placa === pl).map(([kk, p]) => `<option value="${kk}"${kk === k ? " selected" : ""}>${p.desc} (${p.titlu})</option>`).join("");
+  $("#tk-cod").innerHTML = cod(k).split("\n").map((l, i) => `<span class="cd-ln">${i + 1}</span>${l}`).join("\n");
+  $$("#tk-cod [data-cf]").forEach(el => { el.disabled = sim.run; el.addEventListener("change", () => { sim.camp[el.dataset.cf] = el.tagName === "SELECT" ? el.value : num(el.value); }); });
+  $("#tk-sk").disabled = sim.run; $("#tk-blocat").hidden = !sim.run;
+  afiseazaSerial();
 }
-function terminal(lin, cls) { const t = $("#term"); t.insertAdjacentHTML("beforeend", `<div class="${cls || ""}">${lin}</div>`); t.scrollTop = t.scrollHeight; }
-function incarca(doarBuild) {
-  if (sim.inc) return;
-  const k = sim.editor, pr = PROG[k], mega = pr.placa === "mega", err = verificaCod(k);
-  panou("term"); $("#term").innerHTML = "";
-  const env = mega ? "megaatmega2560" : "bluepill_f103c8", fl = mega ? 2900 + Math.round(Math.random() * 3000) : 13800 + Math.round(Math.random() * 4000);
-  const pasi = [
-    [`Processing ${env} (platform: ${mega ? "atmelavr" : "ststm32"}; board: ${env}; framework: arduino)`, ""],
-    ["--------------------------------------------------------------------------------", "slab"],
-    [`Compiling .pio/build/${env}/src/main.cpp.o`, ""]
-  ];
-  if (err && err[0].includes("error")) pasi.push([err[0], "err"], ["*** [.pio/build/" + env + "/src/main.cpp.o] Error 1", "err"], ["========================= [FAILED] Took 1.84 seconds =========================", "err"]);
-  else {
-    if (err) pasi.push([err[0], "warn"]);
-    pasi.push([`Linking .pio/build/${env}/firmware.elf`, ""], [`RAM:   [=         ]   ${mega ? "9.6% (used 788 bytes from 8192 bytes)" : "5.2% (used 1064 bytes from 20480 bytes)"}`, ""],
-      [`Flash: [${mega ? "          ]   " + fx(fl / 253952 * 100, 1).replace(",", ".") + "% (used " + fl + " bytes from 253952 bytes)" : "==        ]  " + fx(fl / 65536 * 100, 1).replace(",", ".") + "% (used " + fl + " bytes from 65536 bytes)"}`, ""]);
-    if (!doarBuild) {
-      if (mega) pasi.push(["Configuring upload protocol... AVAILABLE: wiring  CURRENT: upload_protocol = wiring", ""], ["Looking for upload port... Auto-detected: /dev/ttyACM0", ""], [`Uploading .pio/build/${env}/firmware.hex`, ""], ["avrdude: AVR device initialized and ready to accept instructions", ""], [`avrdude: writing flash (${fl} bytes): ████████████████████ 100%`, ""], [`avrdude: ${fl} bytes of flash verified`, "ok"]);
-      else pasi.push(["Configuring upload protocol... CURRENT: upload_protocol = stlink", ""], ["Open On-Chip Debugger 0.12.0 – Info : STLINK V2J37S7 (API v2) VID:PID 0483:3748", ""], ["Info : Target voltage: " + P().vdd.toFixed(3), ""], ["** Programming Started **", ""], ["** Programming Finished **", "ok"], ["** Verified OK **", "ok"], ["** Resetting Target **", ""]);
-      pasi.push([`========================= [SUCCESS] Took ${fx(2.4 + Math.random() * 1.5, 2).replace(",", ".")} seconds =========================`, "ok"]);
-    } else pasi.push([`========================= [SUCCESS] Took ${fx(1.2 + Math.random() * 0.6, 2).replace(",", ".")} seconds =========================`, "ok"]);
-  }
-  sim.inc = true; let i = 0;
-  const urm = () => {
-    if (i >= pasi.length) {
-      sim.inc = false;
-      if (!doarBuild && !(err && err[0].includes("error"))) { sim.fw[pr.placa] = snapshot(k); sim.n = 0; sim.led13 = false; actualizeazaFw(); if (k.endsWith("adc")) setTimeout(() => panou("serial"), 600); }
-      return;
-    }
-    terminal(pasi[i][0], pasi[i][1]); i++; setTimeout(urm, 90 + Math.random() * 180);
-  };
-  urm();
+function eroriCompilare() {
+  const out = [];
+  ["mega", "stm"].forEach(pl => { const k = sim.sketch[pl], e = verificaCod(k); if (e) out.push([PROG[k].titlu, e[0]]); });
+  return out;
+}
+function pornesteSim() {
+  if (sim.run) { opresteSim(); return; }
+  const er = eroriCompilare(), bara = $("#tk-erori");
+  const grave = er.filter(([, m]) => m.includes("error"));
+  if (grave.length) { bara.hidden = false; bara.innerHTML = grave.map(([t, m]) => `<b>${t}</b>: ${m}`).join("<br>"); return; }
+  bara.hidden = !er.length; bara.innerHTML = er.map(([t, m]) => `<b>${t}</b>: ${m}`).join("<br>");
+  sim.fw = { mega: snapshot(sim.sketch.mega), stm: snapshot(sim.sketch.stm) };
+  sim.run = true; sim.t0 = performance.now(); sim.n = 0; sim.led13 = false; sim.nMega = undefined; sim.nStm = undefined;
+  $("#tk-start").textContent = "■ Oprește simularea"; $("#tk-start").classList.add("ruleaza");
+  genAfis(); afiseazaCod(); actualizeazaFw(); achizitie(); deseneazaOsc(); citesteDMM();
+}
+function opresteSim() {
+  sim.run = false; sim.fw = { mega: null, stm: null };
+  $("#tk-start").textContent = "▶ Pornește simularea"; $("#tk-start").classList.remove("ruleaza"); $("#tk-timp").textContent = "";
+  genAfis(); afiseazaCod(); actualizeazaFw(); deseneazaOsc(); citesteDMM();
 }
 function actualizeazaFw() {
   const f = sim.fw.mega, s = sim.fw.stm;
   const d = f => !f ? "—" : PROG[f.prog].titlu + (f.prog === "mega_t1" ? ` (P = ${f.P}, ICR1 = ${f.top}, OCR1A = ${f.ocr})` : f.prog === "mega_aw" ? ` (valoare ${f.val})` : f.prog === "mega_isr" ? ` (ISR: ${{ dw: "digitalWrite", port: "PINB", ser: "Serial + digitalWrite" }[f.isr]})` : f.stare !== undefined ? ` (${f.stare ? "HIGH" : "LOW"})` : "");
-  $("#fw-mega").textContent = d(f); $("#fw-stm").textContent = d(s);
+  if ($("#fw-mega")) { $("#fw-mega").textContent = d(f); $("#fw-stm").textContent = d(s); }
 }
-function panou(p) { sim.panou = p; $$("[data-pn]").forEach(b => b.classList.toggle("activ", b.dataset.pn === p)); $("#term").hidden = p !== "term"; $("#serial").hidden = p !== "serial"; if (p === "serial") { $("#serial").textContent = sim.serial.join("\n"); } }
 
 /* ------------------------------------------------------------------ înregistrările */
 function msg(t) { $("#msg-inreg").textContent = t; }
 const rot = (v, n) => Math.round(v * 10 ** n) / 10 ** n;
 function inregGPIO(e) {
-  const s = sim.dmm.s, fw = sim.fw.mega || {}, fs = sim.fw.stm || {};
+  const s = net(sim.dmm.s), fw = sim.fw.mega || {}, fs = sim.fw.stm || {};
   let placa, stare;
   if (s === "pin13" && fw.prog === "mega_gpio") { placa = "mega"; stare = fw.stare; }
   else if (s === "PB12" && fs.prog === "stm_gpio") { placa = "stm"; stare = fs.stare; }
-  else return Cadru.mesajTemporar("Încărcați programul de ieșire digitală (mega_gpio sau stm32_gpio) și puneți sonda multimetrului pe pinul de ieșire (D13 sau PB12).", "atentie");
+  else return Cadru.mesajTemporar("Porniți simularea cu schița de ieșire digitală (mega_gpio sau stm32_gpio) și trageți sonda roșie a multimetrului pe pinul de ieșire (13 sau PB12).", "atentie");
   const U = sim.dmm.v, r = stare ? "UOH" : "UOL";
   const ok = Cadru.inregistreaza(e, { log: { m: "gpio", placa, stare: stare ? 1 : 0, U }, celule: [{ t: "t11", r, c: placa, v: U.toFixed(3) }] });
   if (ok) msg(`Tabelul 1.1: ${r} ${placa === "mega" ? "Arduino Mega" : "STM32F103"} = ${fx(U, 3)} V.`);
 }
 function inregADC(e, placa) {
   const fw = placa === "mega" ? sim.fw.mega || {} : sim.fw.stm || {}, pin = placa === "mega" ? "A0" : "PA0";
-  if (fw.prog !== (placa === "mega" ? "mega_adc" : "stm_adc")) return Cadru.mesajTemporar(`Încărcați programul ${placa === "mega" ? "mega_adc" : "stm32_adc"} și deschideți monitorul serial.`, "atentie");
-  if (sim.dmm.s !== pin) return Cadru.mesajTemporar(`Puneți sonda multimetrului pe ${pin} (cursorul potențiometrului).`, "atentie");
+  if (fw.prog !== (placa === "mega" ? "mega_adc" : "stm_adc")) return Cadru.mesajTemporar(`Porniți simularea cu schița ${placa === "mega" ? "mega_adc" : "stm32_adc"} și deschideți monitorul serial.`, "atentie");
+  if (net(sim.dmm.s) !== pin) return Cadru.mesajTemporar(`Puneți sonda multimetrului pe ${pin} (cursorul potențiometrului).`, "atentie");
   const N = placa === "mega" ? sim.nMega : sim.nStm; if (N === undefined) return Cadru.mesajTemporar("Așteptați prima linie pe monitorul serial.", "atentie");
   const tb = placa === "mega" ? "t12" : "t12b", chei = placa === "mega" ? ["p1", "p2", "p3", "p4", "p5"] : ["s1", "s2", "s3"], r = $("#sel-punct-" + placa).value;
   const U = sim.dmm.v;
@@ -425,22 +554,22 @@ function inregPWM(e) {
   const fw = sim.fw.mega || {}, a = sim.osc.acq;
   if (fw.prog === "mega_aw") {
     if (fw.val !== 128) return Cadru.mesajTemporar("Pentru rândul analogWrite() folosiți analogWrite(9, 128).", "atentie");
-    if (sim.osc.ch[0].s !== "pin9" || !a || !a.m.f) return Cadru.mesajTemporar("Conectați CH1 al osciloscopului pe D9 și ajustați baza de timp până apar măsurătorile automate.", "atentie");
+    if (net(sim.osc.ch[0].s) !== "pin9" || !a || !a.m.f) return Cadru.mesajTemporar("Conectați CH1 al osciloscopului pe D9 și ajustați baza de timp până apar măsurătorile automate.", "atentie");
     const f = rot(a.m.f, 1), dc = rot(a.m.dc, 2);
     const ok = Cadru.inregistreaza(e, { log: { m: "aw", f, dc }, celule: [{ t: "t13", r: "aw", c: "f", v: f.toFixed(1) }, { t: "t13", r: "aw", c: "dc", v: dc.toFixed(2) }] });
     if (ok) msg(`Tabelul 1.3 (analogWrite): f = ${fx(f, 1)} Hz, DC = ${fx(dc, 2)} %.`); return;
   }
-  if (fw.prog !== "mega_t1") return Cadru.mesajTemporar("Încărcați programul mega_timer1_pwm (sau mega_pwm_implicit pentru rândul analogWrite).", "atentie");
+  if (fw.prog !== "mega_t1") return Cadru.mesajTemporar("Porniți simularea cu schița mega_timer1_pwm (sau mega_pwm_implicit pentru rândul analogWrite).", "atentie");
   if (fw.P !== 1 || fw.top !== 799 || !MD.OCR.includes(fw.ocr)) return Cadru.mesajTemporar("Tabelul 1.3 se completează cu P = 1 (CS10), ICR1 = 799 și OCR1A = 199, 399 sau 599.", "atentie");
-  if (sim.osc.ch[0].s !== "pin11" || !a || !a.m.f) return Cadru.mesajTemporar("Conectați CH1 al osciloscopului pe D11 (OC1A) și alegeți o bază de timp potrivită (de ex. 10 µs/div).", "atentie");
-  if (sim.dmm.s !== "pin11") return Cadru.mesajTemporar("Puneți și sonda multimetrului pe D11 pentru tensiunea medie.", "atentie");
+  if (net(sim.osc.ch[0].s) !== "pin11" || !a || !a.m.f) return Cadru.mesajTemporar("Conectați CH1 al osciloscopului pe D11 (OC1A) și alegeți o bază de timp potrivită (de ex. 10 µs/div).", "atentie");
+  if (net(sim.dmm.s) !== "pin11") return Cadru.mesajTemporar("Puneți și sonda multimetrului pe D11 pentru tensiunea medie.", "atentie");
   const f = Math.round(a.m.f), dc = rot(a.m.dc, 2), um = sim.dmm.v, r = "o" + fw.ocr;
   const ok = Cadru.inregistreaza(e, { log: { m: "pwm", ocr: fw.ocr, f, dc, um }, celule: [{ t: "t13", r, c: "f", v: String(f) }, { t: "t13", r, c: "dc", v: dc.toFixed(2) }, { t: "t13", r, c: "um", v: um.toFixed(3) }] });
   if (ok) msg(`Tabelul 1.3 (OCR1A = ${fw.ocr}): f = ${f} Hz, DC = ${fx(dc, 2)} %, U_med = ${fx(um, 3)} V.`);
 }
 function inregLat(e) {
   const fw = sim.fw.mega || {}, a = sim.osc.acq;
-  if (fw.prog !== "mega_isr" || fw.isr === "ser") return Cadru.mesajTemporar("Încărcați programul mega_intrerupere cu rutina digitalWrite() sau cu scrierea directă în PINB.", "atentie");
+  if (fw.prog !== "mega_isr" || fw.isr === "ser") return Cadru.mesajTemporar("Porniți simularea cu schița mega_intrerupere cu rutina digitalWrite() sau cu scrierea directă în PINB.", "atentie");
   if (!a || !a.m.lat) return Cadru.mesajTemporar("CH1 pe D2, CH2 pe D13, generatorul pornit (sau o apăsare de buton cu osciloscopul în așteptare) și baza de timp de 1…2 µs/div.", "atentie");
   const col = fw.isr === "port" ? "port" : "dw", r = ["m1", "m2", "m3"].find(k => Cadru.D.t.t14[k][col] === "") || "m3";
   const v = rot(a.m.lat, 2);
@@ -563,39 +692,38 @@ const TEST = [
 
 /* ------------------------------------------------------------------ definiția lucrării */
 const CSS = `<style>
-.mam-bara { display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; margin:.4rem 0; }
-.vs { background:#1e1e1e; color:#d4d4d4; border-radius:8px; overflow:hidden; border:1px solid #333; font:12.5px/1.45 ui-monospace,Consolas,"Cascadia Code",monospace; }
-.vs-sus { display:flex; align-items:center; gap:.5rem; background:#2d2d2d; padding:.3rem .6rem; color:#ccc; font:12px system-ui,sans-serif; }
-.vs-sus b { color:#fff; font-weight:600; } .vs-sus .env { margin-left:auto; color:#e7a43a; }
-.vs-corp { display:grid; grid-template-columns:170px 1fr; min-height:300px; }
-.vs-lista { background:#252526; padding:.4rem 0; border-right:1px solid #333; font:12px system-ui,sans-serif; }
-.vs-lista div { padding:.2rem .7rem; color:#9da5b4; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
-.vs-lista button { display:block; width:100%; text-align:left; background:none; border:0; color:#ccc; padding:.25rem .9rem; cursor:pointer; font:12px ui-monospace,monospace; }
-.vs-lista button:hover { background:#2a2d2e; } .vs-lista button.activ { background:#37373d; color:#fff; }
-.vs-lista small { display:block; color:#888; font:10.5px system-ui,sans-serif; }
-#cd-cod { margin:0; padding:.6rem .4rem; white-space:pre; overflow:auto; max-height:320px; background:#1e1e1e; color:#d4d4d4; }
-.cd-ln { display:inline-block; width:2.4em; color:#858585; text-align:right; margin-right:1em; user-select:none; }
-.cd-k { color:#569cd6; } .cd-s { color:#ce9178; } .cd-c { color:#6a9955; } .cd-n { color:#b5cea8; }
-.cd-f { background:#3c3c3c; color:#ffd479; border:1px solid #6d6d6d; border-radius:3px; font:inherit; padding:0 .2rem; max-width:100%; }
-.vs-bara { display:flex; gap:.3rem; background:#007acc; padding:.25rem .5rem; align-items:center; flex-wrap:wrap; }
-.vs-bara button { background:transparent; border:1px solid rgba(255,255,255,.35); color:#fff; border-radius:3px; padding:.15rem .55rem; cursor:pointer; font:12px system-ui,sans-serif; }
-.vs-bara button.activ { background:rgba(255,255,255,.22); } .vs-bara span { color:#e8f4ff; font:11px system-ui,sans-serif; margin-left:auto; }
-#term, #serial { margin:0; height:150px; overflow:auto; background:#181818; color:#cccccc; padding:.4rem .6rem; white-space:pre-wrap; font:11.5px/1.4 ui-monospace,Consolas,monospace; }
-#term .ok { color:#89d185; } #term .err { color:#f48771; } #term .warn { color:#cca700; } #term .slab { color:#6b6b6b; }
-.rigol { background:#2b2e33; border-radius:8px; padding:.5rem; color:#dfe3e8; }
-.rigol canvas { width:100%; height:260px; display:block; border-radius:3px; }
-.rigol .mam-bara label { font-size:.78rem; color:#cfd5db; } .rigol select { background:#1a1d21; color:#e9edf1; border:1px solid #555; border-radius:3px; }
-#osc-run { background:#c62828; color:#fff; border:0; border-radius:4px; padding:.25rem .8rem; font-weight:700; }
-.rigol .mam-bara { display:grid; grid-template-columns:auto repeat(3, minmax(0,1fr)); gap:.35rem .6rem; align-items:end; } .rigol .mam-bara label { display:flex; flex-direction:column; gap:.1rem; } .rigol .mam-bara select { width:100%; }
-#osc-stare { font:11px ui-monospace,monospace; color:#9fb3c8; } #osc-cit { font:12px ui-monospace,monospace; color:#ffe96b; min-height:1.2em; margin:.3rem 0 0; }
-.dmm { display:flex; align-items:center; gap:.8rem; background:#e9b400; border-radius:12px; padding:.5rem .7rem; color:#222; }
-.dmm .ecr { background:#a9b59a; border:3px solid #333; border-radius:6px; padding:.2rem .6rem; font:700 1.9rem/1 "DSEG7 Classic",ui-monospace,monospace; color:#1b2015; min-width:7.5rem; text-align:right; }
-.dmm select { font-size:.8rem; }
-.fw { font-size:.8rem; }
-pre.cod { background:#1e1e1e; color:#d4d4d4; padding:.7rem .9rem; border-radius:6px; overflow:auto; font:12.5px/1.45 ui-monospace,Consolas,monospace; } .fw b { font-family:ui-monospace,monospace; }
-@media (max-width:720px){ .vs-corp { grid-template-columns:1fr; } .vs-lista { display:flex; flex-wrap:wrap; } .vs-lista div { width:100%; } .vs-lista button { width:auto; } }
+.tk { padding:0 !important; overflow:hidden; background:#fff; color:#222; }
+.tk-bara { display:flex; flex-wrap:wrap; align-items:center; gap:.45rem; padding:.45rem .6rem; background:#fff; border-bottom:1px solid #e3e3e3; }
+.tk-logo { font:600 .9rem system-ui,sans-serif; color:#333; margin-right:auto; } .tk-logo b { color:#1477d1; }
+.tk-unelte { display:flex; gap:.15rem; } .tk-unelte i { font-style:normal; color:#9a9a9a; padding:.2rem .4rem; border-radius:4px; }
+.tk-bara button { border:1px solid #cfd4da; background:#fff; color:#333; border-radius:4px; padding:.32rem .7rem; font:600 .82rem system-ui,sans-serif; cursor:pointer; }
+.tk-bara button.activ { background:#e8f1fb; border-color:#1477d1; color:#0d5ea8; }
+.tk-bara .tk-start { background:#2e9e44; border-color:#2e9e44; color:#fff; } .tk-bara .tk-start.ruleaza { background:#d6452f; border-color:#d6452f; }
+.tk-corp { display:flex; min-height:520px; background:#fbfbfb; }
+.tk-plansa { position:relative; flex:1 1 auto; min-width:0; }
+#tk-svg { width:100%; height:100%; min-height:520px; display:block; touch-action:none; user-select:none; font-family:system-ui,sans-serif; }
+.tk-pin { fill:transparent; stroke:transparent; cursor:crosshair; } .tk-pin:hover, .tk-pin.aproape { fill:rgba(20,119,209,.35); stroke:#1477d1; stroke-width:1.2; }
+.tk-comp { cursor:pointer; }
+.tk-ajutor { position:absolute; left:.6rem; bottom:.4rem; margin:0; font:11px system-ui,sans-serif; color:#888; pointer-events:none; }
+.tk-insp { position:absolute; right:.6rem; top:.6rem; width:250px; background:#fff; border:1px solid #d8dde3; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.15); font:12.5px system-ui,sans-serif; color:#333; }
+.tk-insp-t { display:flex; justify-content:space-between; align-items:center; padding:.5rem .6rem; font-weight:700; border-bottom:1px solid #eee; } .tk-insp-t button { border:0; background:none; cursor:pointer; color:#777; }
+.tk-insp-r { display:flex; justify-content:space-between; gap:.6rem; padding:.3rem .6rem; } .tk-insp-r span { color:#777; } .tk-insp-r b { font-weight:600; text-align:right; }
+.tk-cod { flex:0 0 370px; max-width:40%; border-left:1px solid #e3e3e3; background:#fff; display:flex; flex-direction:column; }
+.tk-cod[hidden] { display:none; }
+.tk-cod-sus { display:flex; gap:.4rem; padding:.4rem .5rem; border-bottom:1px solid #eee; align-items:center; font:12px system-ui,sans-serif; color:#555; } .tk-cod-sus select { font:12px system-ui,sans-serif; padding:.2rem; border:1px solid #cfd4da; border-radius:4px; background:#fff; color:#222; max-width:100%; }
+#tk-cod { flex:1 1 auto; margin:0; padding:.5rem .3rem; overflow:auto; background:#fff; color:#1f1f1f; font:12px/1.5 ui-monospace,Consolas,"Courier New",monospace; white-space:pre; min-height:250px; max-height:430px; }
+.cd-ln { display:inline-block; width:2.4em; color:#a8a8a8; text-align:right; margin-right:.9em; user-select:none; }
+.cd-k { color:#0b62b5; font-weight:600; } .cd-s { color:#b2502b; } .cd-c { color:#6a8759; font-style:italic; } .cd-n { color:#7a3fb0; }
+.cd-f { min-width:5.5ch; background:#fff8d6; color:#5b3d00; border:1px solid #e0b84a; border-radius:3px; font:inherit; padding:0 .2rem; max-width:100%; } .cd-f:disabled { background:#f1f1f1; color:#777; border-color:#ccc; }
+.tk-blocat { background:#fff4e5; color:#8a5300; font:12px system-ui,sans-serif; padding:.35rem .6rem; border-bottom:1px solid #f1d7a8; }
+.tk-erori { background:#fde8e6; color:#9b1c10; font:12px ui-monospace,monospace; padding:.4rem .6rem; border-bottom:1px solid #f3b9b1; }
+.tk-ser-bara { display:flex; gap:.4rem; padding:.35rem .5rem; border-top:1px solid #eee; } .tk-ser-bara button { border:1px solid #cfd4da; background:#fff; border-radius:4px; padding:.2rem .6rem; font:12px system-ui,sans-serif; cursor:pointer; color:#333; } .tk-ser-bara button.activ { background:#e8f1fb; border-color:#1477d1; }
+#tk-serial { margin:0; height:150px; overflow:auto; background:#fff; border-top:1px solid #eee; color:#222; padding:.4rem .6rem; font:12px/1.4 ui-monospace,Consolas,monospace; }
+.fw { font-size:.8rem; } .fw b { font-family:ui-monospace,monospace; }
+pre.cod { background:#1e1e1e; color:#d4d4d4; padding:.7rem .9rem; border-radius:6px; overflow:auto; font:12.5px/1.45 ui-monospace,Consolas,monospace; }
+.sim-grila:fullscreen .tk-corp, .sim-grila.ecran-plin .tk-corp { min-height:calc(100vh - 5rem); }
+@media (max-width:860px){ .tk-corp { flex-direction:column; } .tk-cod { max-width:none; flex-basis:auto; border-left:0; border-top:1px solid #e3e3e3; } #tk-svg { min-height:360px; } }
 </style>`;
-const SURSE = ["pin11", "pin9", "pin13", "pin2", "A0", "PB12", "PA0", "off"];
 Cadru.porneste({
   disc: "MAM1", nr: 1, cod: "mam1-l1",
   titlu: "Microcontrolere: intrări/ieșiri, convertor A/D, timere, întreruperi și PWM",
@@ -663,33 +791,33 @@ Cadru.porneste({
   continut: { teorie: HTML_TEORIE, probleme: htmlProbleme, intrebari: INTREBARI, test: TEST },
   sim: {
     html: `${CSS}<div class="sim-grila">
-    <div class="card sim-scena scena">
-      <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
-      ${standSVG()}
-      <p class="nota" style="margin:.3rem 0">Rotiți potențiometrele cu mouse-ul (sau rotița), apăsați butonul D2, clic pe generator pentru a-i porni/opri ieșirea. Marcajele colorate arată unde sunt sondele.</p>
-      <div class="vs">
-        <div class="vs-sus"><b>VS Code</b> · PlatformIO <span id="cd-titlu"></span><span class="env" id="cd-env"></span></div>
-        <div class="vs-corp">
-          <div class="vs-lista" id="cd-lista"><div>Proiecte</div>${Object.entries(PROG).map(([k, p]) => `<button type="button" data-p="${k}">${p.titlu}<small>${p.desc}</small></button>`).join("")}</div>
-          <pre id="cd-cod"></pre>
-        </div>
-        <div class="vs-bara"><button type="button" id="btn-build" title="PlatformIO: Build">✓ Build</button><button type="button" id="btn-up" title="PlatformIO: Upload">→ Upload</button><button type="button" data-pn="term" class="activ">TERMINAL</button><button type="button" data-pn="serial">SERIAL MONITOR (115200)</button><span>UTF-8 · C++ · PlatformIO</span></div>
-        <pre id="term">Selectați un proiect din stânga, modificați câmpurile galbene și apăsați → Upload.</pre><pre id="serial" hidden></pre>
+    <div class="card sim-scena scena tk">
+      <div class="tk-bara">
+        <span class="tk-logo">⚡ <b>Circuite</b> · Stand MAM I – Lucrarea 1</span>
+        <span class="tk-unelte" aria-hidden="true"><i title="Rotire">⟳</i><i title="Ștergere">🗑</i><i title="Anulare">↶</i><i title="Refacere">↷</i><i title="Notițe">✎</i></span>
+        <button type="button" id="tk-fit" title="Încadrează tot">⤢ Încadrează</button>
+        <button type="button" id="btn-ecran" title="Ecran complet">⛶ Ecran complet</button>
+        <button type="button" id="tk-codb" class="activ">{ } Cod</button>
+        <button type="button" id="tk-start" class="tk-start">▶ Pornește simularea</button>
       </div>
-      <div class="rigol" style="margin-top:.6rem">
-        <div class="mam-bara"><b style="color:#fff">RIGOL DS1074Z Plus</b>
-          <label>Timp/div <select id="osc-t">${TDIV.map(v => `<option value="${v}">${fmtT(v)}</option>`).join("")}</select></label>
-          ${[0, 1].map(c => `<label style="color:${CUL[c]}">CH${c + 1} <select data-och="${c}">${SURSE.map(s => `<option value="${s}">${PIN_ET[s]}</option>`).join("")}</select></label><label>V/div <select data-ov="${c}">${VDIV.map(v => `<option value="${v}">${fx(v, 1)}</option>`).join("")}</select></label>`).join("")}
-          <button type="button" id="osc-run">STOP</button>
+      <div class="tk-corp">
+        <div class="tk-plansa">${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div>
+          <p class="tk-ajutor">Rotița = zoom · tragere pe fundal = deplasare · trageți vârfurile sondelor (V, 1, 2) pe pini · rotiți potențiometrele · apăsați butonul · OUTPUT pornește generatorul · clic pe o componentă = proprietăți</p></div>
+        <div class="tk-cod" id="tk-codp">
+          <div class="tk-cod-sus"><select disabled><option>Text</option></select>
+            <select id="tk-placa"><option value="mega">1 (Arduino Mega 2560)</option><option value="stm">2 (STM32 Blue Pill)</option></select></div>
+          <div class="tk-cod-sus"><label>Schiță <select id="tk-sk"></select></label></div>
+          <div id="tk-blocat" class="tk-blocat" hidden>Opriți simularea pentru a modifica codul.</div>
+          <div id="tk-erori" class="tk-erori" hidden></div>
+          <pre id="tk-cod"></pre>
+          <div class="tk-ser-bara"><button type="button" id="tk-serb">Monitor serial</button><button type="button" id="tk-serc">Golește</button></div>
+          <pre id="tk-serial" hidden></pre>
         </div>
-        <canvas id="cv-osc" height="260" aria-label="Ecranul osciloscopului"></canvas>
-        <div id="osc-stare"></div><p id="osc-cit"></p>
       </div>
+      <p class="nota" id="osc-cit" style="margin:.35rem 0 0"></p>
     </div>
     <aside class="card sim-comenzi">
-      <h2>Multimetrul (DC V)</h2>
-      <div class="dmm"><div class="ecr" id="dmm-v">0.000</div><div><b>V DC</b><br><label>Sonda + pe <select id="dmm-s">${["A0", "pin11", "pin9", "pin13", "pin2", "v5", "PB12", "PA0", "v33"].map(s => `<option value="${s}">${PIN_ET[s]}</option>`).join("")}</select></label><br><small>COM la GND</small></div></div>
-      <h2>Programele încărcate</h2>
+      <h2>Programele în execuție</h2>
       <p class="fw">Arduino Mega: <b id="fw-mega">—</b><br>STM32F103: <b id="fw-stm">—</b></p>
       <h2>Înregistrare în tabele</h2>
       <button type="button" class="primar lat" id="btn-t11">● U<sub>OH</sub>/U<sub>OL</sub> (multimetru) → Tabelul 1.1</button>
@@ -698,40 +826,40 @@ Cadru.porneste({
       <button type="button" class="primar lat" id="btn-t13">● f, DC (osciloscop), U<sub>med</sub> → Tabelul 1.3</button>
       <button type="button" class="primar lat" id="btn-t14">● Întârzierea D2→D13 → Tabelul 1.4</button>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
-      <p class="nota">Valorile se trec în tabele numai din aparate: multimetrul, monitorul serial și măsurătorile automate ale osciloscopului.</p>
+      <p class="nota">Valorile se trec în tabele numai din aparate (multimetru, monitorul serial, măsurătorile osciloscopului), cu simularea pornită.</p>
     </aside>
   </div>`,
     init(C) {
-      legaStand(); afiseazaCod(); actualizeazaFw(); actualizeazaSonde();
-      $$("#cd-lista button").forEach(b => b.addEventListener("click", () => { sim.editor = b.dataset.p; afiseazaCod(); }));
-      $("#btn-build").addEventListener("click", () => incarca(true));
-      $("#btn-up").addEventListener("click", () => incarca(false));
-      $$("[data-pn]").forEach(b => b.addEventListener("click", () => panou(b.dataset.pn)));
-      $("#osc-t").value = String(sim.osc.tdiv);
-      $("#osc-t").addEventListener("change", e => { sim.osc.tdiv = +e.target.value; achizitie(); deseneazaOsc(); });
-      $$("[data-och]").forEach(s => { const c = +s.dataset.och; s.value = sim.osc.ch[c].s; s.addEventListener("change", () => { sim.osc.ch[c].s = s.value; actualizeazaSonde(); achizitie(); deseneazaOsc(); }); });
-      $$("[data-ov]").forEach(s => { const c = +s.dataset.ov; s.value = String(sim.osc.ch[c].vdiv); s.addEventListener("change", () => { sim.osc.ch[c].vdiv = +s.value; deseneazaOsc(); }); });
-      $("#osc-run").addEventListener("click", () => { sim.osc.ruleaza = !sim.osc.ruleaza; $("#osc-run").textContent = sim.osc.ruleaza ? "STOP" : "RUN"; deseneazaOsc(); });
-      $("#dmm-s").value = sim.dmm.s; $("#dmm-s").addEventListener("change", e => { sim.dmm.s = e.target.value; actualizeazaSonde(); citesteDMM(); });
+      legaPlansa(); desenSonde(); afiseazaCod(); actualizeazaFw(); genAfis();
+      $("#tk-placa").addEventListener("change", e => { sim.placaCod = e.target.value; afiseazaCod(); });
+      $("#tk-sk").addEventListener("change", e => { sim.sketch[sim.placaCod] = e.target.value; afiseazaCod(); });
+      $("#tk-start").addEventListener("click", pornesteSim);
+      $("#tk-codb").addEventListener("click", () => { const p = $("#tk-codp"); p.hidden = !p.hidden; $("#tk-codb").classList.toggle("activ", !p.hidden); });
+      $("#tk-serb").addEventListener("click", () => { const s = $("#tk-serial"); s.hidden = !s.hidden; $("#tk-serb").classList.toggle("activ", !s.hidden); afiseazaSerial(); });
+      $("#tk-serc").addEventListener("click", () => { sim.serial[sim.placaCod] = []; afiseazaSerial(); });
+      $("#tk-fit").addEventListener("click", () => seteazaVB(VB0.slice()));
       $("#btn-t11").addEventListener("click", inregGPIO);
       $("#btn-t12").addEventListener("click", e => inregADC(e, "mega"));
       $("#btn-t12b").addEventListener("click", e => inregADC(e, "stm"));
       $("#btn-t13").addEventListener("click", inregPWM);
       $("#btn-t14").addEventListener("click", inregLat);
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
-      ["fullscreenchange", "webkitfullscreenchange"].forEach(ev => document.addEventListener(ev, () => setTimeout(deseneazaOsc, 120)));
-      achizitie(); citesteDMM();
-      C.mesaj("Începeți cu proiectul mega_gpio: alegeți HIGH, încărcați programul (→ Upload) și măsurați cu multimetrul pe D13.", "");
+      deseneazaOsc(); citesteDMM();
+      C.mesaj("Alegeți schița mega_gpio (HIGH) în panoul de cod, porniți simularea și trageți sonda roșie a multimetrului pe pinul 13.", "");
     },
-    reset() { Object.assign(sim, { fw: { mega: null, stm: null }, serial: [], n: 0, led13: false, nMega: undefined, nStm: undefined }); if ($("#fw-mega")) actualizeazaFw(); },
+    reset() { if (sim.run && $("#tk-start")) opresteSim(); Object.assign(sim, { serial: { mega: [], stm: [] }, n: 0, led13: false, nMega: undefined, nStm: undefined }); },
     cadru(dt, C, vizibil) {
       const acum = performance.now();
       if (acum - sim.tSer > 200) { sim.tSer = acum; linieSerial(); }
       if (!vizibil) return;
-      if (sim.osc.ruleaza && acum - sim.osc.tAcq > 140) { sim.osc.tAcq = acum; achizitie(); deseneazaOsc(); }
+      if (sim.run && sim.osc.ruleaza && acum - sim.osc.tAcq > 140) { sim.osc.tAcq = acum; achizitie(); deseneazaOsc(); }
       if (acum - sim.dmm.tA > 330) { sim.dmm.tA = acum; citesteDMM(); }
       actualizeazaLeduri(acum);
-      if (acum - (this._ts || 0) > 300) { this._ts = acum; const fw = sim.fw.mega; C.stare(1, fw ? `Mega: ${PROG[fw.prog].titlu}` : "Mega: fără program", fw ? "inc" : ""); C.stare(2, sim.fw.stm ? `STM32: ${PROG[sim.fw.stm.prog].titlu}` : ""); }
+      if (acum - (this._ts || 0) > 300) {
+        this._ts = acum;
+        if (sim.run) { const t = Math.floor((acum - sim.t0) / 1000); $("#tk-timp").textContent = `Timp de simulare: ${String(Math.floor(t / 3600)).padStart(2, "0")}:${String(Math.floor(t / 60) % 60).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; }
+        C.stare(1, sim.run ? "simulare pornită" : "simulare oprită", sim.run ? "inc" : ""); C.stare(2, sim.run && sim.fw.mega ? `Mega: ${PROG[sim.fw.mega.prog].titlu} · STM32: ${PROG[sim.fw.stm.prog].titlu}` : "");
+      }
     },
     redeseneaza() { deseneazaOsc(); },
     formule() {
