@@ -181,7 +181,7 @@ function masoaraCursa(e) {
 
 /* ------------------------------------------------------------------ grafic în timp real */
 function deseneazaLive() {
-  const cv = $("#cv-live"); if (!cv || !cv.offsetParent) return;
+  const cv = $("#cv-live"); if (!cv || !cv.getClientRects().length) return;
   const t = Cadru.D.t, pts1 = TREPTE1.map(F => [F, num((t.t31[F] || {}).p)]).filter(p => p[1] > 0), pts2 = TREPTE2.map(F => [F, num((t.t32[F] || {}).p)]).filter(p => p[1] > 0);
   const i = M3.ip(P()), Am = M3.aria(DM);
   deseneazaGrafic(cv, { xmin: 0, xmax: 400, xticks: [0, 50, 100, 150, 200, 250, 300, 350, 400], ymin: 0, ymax: 160, yticks: [0, 20, 40, 60, 80, 100, 120, 140, 160], xlab: "F_p [N]", ylab: "p [bar]", serii: [

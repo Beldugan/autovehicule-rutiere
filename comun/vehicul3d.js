@@ -4,7 +4,7 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { construiesteMotor } from "./motor3d.js?v=3";
+import { construiesteMotor, transmisieAccesorii } from "./motor3d.js?v=4";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -281,7 +281,7 @@ export function creeaza(gazda, optiuni = {}) {
   const apasa = on => { st.apasat = on; bF.classList.toggle("activ", on); };
   bF.addEventListener("pointerdown", e => { e.preventDefault(); bF.setPointerCapture?.(e.pointerId); apasa(true); });
   ["pointerup", "pointercancel", "lostpointercapture"].forEach(ev => bF.addEventListener(ev, () => apasa(false)));
-  tasta = e => { if (e.code === "Space" && gazda.offsetParent && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) { e.preventDefault(); apasa(e.type === "keydown"); } };
+  tasta = e => { if (e.code === "Space" && gazda.getClientRects().length && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) { e.preventDefault(); apasa(e.type === "keydown"); } };
   window.addEventListener("keydown", tasta); window.addEventListener("keyup", tasta);
   } else S.leaga(cmd, st);
 
@@ -438,7 +438,7 @@ export function creeaza(gazda, optiuni = {}) {
   function bucla(t) {
     raf = requestAnimationFrame(bucla);
     const dt = clamp((t - tPrec) / 1000, 0, 0.05); tPrec = t;
-    if (!gazda.offsetParent) return; // tab ascuns: nu consumăm procesor
+    if (!gazda.getClientRects().length) return; // tab ascuns: nu consumăm procesor
     for (let k = 0; k < 4; k++) pas(dt / 4);
     if (zbor) { zbor.k = Math.min(1, zbor.k + dt / 0.9); const e = sstep(0, 1, zbor.k); camera.position.lerpVectors(zbor.p0, zbor.p1, e); ctl.target.lerpVectors(zbor.t0, zbor.t1, e); if (zbor.k >= 1) zbor = null; }
     ctl.update();
@@ -642,6 +642,9 @@ function construiesteUngere({ THREE, caroserie, optiuni, ctxMotor }) {
   et.push({ obj: filtru, text: "Filtrul de ulei" });
   const sorb = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.01, 16), mOtel); sorb.position.set(X0, 0.225, -0.1); M.add(sorb);
   et.push({ obj: sorb, text: "Sorbul cu sită" });
+  // transmisia accesoriilor (aceeași construcție ca la motorul de pe stand): fulia arborelui cotit, rola întinzătoare, alternatorul, pompa de apă, cureaua Poly-V
+  const acc = transmisieAccesorii(); acc.grup.rotation.y = Math.PI / 2; acc.grup.position.set(X0, YC, -0.42 + acc.XP); M.add(acc.grup);
+  et.push({ obj: acc.rot.altern, text: "Alternatorul" }, { obj: acc.rot.pompa, text: "Pompa de apă (antrenată de curea)" });
 
   // traseele de ulei: țeava (transparentă) + uleiul care o umple progresiv
   const trasee = [];
@@ -743,7 +746,7 @@ function construiesteUngere({ THREE, caroserie, optiuni, ctxMotor }) {
     if (st.motor && st.tLag === null && ramuri.every(r => r.plin >= 1)) st.tLag = st.tPorn;
     if (st.motor && st.tCam === null && trasee[trasee.length - 1].plin >= 1) st.tCam = st.tPorn;
     // rotirea pieselor (vizual încetinită de 40 de ori)
-    st.unghi += st.n / 60 * 2 * Math.PI * dt / 40;
+    st.unghi += st.n / 60 * 2 * Math.PI * dt / 40; acc.roteste(st.n / 60 * 2 * Math.PI * dt / 40);
     cotit.rotation.z = -st.unghi; came.rotation.z = -st.unghi / 2;
     piese.forEach(o => {
       const a = st.unghi + o.faza, r = 0.043, L = 0.14;
@@ -964,7 +967,7 @@ function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       on.addEventListener("change", () => { st.ch[i].on = on.checked; st.buf[i] = []; stil(); });
       sk.addEventListener("change", () => { st.ch[i].k = sk.value; st.buf[i] = []; if (!st.ch[i].on) { st.ch[i].on = on.checked = true; stil(); } });
     });
-    window.addEventListener("keydown", e => { if (!API || !API.scena.offsetParent || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; if (["ArrowUp", "KeyW"].includes(e.code)) { st.accApasat = true; e.preventDefault(); } if (["ArrowDown", "KeyS", "Space"].includes(e.code)) { st.frApasat = true; e.preventDefault(); } });
+    window.addEventListener("keydown", e => { if (!API || !API.scena.getClientRects().length || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; if (["ArrowUp", "KeyW"].includes(e.code)) { st.accApasat = true; e.preventDefault(); } if (["ArrowDown", "KeyS", "Space"].includes(e.code)) { st.frApasat = true; e.preventDefault(); } });
     window.addEventListener("keyup", e => { if (["ArrowUp", "KeyW"].includes(e.code)) st.accApasat = false; if (["ArrowDown", "KeyS", "Space"].includes(e.code)) st.frApasat = false; });
   }
   const v3 = new THREE.Vector3();

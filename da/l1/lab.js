@@ -174,7 +174,7 @@ function actualizeazaSVG(dt) {
 /* ------------------------------------------------------------------ macheta 3D (aceeași rețea, pe autoturism) */
 function porneste3D() {
   const el = $("#retea3d"); if (!el) return;
-  import(BAZA_COMUN + "vehicul3d.js?v=12").then(m => {
+  import(BAZA_COMUN + "vehicul3d.js?v=15").then(m => {
     SV.v3d = m.creeaza(el, { sistem: "retea", control: {
       stare: () => ({ contact: sim.contact || treaza(), defBus: defBus(), defTip: sim.defActiv ? defect() : "", arataDefect: !MOD.eval, punct: sim.punct, sonde: sim.aparat === "mm" || sim.aparat === "osc" }),
       onSelect: k => { if (MD.MK[k] && raspunde(k)) { sim.modCod = k; if (sim.vx === "cod") panouX431(); } $("#af-sel").textContent = k === "obd" ? "Priza OBD (J1962)" : MD.MK[k].nume; $("#af-sel-b").textContent = k === "obd" ? "CAN diagnoză + DoIP" : k === "gw" ? "toate magistralele" : NUME_MAG(MD.MK[k].b) + " · " + MD.MK[k].adr; }
@@ -205,7 +205,7 @@ function achizitie() {
   o.t0 = t0;
 }
 function deseneazaOsc() {
-  const cv = $("#cv-osc"); if (!cv || !cv.offsetParent) return;
+  const cv = $("#cv-osc"); if (!cv || !cv.getClientRects().length) return;
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, o = sim.osc;
   const nAct = o.ch.filter(c => c.on).length, benzi = o.benzi && nAct > 1;
   const Hmin = benzi ? 60 + 135 * nAct : 320;

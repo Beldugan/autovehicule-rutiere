@@ -28,38 +28,22 @@ export const MAT = () => fixEnv({
 });
 
 function fixEnv(o) { Object.values(o).forEach(m => { m.envMapIntensity = 0.55; }); return o; }
-/** construiește motorul; întoarce grupul, componentele selectabile și ancorele etichetelor/sondelor */
-export function construiesteMotor(opt = {}) {
-  const M = MAT(), g = new THREE.Group(), comp = {}, ancore = {}, conectori = {}, rot = {};
+/** funcțiile de construcție (corpuri simple) legate de grupul g */
+function ajutoare(g) {
   const add = (o, p = g) => { o.castShadow = o.receiveShadow = true; p.add(o); return o; };
   const box = (w, h, d, m, x, y, z, p) => { const o = add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m), p); o.position.set(x, y, z); return o; };
   const rbox = (w, h, d, r, m, x, y, z, p) => { const o = add(new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), m), p); o.position.set(x, y, z); return o; };
   const cyl = (r1, r2, h, m, x, y, z, ax = "y", p, seg = 32) => { const o = add(new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), m), p); o.position.set(x, y, z); if (ax === "x") o.rotation.z = Math.PI / 2; if (ax === "z") o.rotation.x = Math.PI / 2; return o; };
   const tub = (pts, r, m, p, seg) => { const c = new THREE.CatmullRomCurve3(pts.map(v => new THREE.Vector3(...v)), false, "catmullrom", 0.3); return add(new THREE.Mesh(new THREE.TubeGeometry(c, seg || Math.max(24, pts.length * 12), r, 12, false), m), p); };
-  const grupC = (k, nume) => { const gg = new THREE.Group(); gg.userData.c = k; gg.name = nume || k; g.add(gg); comp[k] = gg; return gg; };
-  const XC = [-0.135, -0.045, 0.045, 0.135];     // pozițiile cilindrilor pe axa x
+  return { add, box, rbox, cyl, tub };
+}
 
-  // ---------------- blocul motor (fontă) cu nervuri, carterul inferior, chiulasa, capacul
-  rbox(0.46, 0.36, 0.27, 0.012, M.fonta, -0.01, 0.07, 0);
-  for (const s of [1, -1]) for (let i = 0; i < 6; i++) box(0.012, 0.3, 0.014, M.fonta, -0.2 + i * 0.08, 0.06, s * 0.142);
-  rbox(0.44, 0.15, 0.29, 0.02, M.aluMat, -0.01, -0.185, -0.005);                 // baia de ulei
-  for (let i = 0; i < 7; i++) box(0.006, 0.12, 0.3, M.aluMat, -0.2 + i * 0.065, -0.19, -0.005);
-  cyl(0.012, 0.012, 0.03, M.otel, 0.12, -0.27, -0.06);                         // bușonul de golire
-  rbox(0.47, 0.12, 0.25, 0.01, M.alu, -0.01, 0.31, 0);                           // chiulasa (aluminiu)
-  rbox(0.42, 0.08, 0.2, 0.03, M.plastic, -0.02, 0.405, 0.005);                   // capacul culbutorilor
-  for (let i = 0; i < 5; i++) box(0.36, 0.006, 0.01, M.plastic, -0.02, 0.447, -0.06 + i * 0.03);
-  cyl(0.026, 0.026, 0.025, M.galben, 0.09, 0.455, 0.05);                         // bușonul de umplere cu ulei
-  // bobina de inducție (DIS) și fișele de înaltă tensiune către bujii
-  rbox(0.11, 0.05, 0.08, 0.008, M.plastic, -0.04, 0.47, -0.02);
-  XC.forEach((x, i) => { cyl(0.012, 0.012, 0.05, M.cauciuc, x, 0.43, -0.085); tub([[-0.04 + (i - 1.5) * 0.02, 0.47, -0.06], [(-0.04 + x) / 2, 0.5, -0.09], [x, 0.46, -0.09]], 0.004, M.cauciuc); });
-  // filtrul de ulei, demarorul, tija de nivel
-  cyl(0.045, 0.045, 0.11, M.albastru, 0.08, -0.02, 0.19, "z");
-  cyl(0.045, 0.045, 0.16, M.otel, -0.3, -0.02, 0.17, "x");
-  tub([[0.16, 0.26, 0.13], [0.17, 0.4, 0.17], [0.17, 0.46, 0.18]], 0.004, M.galben);
-
-  // ---------------- partea distribuției (+x): carcasa curelei de distribuție și transmisia accesoriilor
-  rbox(0.05, 0.56, 0.24, 0.02, new THREE.MeshStandardMaterial({ color: 0x3b3f46, roughness: 0.75 }), 0.25, 0.15, 0.0);                     // carcasa curelei de distribuție
-  rot.pompa = new THREE.Object3D();                                              // pompa de apă (K7J) este antrenată de cureaua de distribuție, sub carcasă
+/** transmisia accesoriilor (cureaua Poly-V): fulia arborelui cotit cu amortizor, rola întinzătoare automată, alternatorul, pompa de apă.
+   Coordonate locale ca ale motorului: x = axa arborelui cotit (planul curelei la x = XP), y = în sus, z = +admisie; originea pe axa arborelui cotit.
+   roteste(d): rotește ansamblul când arborele cotit se rotește cu unghiul d [rad]. */
+export function transmisieAccesorii(opt = {}) {
+  const M = opt.M || MAT(), g = new THREE.Group(), rot = {};
+  const { add, box, rbox, cyl, tub } = ajutoare(g);
   const XP = 0.315;                                                              // planul curelei de accesorii
   const MP = { fulie: new THREE.MeshStandardMaterial({ color: 0x70757d, roughness: 0.42, metalness: 0.8 }), damper: new THREE.MeshStandardMaterial({ color: 0x16171a, roughness: 0.95 }),
     curea: new THREE.MeshStandardMaterial({ color: 0x0e0f11, roughness: 0.82, metalness: 0 }), alu: new THREE.MeshStandardMaterial({ color: 0xc3c8cd, roughness: 0.38, metalness: 0.9 }),
@@ -107,21 +91,29 @@ export function construiesteMotor(opt = {}) {
     cyl(0.007, 0.007, 0.03, M.otel, XP - 0.03, 0, 0, "x", rotor);                                                          // arborele
     cyl(0.009, 0.009, 0.008, M.crom, XP + 0.019, 0, 0, "x", rotor);                                                        // piulița
   }
-  // rola întinzătoare automată: braț pivotant cu arc, rolă netedă pe rulment
-  const PT = { y: 0.126, z: 0.042, r: 0.032 };
+  // pompa de apă: carcasa pe bloc, butucul și fulia Poly-V antrenată de cureaua de accesorii
+  const PW = { y: 0.215, z: -0.075, r: 0.047 };
+  cyl(0.036, 0.04, 0.03, MP.aluCast, XP - 0.045, PW.y, PW.z, "x");                                                    // corpul pompei (iese prin carcasa distribuției)
+  for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2 + 0.5; cyl(0.005, 0.005, 0.034, M.otel, XP - 0.045, PW.y + Math.cos(a) * 0.043, PW.z + Math.sin(a) * 0.043, "x"); }
+  const pompa = new THREE.Group(); pompa.position.set(XP, PW.y, PW.z); g.add(pompa); rot.pompa = pompa;
+  pompa.add(lathe([[0.008, -0.03], [0.016, -0.03], [0.016, -0.022], [PW.r + 0.003, -0.022], ...profilPolyV(PW.r, 0.0035, -0.016, 0.012, 6), [PW.r + 0.003, 0.012], [PW.r + 0.003, 0.015], [0.03, 0.015], [0.03, 0.006], [0.016, 0.006], [0.016, 0.012], [0.008, 0.012]], MP.fulie));
+  for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2; cyl(0.004, 0.004, 0.006, M.crom, 0.014, Math.cos(a) * 0.011, Math.sin(a) * 0.011, "x", pompa); }   // șuruburile fuliei
+  for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + 0.3; cyl(0.006, 0.006, 0.005, MP.negru, 0.013, Math.cos(a) * 0.022, Math.sin(a) * 0.022, "x", pompa); }  // degajările fuliei
+  // rola întinzătoare automată: braț pivotant cu arc, rolă netedă pe rulment (apasă pe spatele curelei, pe ramura lungă)
+  const PT = { y: 0.075, z: 0.125, r: 0.032 };
   const intinz = new THREE.Group(); intinz.position.set(XP, PT.y, PT.z); g.add(intinz); rot.intinz = intinz;
   intinz.add(lathe([[0.008, -0.016], [PT.r - 0.002, -0.016], [PT.r, -0.012], [PT.r + 0.0008, 0], [PT.r, 0.012], [PT.r - 0.002, 0.016], [0.008, 0.016]], MP.rola));
   intinz.add(lathe([[0.008, 0.016], [0.02, 0.016], [0.02, 0.02], [0.008, 0.02]], MP.negru));                                // capacul de praf al rulmentului
   cyl(0.006, 0.006, 0.006, M.crom, 0.022, 0, 0, "x", intinz);
-  { const piv = { y: 0.205, z: -0.045 }, dy = PT.y - piv.y, dz = PT.z - piv.z, L = Math.hypot(dy, dz);
-    const brat = box(0.012, L + 0.03, 0.026, MP.aluCast, XP - 0.022, (PT.y + piv.y) / 2, (PT.z + piv.z) / 2); brat.rotation.x = Math.atan2(dz, dy) * -1;
-    cyl(0.02, 0.02, 0.03, MP.aluCast, XP - 0.03, piv.y, piv.z, "x");                                                       // carcasa arcului spiral
-    cyl(0.008, 0.008, 0.01, M.crom, XP - 0.012, piv.y, piv.z, "x");
-    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.002, 6, 24, Math.PI * 1.6), M.otel); arc.rotation.y = Math.PI / 2; arc.position.set(XP - 0.012, piv.y, piv.z); add(arc);
-    box(0.004, 0.012, 0.003, M.galben, XP - 0.012, piv.y + 0.016, piv.z, g);                                             // indicatorul de tensiune
+  { const piv = { y: 0.15, z: 0.065 }, dy = PT.y - piv.y, dz = PT.z - piv.z, L = Math.hypot(dy, dz);
+    const brat = box(0.012, L + 0.03, 0.026, MP.aluCast, XP - 0.024, (PT.y + piv.y) / 2, (PT.z + piv.z) / 2); brat.rotation.x = Math.atan2(dz, dy) * -1;
+    cyl(0.022, 0.022, 0.03, MP.aluCast, XP - 0.036, piv.y, piv.z, "x");                                                    // carcasa arcului spiral
+    cyl(0.008, 0.008, 0.01, M.crom, XP - 0.016, piv.y, piv.z, "x");
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.015, 0.002, 6, 24, Math.PI * 1.6), M.otel); arc.rotation.y = Math.PI / 2; arc.position.set(XP - 0.02, piv.y, piv.z); add(arc);
+    box(0.004, 0.012, 0.003, M.galben, XP - 0.02, piv.y + 0.018, piv.z, g);                                              // indicatorul de tensiune
   }
   // cureaua Poly-V (6 nervuri), calculată ca tangente exterioare/interioare la cele trei fulii
-  { const P = [{ u: 0, v: 0, r: 0.074 + 0.003 }, { u: 0.19, v: 0.205, r: 0.028 + 0.003 }, { u: PT.z, v: PT.y, r: -(PT.r + 0.0008) }];   // r < 0: fulia atinge spatele curelei
+  { const P = [{ u: 0, v: 0, r: 0.074 + 0.003 }, { u: PT.z, v: PT.y, r: -(PT.r + 0.0008) }, { u: 0.19, v: 0.205, r: 0.028 + 0.003 }, { u: PW.z, v: PW.y, r: PW.r + 0.003 }];   // r < 0: fulia atinge spatele curelei
     const tang = (a, b) => { const dx = b.u - a.u, dy = b.v - a.v, L = Math.hypot(dx, dy), A = (b.r - a.r) / L, B = Math.sqrt(1 - A * A), du = dx / L, dv = dy / L, nu = A * du - B * dv, nv = A * dv + B * du;
       return [{ u: a.u - a.r * nu, v: a.v - a.r * nv }, { u: b.u - b.r * nu, v: b.v - b.r * nv }]; };
     const T = P.map((p, k) => tang(p, P[(k + 1) % P.length]));
@@ -161,6 +153,41 @@ export function construiesteMotor(opt = {}) {
     };
     rot.marcaje.pozitie(0);
   }
+  return { grup: g, rot, XP,
+    roteste(d) {
+      rot.fulia.rotation.x -= d; rot.altern.rotation.x -= d * 0.077 / 0.031; rot.intinz.rotation.x += d * 0.077 / 0.0328; rot.pompa.rotation.x -= d * 0.077 / 0.05;
+      rot.sCurea = (rot.sCurea || 0) + d * 0.077; rot.marcaje.pozitie(rot.sCurea);
+    } };
+}
+
+/** construiește motorul; întoarce grupul, componentele selectabile și ancorele etichetelor/sondelor */
+export function construiesteMotor(opt = {}) {
+  const M = MAT(), g = new THREE.Group(), comp = {}, ancore = {}, conectori = {}, rot = {};
+  const { add, box, rbox, cyl, tub } = ajutoare(g);
+  const grupC = (k, nume) => { const gg = new THREE.Group(); gg.userData.c = k; gg.name = nume || k; g.add(gg); comp[k] = gg; return gg; };
+  const XC = [-0.135, -0.045, 0.045, 0.135];     // pozițiile cilindrilor pe axa x
+
+  // ---------------- blocul motor (fontă) cu nervuri, carterul inferior, chiulasa, capacul
+  rbox(0.46, 0.36, 0.27, 0.012, M.fonta, -0.01, 0.07, 0);
+  for (const s of [1, -1]) for (let i = 0; i < 6; i++) box(0.012, 0.3, 0.014, M.fonta, -0.2 + i * 0.08, 0.06, s * 0.142);
+  rbox(0.44, 0.15, 0.29, 0.02, M.aluMat, -0.01, -0.185, -0.005);                 // baia de ulei
+  for (let i = 0; i < 7; i++) box(0.006, 0.12, 0.3, M.aluMat, -0.2 + i * 0.065, -0.19, -0.005);
+  cyl(0.012, 0.012, 0.03, M.otel, 0.12, -0.27, -0.06);                         // bușonul de golire
+  rbox(0.47, 0.12, 0.25, 0.01, M.alu, -0.01, 0.31, 0);                           // chiulasa (aluminiu)
+  rbox(0.42, 0.08, 0.2, 0.03, M.plastic, -0.02, 0.405, 0.005);                   // capacul culbutorilor
+  for (let i = 0; i < 5; i++) box(0.36, 0.006, 0.01, M.plastic, -0.02, 0.447, -0.06 + i * 0.03);
+  cyl(0.026, 0.026, 0.025, M.galben, 0.09, 0.455, 0.05);                         // bușonul de umplere cu ulei
+  // bobina de inducție (DIS) și fișele de înaltă tensiune către bujii
+  rbox(0.11, 0.05, 0.08, 0.008, M.plastic, -0.04, 0.47, -0.02);
+  XC.forEach((x, i) => { cyl(0.012, 0.012, 0.05, M.cauciuc, x, 0.43, -0.085); tub([[-0.04 + (i - 1.5) * 0.02, 0.47, -0.06], [(-0.04 + x) / 2, 0.5, -0.09], [x, 0.46, -0.09]], 0.004, M.cauciuc); });
+  // filtrul de ulei, demarorul, tija de nivel
+  cyl(0.045, 0.045, 0.11, M.albastru, 0.08, -0.02, 0.19, "z");
+  cyl(0.045, 0.045, 0.16, M.otel, -0.3, -0.02, 0.17, "x");
+  tub([[0.16, 0.26, 0.13], [0.17, 0.4, 0.17], [0.17, 0.46, 0.18]], 0.004, M.galben);
+
+  // ---------------- partea distribuției (+x): carcasa curelei de distribuție și transmisia accesoriilor
+  rbox(0.05, 0.56, 0.24, 0.02, new THREE.MeshStandardMaterial({ color: 0x3b3f46, roughness: 0.75 }), 0.25, 0.15, 0.0);                     // carcasa curelei de distribuție
+  const acc = transmisieAccesorii({ M }); g.add(acc.grup); Object.assign(rot, acc.rot); const XP = acc.XP;
   ancore.distributie = new THREE.Vector3(XP, 0.1, 0.0);
 
   // ---------------- partea volantului (−x): carcasa ambreiajului cu fereastră, coroana dințată 60−2, senzorul CKP
@@ -233,8 +260,7 @@ export function construiesteMotor(opt = {}) {
     actualizeaza(st, dt) {
       const w = (st.rpm || 0) / 60 * 2 * Math.PI;
       const vis = w * dt / 30;                                 // rotația afișată (încetinită ×30 pentru a se vedea)
-      rot.volant.rotation.x -= vis; rot.fulia.rotation.x -= vis; rot.altern.rotation.x -= vis * 0.077 / 0.031; rot.intinz.rotation.x += vis * 0.077 / 0.0328;
-      rot.sCurea = (rot.sCurea || 0) + vis * 0.077; rot.marcaje.pozitie(rot.sCurea);
+      rot.volant.rotation.x -= vis; acc.roteste(vis);
       rot.clapeta.rotation.y = (st.tps || 0) / 100 * Math.PI / 2 * 0.95;
       matCald.emissiveIntensity = Math.max(0, Math.min(0.9, ((st.tEv || 20) - 480) / 500));
       Object.entries(conectori).forEach(([k, m]) => { if (!m.userData.y0) m.userData.y0 = m.position.y; m.position.y = m.userData.y0 + (st.decuplat && st.decuplat[k] ? 0.03 : 0); });
@@ -363,7 +389,7 @@ export function creeazaStand(gazda, optiuni = {}) {
   function bucla(t) {
     raf = requestAnimationFrame(bucla);
     const dt = Math.min(0.1, Math.max(0, (t - tP) / 1000)); tP = t;
-    if (!cont.offsetParent) return;
+    if (!cont.getClientRects().length) return;
     stare.timp += dt;
     mot.actualizeaza(stare, dt);
     if (stare.vent) pal.rotation.z += dt * 25;

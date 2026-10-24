@@ -878,7 +878,7 @@ function curbaTeoretica(c, pmax, pas = 0.5) {
 
 function deseneazaLive(pArg) {
   const cv = $("#cv-live");
-  if (!cv || !cv.offsetParent) return;
+  if (!cv || !cv.getClientRects().length) return;
   const p = pArg ?? sim.ultimP;
   const ar = Ar();
   const c0 = { ...cfg(), Vaer: 0, Cf: 0 };
@@ -944,7 +944,7 @@ function calcAuto() {
   for (let p = 0; p <= Math.max(120, v.pt); p += p < 10 ? 0.25 : 2) { ptsF.push([cursaPompa(v, p, true) * v.ip, p]); ptsC.push([cursaPompa(v, p, false) * v.ip, p]); }
   const xmax = niceMax(Math.max(v.smax * v.ip, ptsC[ptsC.length - 1][0]) * 1.05);
   const cv = $("#cv-pedala");
-  if (cv.offsetParent) deseneazaGrafic(cv, { xmax, ymax: Math.ceil(Math.max(120, v.pt) * 1.05 / 20) * 20, xlab: "cursa pedalei [mm]", ylab: "p [bar]", serii: [
+  if (cv.getClientRects().length) deseneazaGrafic(cv, { xmax, ymax: Math.ceil(Math.max(120, v.pt) * 1.05 / 20) * 20, xlab: "cursa pedalei [mm]", ylab: "p [bar]", serii: [
     { tip: "linie", pts: ptsF, culoare: 0 }, { tip: "linie", pts: ptsC, culoare: 1 },
     { tip: "linie", pts: [[v.smax * v.ip, 0], [v.smax * v.ip, 1e4]], culoare: css("--text-sec"), punctat: true, gros: 1.5 }] });
   $("#leg-pedala").innerHTML = `<span><i style="background:var(--serie-0)"></i>fără aer</span><span><i style="background:var(--serie-1)"></i>cu ${fmt(v.Va, 2)} cm³ de aer</span><span><i style="background:var(--text-sec)"></i>capătul cursei pompei</span>`;

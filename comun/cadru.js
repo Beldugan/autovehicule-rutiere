@@ -237,7 +237,7 @@ const Cadru = {
   },
   deseneazaDet() {
     const cv = $("#cv-det");
-    if (cv && cv.offsetParent && this.R.grafic) deseneazaGrafic(cv, this.R.grafic);
+    if (cv && cv.getClientRects().length && this.R.grafic) deseneazaGrafic(cv, this.R.grafic);
     $("#leg-det").innerHTML = this.R.legenda ? legendaHTML(this.R.legenda) : "";
   },
   redeseneaza() {
@@ -360,7 +360,7 @@ const Cadru = {
     if (id === "det") this.recalculeaza();
     if (id === "v3d" && !this._v3d) {
       this._v3d = true;
-      import(BAZA_COMUN + "vehicul3d.js?v=14").then(m => { this.v3d = m.creeaza($("#v3d-gazda"), LAB.vehicul3d.optiuni ? LAB.vehicul3d.optiuni(this) : {}); })
+      import(BAZA_COMUN + "vehicul3d.js?v=15").then(m => { this.v3d = m.creeaza($("#v3d-gazda"), LAB.vehicul3d.optiuni ? LAB.vehicul3d.optiuni(this) : {}); })
         .catch(e => { $("#v3d-gazda").innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}). Este necesar un browser cu WebGL.</p>`; });
     }
     if (id === "referat") this.genReferat();

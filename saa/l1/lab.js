@@ -177,13 +177,13 @@ function actualizeazaPanou() {
   $("#btn-ing").textContent = sim.ingheta ? "Reia graficul" : "Îngheață graficul";
 }
 function liveOBD() {
-  const el = $("#obd-live"); if (!el || el.offsetParent === null) return;
+  const el = $("#obd-live"); if (!el || el.getClientRects().length === 0) return;
   const on = sim.motor, r = (n, v, u) => `<tr><td>${n}</td><td><b>${v}</b></td><td>${u}</td></tr>`, o = obd();
   el.innerHTML = `<table class="tabel x431"><tbody>${r("Turație motor", on ? o.n : 0, "rot/min")}${r("Presiune colector (MAP)", o.p, "kPa")}${r("Temp. lichid răcire", fmt(sim.motor || sim.tPorn ? sim.T : P().T0, 1), "°C")}${r("Temp. aer admis", "27", "°C")}
     ${r("Poziție clapetă", fmt(sim.tps, 1), "%")}${r("Timp de injecție", on ? fmt(o.ti, 2) : "0,00", "ms")}${r("Tensiune baterie", fmt(ubat(), 1), "V")}${r("Injecție", !on ? "—" : sim.taiat ? "<span class='rau-t'>ÎNTRERUPTĂ</span>" : "activă", "")}${r("Buclă λ", on && cald() ? "închisă" : "deschisă (încălzire)", "")}</tbody></table>`;
 }
 function deseneazaGraficOBD() {
-  const cv = $("#cv-obd"); if (!cv || !cv.offsetParent) return;
+  const cv = $("#cv-obd"); if (!cv || !cv.getClientRects().length) return;
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = 190;
   if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px"; }
   const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -249,7 +249,7 @@ function achizitie() {
 }
 function oscPeEcran(cv) { const fe = document.fullscreenElement || document.webkitFullscreenElement; return (fe && fe.contains(cv)) || !!cv.closest(".ecran-plin"); }
 function deseneazaOsc() {
-  const cv = $("#cv-osc"); if (!cv || !cv.offsetParent) return;
+  const cv = $("#cv-osc"); if (!cv || !cv.getClientRects().length) return;
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth;
   const o0 = sim.osc, nAct = o0.ch.filter(c => c.on).length, benzi = o0.benzi && nAct > 1;
   const Hmin = benzi ? 60 + 135 * nAct : (+cv.dataset.h || 320);       // canale separate: fiecare canal are banda lui (≈ 135 px)
@@ -438,7 +438,7 @@ const TEST = [
 /* ------------------------------------------------------------------ 3D: motorul pe stand */
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=3").then(m => {
+  import(BAZA_COMUN + "motor3d.js?v=4").then(m => {
     const ET = { inj1: "injector 1", inj2: "injector 2", inj3: "injector 3", inj4: "injector 4", map: "MAP", ect: "CTS", ckp: "CKP", tps: "clapetă / TPS", clap: "corp clapetă", iat: "IAT", l1: "λ amonte", can: "canistră" };
     SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: () => { } });
     SV.m3d.selecteaza("inj1", false);

@@ -220,7 +220,7 @@ function actualizeazaSVG(dt) {
 /* motorul 3D realist pe stand (cu revenire la desenul 2D dacă WebGL lipsește) */
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=3").then(m => {
+  import(BAZA_COMUN + "motor3d.js?v=4").then(m => {
     const ET = { ckp: "CKP", cmp: "CMP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", clap: "clapetă", can: "canistră", knock: "detonație" };
     SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: k => { if (COMP[k]) selecteaza(k, false); } });
     $("#svg-motor").style.display = "none";
@@ -252,7 +252,7 @@ function achizitie() {
 }
 function oscPeEcran(cv) { const fe = document.fullscreenElement || document.webkitFullscreenElement; return (fe && fe.contains(cv)) || !!cv.closest(".ecran-plin"); }
 function deseneazaOsc() {
-  const cv = $("#cv-osc"); if (!cv || !cv.offsetParent) return;
+  const cv = $("#cv-osc"); if (!cv || !cv.getClientRects().length) return;
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth;
   const o0 = sim.osc, nAct = o0.ch.filter(c => c.on).length, benzi = o0.benzi && nAct > 1;
   const Hmin = benzi ? 60 + 135 * nAct : (+cv.dataset.h || 320);       // canale separate: fiecare canal are banda lui (≈ 135 px)
@@ -407,7 +407,7 @@ function actualizeazaPanou() {
   $("#btn-pompa").textContent = sim.pompaVid ? "Scoate pompa de vid" : "Conectează pompa de vid la MAP";
 }
 function liveX431() {
-  const el = $("#x431-live"); if (!el || el.offsetParent === null) return;
+  const el = $("#x431-live"); if (!el || el.getClientRects().length === 0) return;
   const d = defect(), on = sim.contact;
   const rand = (n, v, u) => `<tr><td>${n}</td><td><b>${on ? v : "—"}</b></td><td>${u}</td></tr>`;
   el.innerHTML = `<table class="tabel x431"><tbody>

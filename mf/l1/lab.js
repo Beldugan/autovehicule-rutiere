@@ -295,7 +295,7 @@ function deseneazaAreometru() {
 
 /* ------------------------------------------------------------------ graficul mic, în timp real */
 function deseneazaLive() {
-  const cv = $("#cv-live"); if (!cv || !cv.offsetParent) return;
+  const cv = $("#cv-live"); if (!cv || !cv.getClientRects().length) return;
   const R = M1.prelucreaza(Cadru.D.t, { num });
   const serii = [];
   ["A", "U"].forEach((o, i) => {
