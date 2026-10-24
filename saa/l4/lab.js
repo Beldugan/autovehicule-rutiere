@@ -1,8 +1,10 @@
-/* SAA – Lucrarea 4. Sistemul de ungere – caracteristica presiunii uleiului (standul K7J 1.4 MPI).
-   Simulator: schema circuitului de ungere în secțiune, animată (baie, sorb, pompa cu roți dințate, supapa de siguranță, filtrul cu
-   supapă de bypass, galeria principală, lagărele paliere, arborele cu came), panoplia cu pompe (roți dințate, rotor, debit variabil),
-   manometrul de ulei 0…10 bar montat în locul manocontactului, termometrul cu sondă în locul jojei, turația (OBD) și multimetrul
-   pentru verificarea manocontactului. Panoul din dreapta conduce lucrarea pas cu pas. Parametrii sunt individuali. */
+/* SAA – Lucrarea 4. Sistemul de ungere – caracteristica presiunii uleiului (standul K7J 1.4 MPI turbo din laborator).
+   Simulator: (1) fotografia standului real cu punctele de măsură, lupa pe zona manocontactului (demontarea/montarea animată a
+   manocontactului și a adaptorului manometrului), manometrul de control cu glicerină, termometrul cu sondă K în tubul jojei,
+   testerul OBD și panoul standului cu martorii din bord; (2) secțiunea longitudinală prin motor: mecanismul bielă-manivelă real
+   (ordinea de aprindere 1-3-4-2), distribuția, lanțul și pompa cu roți dințate evolventice, supapa de siguranță cu plonjor și arc,
+   răcitorul, filtrul în secțiune, galeria, lagărele, axul culbutorilor, turbosuflanta; debitele ramurilor după model (animație
+   încetinită de 40 de ori). Panoplia cu pompe (roți dințate, gerotor, palete cu debit variabil). Parametrii sunt individuali. */
 "use strict";
 const MD = MODELE["saa-l4"];
 function P() { return Cadru.P; }
@@ -13,7 +15,8 @@ const ET_REG = { ral: "ralanti", n1500: "1500 rot/min", n2000: "2000 rot/min", n
 /* ------------------------------------------------------------------ starea standului */
 const sim = {
   t: 0, contact: false, merge: false, n: 0, reg: "ral", T: 24, p: 0, rapid: false, manusi: false, ochelari: false, defect: "none",
-  senzor: true, man: false, etans: false, mm: false, rot: 0, comp: {}, pompe: {}, part: [], selectat: null
+  senzor: true, man: false, etans: false, mm: false, rot: 0, comp: {}, pompe: {}, part: [], picaturi: [], picF: [], selectat: null,
+  vSw: 0, vMan: 0, pAc: 0, Tafis: 24, nAfis: 0, dripLeft: 0, vedere: "stand"
 };
 function nTinta() { return sim.merge ? MD.nr(P(), sim.reg) : 0; }
 function pAdev() { return MD.presiune(P(), sim.n, sim.T, sim.defect); }
@@ -54,141 +57,413 @@ function svgGauge(P, cx, cy, r, max, val, o = {}) {
   return s;
 }
 const txt = (x, y, s, o = {}) => `<text x="${x}" y="${y}" font-size="${o.fs || 11}" text-anchor="${o.a || "middle"}" fill="${o.f || "currentColor"}" font-weight="${o.w || 400}"${o.fam ? ` font-family="${o.fam}"` : ""}${o.halo ? ` paint-order="stroke" style="stroke:var(--suprafata,#fff);stroke-width:4px;stroke-linejoin:round"` : ""}>${s}</text>`;
-/** roată dințată (contur cu dinți) centrată în 0,0 */
-function roata(z, R, h, extra = "") {
-  let d = ""; for (let i = 0; i < z; i++) { const a0 = i * 2 * Math.PI / z, w = Math.PI / z; [[a0 - w * 0.5, R - h], [a0 - w * 0.3, R], [a0 + w * 0.3, R], [a0 + w * 0.5, R - h], [a0 + w * 1.5, R - h]].forEach(([a, r], j) => { d += `${i || j ? "L" : "M"}${(r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`; }); }
-  return `<path d="${d}Z" ${extra}/>`;
+/* ------------------------------------------------------------------ geometrie: roți dințate cu profil evolventic */
+/** profilul unei roți dințate evolventice (α = 20°), centrată în 0,0; dintele 0 este orientat pe axa +x */
+function profilEvolventa(z, m, alfa = 20) {
+  const a = alfa * Math.PI / 180, r = m * z / 2, rb = r * Math.cos(a), ra = r + m, rf = r - 1.25 * m;
+  const inv = x => Math.tan(x) - x, psi = Math.PI / (2 * z) + inv(a);
+  const unghi = rho => { if (rho <= rb) return psi; const t = Math.sqrt(rho * rho / (rb * rb) - 1); return psi - (t - Math.atan(t)); };
+  const pts = [];
+  for (let k = 0; k < z; k++) {
+    const c = 2 * Math.PI * k / z, fl = [];
+    for (let i = 0; i <= 8; i++) { const rho = Math.max(rf, rb) + (ra - Math.max(rf, rb)) * i / 8; fl.push([rho, unghi(rho)]); }
+    pts.push([rf, c - unghi(rf)]);
+    fl.forEach(([rho, u]) => pts.push([rho, c - u]));
+    for (let i = 1; i < 4; i++) pts.push([ra, c - unghi(ra) + 2 * unghi(ra) * i / 4]);
+    fl.slice().reverse().forEach(([rho, u]) => pts.push([rho, c + u]));
+    pts.push([rf, c + unghi(rf)]);
+    for (let i = 1; i < 4; i++) pts.push([rf, c + unghi(rf) + (2 * Math.PI / z - 2 * unghi(rf)) * i / 4]);
+  }
+  return "M" + pts.map(([rho, u]) => `${(rho * Math.cos(u)).toFixed(2)},${(rho * Math.sin(u)).toFixed(2)}`).join("L") + "Z";
 }
+const pol = (cx, cy, r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+const RAD = Math.PI / 180;
 
-/* ------------------------------------------------------------------ schema circuitului de ungere (secțiune) */
+/* ------------------------------------------------------------------ elementele circuitului (identificare) */
 const COMP = {
-  carter: ["Baia de ulei (carterul)", "Rezervorul de ulei al motorului (≈ 3,5…4,5 l la K7J); uleiul se întoarce aici prin gravitație din lagăre și din chiulasă."],
-  sorb: ["Sorbul cu sită", "Țeava de aspirație cu sită: reține impuritățile mari înaintea pompei; colmatarea lui produce scăderea presiunii la turații mari."],
-  pompa: ["Pompa de ulei cu roți dințate", "Pompă volumetrică antrenată de arborele cotit: debitul este proporțional cu turația (Q = V·n·η<sub>v</sub>)."],
-  supapa: ["Supapa de siguranță (limitare a presiunii)", "Piston cu arc: se deschide la presiunea maximă (≈ 4,5…5 bar) și trimite surplusul înapoi în carter – palierul caracteristicii."],
-  filtru: ["Filtrul de ulei cu supapă de bypass", "Element filtrant din hârtie; supapa de bypass ocolește filtrul colmatat sau uleiul rece foarte vâscos (Δp ≈ 1…2 bar)."],
-  galerie: ["Galeria principală de ungere", "Canal găurit în bloc din care pleacă ramificațiile spre lagăre și spre chiulasă; aici este racordul senzorului de presiune."],
-  lagare: ["Lagărele paliere și de bielă", "Cuzineți cu joc de 0,02…0,06 mm: pelicula portantă hidrodinamică; jocul mărit prin uzură scade presiunea, mai ales la cald."],
-  came: ["Arborele cu came și culbutorii", "Ungerea chiulasei printr-o coloană din galerie; uleiul se scurge înapoi în carter."],
-  senzor: ["Manocontactul / racordul manometrului", "Manocontactul (contact normal închis) aprinde martorul de presiune sub ≈ 0,3…0,5 bar; în lucrare, în locul lui se montează manometrul."]
+  carter: ["Baia de ulei (carterul)", "Rezervorul de ulei al motorului (≈ 4,9 l cu filtrul la K7J); din galerii și din chiulasă uleiul revine aici prin gravitație."],
+  sorb: ["Sorbul cu sită", "Clopotul de aspirație cu sită de sârmă, aproape de fundul băii: reține impuritățile mari înaintea pompei."],
+  pompa: ["Pompa de ulei cu roți dințate", "Montată în baie, sub lagărul palier 1, antrenată de arborele cotit prin lanț. Pompă volumetrică: uleiul este purtat între dinți și carcasă de la aspirație la refulare; debitul ∝ turație (Q = V·n·η<sub>v</sub>)."],
+  supapa: ["Supapa de siguranță (în corpul pompei)", "Piston (plonjor) apăsat de un arc: la presiunea de deschidere (≈ 4,5…5 bar) plonjorul se deplasează, descoperă orificiul de retur și surplusul trece înapoi la aspirație – palierul caracteristicii."],
+  filtru: ["Filtrul de ulei (cartuș înșurubat)", "Element din hârtie pliată în jurul unui tub central perforat; membrana antiretur păstrează uleiul în filtru la oprire, supapa de bypass ocolește elementul colmatat sau uleiul rece foarte vâscos."],
+  racitor: ["Răcitorul de ulei (schimbător ulei–lichid de răcire)", "Pachet de plăci montat între bloc și filtru: lichidul de răcire limitează temperatura uleiului la sarcini mari și îl încălzește mai repede la pornirea la rece."],
+  galerie: ["Galeria principală de ungere", "Canal găurit pe lungimea blocului; din el pleacă găurile spre fiecare lagăr palier, coloana spre chiulasă și conducta turbosuflantei. La capătul ei este manocontactul."],
+  lagare: ["Lagărele paliere și de bielă (cuzineți)", "Uleiul intră în cuzinetul palier și, prin găurile oblice din arborele cotit, ajunge la fusurile maneton. Pelicula portantă hidrodinamică are 2…20 µm; jocul mărit prin uzură scade presiunea, mai ales la cald."],
+  came: ["Axul culbutorilor și arborele cu came", "Coloana din bloc alimentează axul tubular al culbutorilor; prin orificii uleiul stropește culbutorii, camele și supapele, apoi se scurge spre baie prin canalele de retur."],
+  turbo: ["Turbosuflanta – ungerea lagărelor", "Conducta de alimentare din galerie ungerea lagărelor arborelui turbinei (≈ 100 000 rot/min); uleiul se întoarce liber în baie prin conducta de retur."],
+  senzor: ["Manocontactul / racordul manometrului", "Contact normal închis: aprinde martorul de presiune sub ≈ 0,3…0,5 bar. În lucrare se demontează și în locul lui se montează manometrul de control."]
 };
-const SCH = { W: 1000, H: 560 };
-function schemaSVG() {
-  const Pf = "sc";
-  let s = defsInstr(Pf) + `<defs>
-    <linearGradient id="${Pf}-fonta" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c3c7cb"/><stop offset=".5" stop-color="#9ba1a7"/><stop offset="1" stop-color="#7a8087"/></linearGradient>
-    <pattern id="${Pf}-has" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="9" height="9" fill="url(#${Pf}-fonta)"/><line x1="0" y1="0" x2="0" y2="9" stroke="#868c92" stroke-width="1.2"/></pattern>
-    <linearGradient id="${Pf}-ulei" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9a441"/><stop offset="1" stop-color="#8a5a14"/></linearGradient>
-    <linearGradient id="${Pf}-otel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef1f4"/><stop offset=".45" stop-color="#a9b0b7"/><stop offset="1" stop-color="#5b626a"/></linearGradient>
-    <linearGradient id="${Pf}-bronz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1d39a"/><stop offset="1" stop-color="#a77b33"/></linearGradient>
-    <linearGradient id="${Pf}-filtru" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0d47a1"/><stop offset=".4" stop-color="#4f86d9"/><stop offset="1" stop-color="#0a2f6b"/></linearGradient>
-    <linearGradient id="${Pf}-baie" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d636a"/><stop offset="1" stop-color="#2b2f34"/></linearGradient></defs>`;
-  // blocul motor în secțiune (fontă hașurată), chiulasa, baia
-  s += `<g data-comp="carter"><path d="M180,450 H860 L840,540 H200 Z" fill="url(#${Pf}-baie)" stroke="#111"/><path id="sc-ul" d="M196,500 H844 L840,536 H201 Z" fill="url(#${Pf}-ulei)" opacity=".9"/></g>`;
-  s += `<path d="M180,140 H860 V450 H180 Z" fill="url(#${Pf}-has)" stroke="#4a4f55" stroke-width="1.5"/><path d="M200,60 H840 V140 H200 Z" fill="url(#${Pf}-has)" stroke="#4a4f55" stroke-width="1.5"/>`;
-  // cilindrii (alezaje) – goluri în bloc
-  [290, 430, 570, 710].forEach(x => { s += `<rect x="${x - 52}" y="140" width="104" height="170" fill="#e9ecef" stroke="#6b7178"/><rect x="${x - 48}" y="190" width="96" height="60" rx="4" fill="url(#${Pf}-otel)" stroke="#555"/><rect x="${x - 10}" y="250" width="20" height="70" fill="url(#${Pf}-otel)" opacity=".85"/>`; });
-  // arborele cotit cu fusurile paliere (5) și cuzineții
-  s += `<g data-comp="lagare"><rect x="200" y="372" width="640" height="16" rx="8" fill="url(#${Pf}-otel)" stroke="#444"/>`;
-  [220, 360, 500, 640, 780].forEach(x => { s += `<circle cx="${x}" cy="380" r="26" fill="url(#${Pf}-bronz)" stroke="#6b4f1f"/><circle cx="${x}" cy="380" r="20" fill="url(#${Pf}-otel)" stroke="#333"/><path class="sc-film" d="M${x - 23},380 A23,23 0 0 1 ${x + 23},380" fill="none" stroke="#d9a441" stroke-width="2.5"/>`; });
+const NCOMP = Object.keys(COMP).length;
+
+/* ------------------------------------------------------------------ secțiunea longitudinală prin motor (vedere „Circuitul de ungere”) */
+const SX = { YC: 330, r: 32, l: 120, CIL: [320, 460, 600, 740], PAL: [250, 390, 530, 670, 810], OF: [0, 540, 180, 360], C: [118, 528], z: 9, m: 4.6 };
+SX.ra1 = [SX.C[0] - SX.m * SX.z / 2, SX.C[1] + 7]; SX.ra2 = [SX.C[0] + SX.m * SX.z / 2, SX.C[1] + 7];
+/** puncte pe cercul de divizare al unei roți a pompei, între unghiurile a0 și a1 [°] */
+function arcRoata(c, a0, a1) { const r = SX.m * SX.z / 2, out = []; for (let i = 0; i <= 14; i++) { const a = (a0 + (a1 - a0) * i / 14) * RAD; out.push([+(c[0] + r * Math.cos(a)).toFixed(1), +(c[1] + r * Math.sin(a)).toFixed(1)]); } return out; }
+/** traseele uleiului: puncte și fracțiunea de debit (q: „pompa” – tot debitul, „motor” – debitul prin motor, „retur” – prin supapă) */
+const TRASEE = [
+  { id: "asp", q: "pompa", f: 1, n: 10, pts: [[360, 503], [360, 490], [272, 490], [272, 458]] },
+  { id: "ref", q: "motor", f: 1, n: 16, pts: [[234, 408], [234, 205], [204, 205], [196, 226], [196, 330], [178, 340], [160, 300], [160, 228], [160, 192], [248, 186], [248, 268]] },
+  { id: "gal", q: "motor", f: 1, n: 22, pts: [[248, 268], [880, 268]] },
+  ...SX.PAL.map((x, i) => ({ id: "pal" + i, q: "motor", f: 0.14, n: 3, pts: [[x, 268], [x, 314]] })),
+  { id: "col", q: "motor", f: 0.18, n: 12, pts: [[822, 268], [822, 60], [256, 60]] },
+  { id: "tur", q: "motor", f: 0.1, n: 9, pts: [[880, 268], [914, 268], [914, 104], [996, 104], [996, 132]] },
+  { id: "trt", q: "motor", f: 0.1, n: 9, pts: [[996, 190], [996, 214], [944, 214], [944, 470], [876, 470]] },
+  { id: "ia", q: "pompa", f: 1, n: 12, pts: [[118, 615], [118, 572], ...arcRoata(SX.ra1, 70, 290), [118, 492], [118, 448]], inset: 1, roata: 1 },
+  { id: "ib", q: "pompa", f: 1, n: 12, pts: [[118, 572], ...arcRoata(SX.ra2, 110, -110), [118, 492]], inset: 1, roata: 1 },
+  { id: "ir", q: "retur", f: 1, n: 7, pts: [[124, 462], [145, 462], [145, 496], [190, 496], [190, 604], [118, 604]], inset: 1 }
+];
+function traseuGeom(t) { let tot = 0; t.L = t.pts.slice(1).map((p, i) => { const l = Math.hypot(p[0] - t.pts[i][0], p[1] - t.pts[i][1]); tot += l; return l; }); t.tot = tot; }
+TRASEE.forEach(traseuGeom);
+function pctTraseu(t, s) { let r = s * t.tot; for (let i = 0; i < t.L.length; i++) { if (r <= t.L[i]) { const a = t.pts[i], b = t.pts[i + 1], f = r / t.L[i]; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; } r -= t.L[i]; } return t.pts[t.pts.length - 1]; }
+const linie = (pts, o) => `<path d="M${pts.map(p => p.join(",")).join("L")}" fill="none" ${o}/>`;
+
+function defsSectiune(P) {
+  return `<defs>
+    <filter id="${P}-turnare" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4" result="z"/><feColorMatrix in="z" type="matrix" values="0 0 0 0 .45  0 0 0 0 .47  0 0 0 0 .5  0 0 0 .55 0" result="g"/><feComposite in="g" in2="SourceGraphic" operator="in" result="gz"/><feBlend in="SourceGraphic" in2="gz" mode="multiply"/></filter>
+    <pattern id="${P}-has" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#a7adb3"/><line x1="0" y1="0" x2="0" y2="8" stroke="#80868c" stroke-width="1.1"/></pattern>
+    <pattern id="${P}-hasAl" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="10" height="10" fill="#c9ced3"/><line x1="0" y1="0" x2="0" y2="10" stroke="#9ea4aa" stroke-width="1"/><line x1="4" y1="0" x2="4" y2="10" stroke="#9ea4aa" stroke-width=".6"/></pattern>
+    <linearGradient id="${P}-ulei" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c98f2e"/><stop offset="1" stop-color="#6e4310"/></linearGradient>
+    <linearGradient id="${P}-otel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6f8"/><stop offset=".45" stop-color="#aeb5bc"/><stop offset="1" stop-color="#5d646c"/></linearGradient>
+    <linearGradient id="${P}-otelV" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6b727a"/><stop offset=".4" stop-color="#e9edf0"/><stop offset="1" stop-color="#7b828a"/></linearGradient>
+    <linearGradient id="${P}-piston" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9aa1a8"/><stop offset=".35" stop-color="#e3e6e9"/><stop offset="1" stop-color="#8a9198"/></linearGradient>
+    <linearGradient id="${P}-cuz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8c98a"/><stop offset="1" stop-color="#9c7432"/></linearGradient>
+    <linearGradient id="${P}-baie" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b5259"/><stop offset="1" stop-color="#23272c"/></linearGradient>
+    <linearGradient id="${P}-filtru" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0c2f66"/><stop offset=".35" stop-color="#3d74c8"/><stop offset=".6" stop-color="#1b4e9b"/><stop offset="1" stop-color="#0a2550"/></linearGradient>
+    <linearGradient id="${P}-turbo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8d8378"/><stop offset=".5" stop-color="#6a5f55"/><stop offset="1" stop-color="#3f3832"/></linearGradient>
+    <radialGradient id="${P}-flacara" cx="50%" cy="20%" r="80%"><stop offset="0" stop-color="#fff6c2"/><stop offset=".4" stop-color="#ffb02e" stop-opacity=".9"/><stop offset="1" stop-color="#ff5a00" stop-opacity="0"/></radialGradient>
+    <clipPath id="${P}-clipA"><circle cx="${SX.C[0]}" cy="${SX.C[1]}" r="100"/></clipPath>
+    <clipPath id="${P}-clipBaie"><path d="M238,372 H872 L860,524 H250 Z"/></clipPath></defs>`;
+}
+function sectiuneSVG() {
+  const Pf = "sx", { YC, CIL, PAL } = SX;
+  let s = defsInstr(Pf) + defsSectiune(Pf);
+  // baia de ulei (tablă ambutisată) cu uleiul
+  s += `<g data-comp="carter"><path d="M232,370 H878 L866,530 H244 Z" fill="url(#${Pf}-baie)" stroke="#111" stroke-width="1.5"/><path d="M238,372 H872 L860,524 H250 Z" fill="#2f353b"/>
+    <g clip-path="url(#${Pf}-clipBaie)"><rect id="sx-ulei" x="238" y="470" width="640" height="70" fill="url(#${Pf}-ulei)" opacity=".92"/><path id="sx-val" d="" fill="none" stroke="#e9b45a" stroke-width="1.2" opacity=".8"/></g>
+    <rect x="548" y="526" width="26" height="9" rx="2" fill="#7c848c" stroke="#222"/>${txt(561, 548, "bușon golire", { fs: 8.5 })}</g>`;
+  // blocul motor (fontă, secțiune hașurată) – cămășile cilindrilor și pereții paliери
+  s += `<path d="M228,140 H880 V370 H872 V276 H238 V370 H228 Z" fill="url(#${Pf}-has)" stroke="#4a4f55" stroke-width="1.4"/>`;
+  CIL.forEach((x, i) => { s += `<rect x="${x - 50}" y="140" width="100" height="136" fill="#eef0f2" stroke="#6b7178"/>`; if (i < 3) s += `<rect x="${x + 50}" y="140" width="40" height="136" fill="url(#${Pf}-has)" stroke="#4a4f55"/><rect x="${x + 58}" y="150" width="24" height="96" rx="3" fill="#7fb2d9" opacity=".75"/>`; });
+  s += `<rect x="236" y="150" width="26" height="96" rx="3" fill="#7fb2d9" opacity=".75"/><rect x="796" y="150" width="20" height="96" rx="3" fill="#7fb2d9" opacity=".75"/>`;
+  // pereții paliери cu capacele și cuzineții
+  s += `<g data-comp="lagare">`;
+  PAL.forEach(x => { s += `<path d="M${x - 16},276 H${x + 16} V${YC - 18} H${x - 16} Z M${x - 16},${YC + 18} H${x + 16} V346 H${x - 16} Z" fill="url(#${Pf}-has)" stroke="#4a4f55"/><rect x="${x - 20}" y="346" width="40" height="10" rx="2" fill="url(#${Pf}-has)" stroke="#4a4f55"/><rect x="${x - 3}" y="342" width="6" height="18" fill="#5d646b"/>
+    <rect x="${x - 16}" y="${YC - 18}" width="32" height="3.5" fill="url(#${Pf}-cuz)" stroke="#6b4f1f" stroke-width=".5"/><rect x="${x - 16}" y="${YC + 14.5}" width="32" height="3.5" fill="url(#${Pf}-cuz)" stroke="#6b4f1f" stroke-width=".5"/>
+    <line class="sx-film" x1="${x - 16}" y1="${YC - 14.5}" x2="${x + 16}" y2="${YC - 14.5}" stroke="#d9a441" stroke-width="1.4"/><line class="sx-film" x1="${x - 16}" y1="${YC + 14.5}" x2="${x + 16}" y2="${YC + 14.5}" stroke="#d9a441" stroke-width="1.4"/>`; });
   s += `</g>`;
-  // arborele cu came în chiulasă
-  s += `<g data-comp="came"><rect x="210" y="92" width="620" height="12" rx="6" fill="url(#${Pf}-otel)" stroke="#444"/>`;
-  [255, 325, 395, 465, 535, 605, 675, 745].forEach(x => { s += `<ellipse cx="${x}" cy="98" rx="13" ry="18" fill="url(#${Pf}-otel)" stroke="#444"/>`; });
-  s += `</g>`;
-  // galeria principală și ramificațiile (canale găurite)
-  s += `<g data-comp="galerie"><path id="sc-gal" d="M150,330 H860" stroke="#3b2a0c" stroke-width="11" fill="none"/><path class="sc-canal" d="M150,330 H860" stroke="url(#${Pf}-ulei)" stroke-width="7" fill="none"/>`;
-  [220, 360, 500, 640, 780].forEach(x => { s += `<path class="sc-canal" d="M${x},330 V356" stroke="#d9a441" stroke-width="5"/>`; });
-  s += `<path class="sc-canal" d="M830,330 V104" stroke="#d9a441" stroke-width="5" fill="none"/><path class="sc-canal" d="M830,110 H220" stroke="#d9a441" stroke-width="4" fill="none" opacity=".9"/></g>`;
-  // pompa cu roți dințate (secțiune, animată) și supapa de siguranță
-  s += `<g data-comp="pompa"><rect x="88" y="380" width="104" height="70" rx="10" fill="url(#${Pf}-fonta)" stroke="#444"/><circle cx="118" cy="415" r="27" fill="#3b2a0c"/><circle cx="163" cy="415" r="27" fill="#3b2a0c"/>
-    <g id="sc-g1" transform="translate(118 415)">${roata(11, 25, 6, `fill="url(#${Pf}-otel)" stroke="#333"`)}<circle r="5" fill="#333"/></g><g id="sc-g2" transform="translate(163 415)">${roata(11, 25, 6, `fill="url(#${Pf}-otel)" stroke="#333"`)}<circle r="5" fill="#333"/></g></g>`;
-  s += `<g data-comp="supapa"><rect x="40" y="352" width="44" height="22" rx="4" fill="url(#${Pf}-fonta)" stroke="#444"/><rect x="44" y="357" width="36" height="12" fill="#3b2a0c"/><rect id="sc-psup" x="46" y="357" width="12" height="12" rx="2" fill="url(#${Pf}-otel)"/><path id="sc-arc" d="" stroke="#ddd" stroke-width="1.6" fill="none"/>
-    <path id="sc-retsup" d="M62,374 V500" stroke="#d9a441" stroke-width="4" stroke-dasharray="5 4" opacity="0"/></g>`;
-  // sorbul
-  s += `<g data-comp="sorb"><path d="M140,450 V510 H230" stroke="#4a4f55" stroke-width="12" fill="none"/><path class="sc-canal" d="M140,450 V510 H230" stroke="#d9a441" stroke-width="7" fill="none"/><rect x="226" y="498" width="40" height="24" rx="5" fill="#7b8189" stroke="#333"/>${[0, 1, 2, 3, 4].map(k => `<line x1="${230 + k * 8}" y1="500" x2="${230 + k * 8}" y2="520" stroke="#cfd5db"/>`).join("")}</g>`;
-  // conducta pompă → filtru → galerie
-  s += `<path class="sc-canal" d="M140,380 V360 H62 V352" stroke="#d9a441" stroke-width="5" fill="none"/><path class="sc-canal" d="M163,380 V250 H120" stroke="#d9a441" stroke-width="6" fill="none"/>`;
-  s += `<g data-comp="filtru"><rect x="70" y="190" width="58" height="104" rx="10" fill="url(#${Pf}-filtru)" stroke="#0a2a5a"/><rect x="76" y="200" width="46" height="84" rx="4" fill="#f3eee0" opacity=".9"/>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => `<line x1="${80 + k * 4}" y1="203" x2="${80 + k * 4}" y2="281" stroke="#c9bc98"/>`).join("")}<rect x="92" y="236" width="14" height="12" rx="2" fill="#555"/>${txt(99, 186, "filtru", { fs: 10, w: 700 })}</g>`;
-  s += `<path class="sc-canal" d="M128,250 H150 V330" stroke="#d9a441" stroke-width="6" fill="none"/>`;
-  // racordul de la capătul galeriei: manocontact sau adaptorul manometrului
-  s += `<g data-comp="senzor"><rect x="860" y="320" width="22" height="20" fill="url(#${Pf}-alama)" stroke="#6b5214"/><g id="sc-sw"><rect x="882" y="316" width="30" height="28" rx="4" fill="#2b2f34" stroke="#000"/><rect x="912" y="324" width="10" height="12" fill="#c9a043"/><path d="M922,330 C950,330 950,290 975,280" stroke="#1d6fd1" stroke-width="2.5" fill="none"/></g>
-    <g id="sc-hose"><path d="M882,330 C930,330 910,250 918,215" stroke="#1b1b1b" stroke-width="7" fill="none"/></g></g>`;
-  s += `<g id="sc-man"></g>`;
-  // martorul de presiune (bord) și termometrul / OBD
-  s += `<g transform="translate(940 300)"><circle r="20" fill="#1b1d20" stroke="#000"/><path id="sc-lampa" d="M-11,4 h16 l6,-6 h4 v-2 h-6 l-4,4 h-14 v-6 h-3 v6 z M10,-8 q4,6 0,9" fill="#3a2a10" stroke="#111"/></g>`;
-  s += txt(940, 334, "martor ulei", { fs: 9 });
-  s += `<g transform="translate(870 400)"><rect width="120" height="56" rx="8" fill="#e9edf1" stroke="#8a949e"/><rect x="8" y="8" width="104" height="28" rx="3" fill="#a7b39b"/><text id="sc-T" x="104" y="30" text-anchor="end" font-size="20" font-family="'Courier New',monospace" font-weight="700" fill="#1d2618">--</text>${txt(60, 50, "°C ulei · sondă în joja", { fs: 8.5 })}</g>`;
-  s += `<path d="M870,428 C840,428 820,300 806,150" stroke="#222" stroke-width="2" fill="none"/>`;
-  s += `<g transform="translate(870 470)"><rect width="120" height="56" rx="8" fill="#1d2228" stroke="#000"/><rect x="8" y="8" width="104" height="28" rx="3" fill="#0b1b14"/><text id="sc-n" x="104" y="30" text-anchor="end" font-size="20" font-family="'Courier New',monospace" font-weight="700" fill="#6dff8e">0</text>${txt(60, 50, "rot/min · tester OBD", { fs: 8.5, f: "#cfd5db" })}</g>`;
-  s += `<g id="sc-part"></g>`;
-  s += txt(520, 30, "Circuitul de ungere – secțiune prin motorul K7J (schematic)", { fs: 14, w: 700 });
-  s += `<g font-size="10" fill="#10202f">${txt(520, 470, "baia de ulei (carter)", { fs: 10, f: "#e9edf1" })}${txt(140, 470, "pompă", { fs: 10, f: "#10202f", w: 700 })}${txt(62, 345, "supapă sig.", { fs: 9, f: "#10202f" })}${txt(500, 324, "galeria principală", { fs: 10, f: "#3b2a0c", w: 700, halo: true })}${txt(500, 418, "lagăre paliere (cuzineți)", { fs: 10, w: 700, halo: true })}${txt(520, 80, "arborele cu came", { fs: 10, w: 700, halo: true })}</g>`;
+  // chiulasa (aliaj de aluminiu), camerele de ardere, capacul culbutorilor
+  s += `<path d="M228,72 H880 V140 H228 Z" fill="url(#${Pf}-hasAl)" stroke="#5d646b" stroke-width="1.4"/><path d="M236,36 Q236,26 250,26 H858 Q872,26 872,36 V72 H236 Z" fill="#c7ccd1" stroke="#5d646b"/><path d="M236,36 Q236,26 250,26 H858 Q872,26 872,36 V44 H236 Z" fill="#dfe3e6"/>`;
+  CIL.forEach(x => { s += `<path d="M${x - 46},140 Q${x - 40},122 ${x},120 Q${x + 40},122 ${x + 46},140 Z" fill="#eef0f2" stroke="#6b7178"/><rect id="sx-fl${x}" x="${x - 44}" y="122" width="88" height="40" fill="url(#${Pf}-flacara)" opacity="0"/>`;
+    s += `<rect x="${x - 2.5}" y="114" width="5" height="6" fill="#e9e4d6" stroke="#777" stroke-width=".5"/><rect x="${x - 1}" y="120" width="2" height="3" fill="#555"/>`; });
+  s += `<g data-comp="came"><rect x="244" y="54" width="612" height="11" rx="5.5" fill="url(#${Pf}-otel)" stroke="#444"/><path class="sx-canal" d="M256,60 H850" stroke="#d9a441" stroke-width="4"/>${txt(548, 50, "axul culbutorilor (tubular, plin cu ulei)", { fs: 8.5, f: "#27313a" })}
+    <rect x="236" y="82" width="636" height="12" rx="6" fill="url(#${Pf}-otel)" stroke="#444"/><g id="sx-came"></g>${txt(548, 105, "arborele cu came", { fs: 8.5, f: "#27313a" })}</g>`;
+  s += `<g id="sx-supape"></g>`;
+  // galeria principală, găurile spre paliere, coloana spre chiulasă
+  s += `<g data-comp="galerie"><path d="M246,268 H884" stroke="#3b2a0c" stroke-width="9" fill="none"/><path class="sx-canal" d="M246,268 H884" stroke="#d9a441" stroke-width="5.5" fill="none"/>`;
+  PAL.forEach(x => { s += `<path class="sx-canal" d="M${x},268 V313" stroke="#d9a441" stroke-width="3.5"/>`; });
+  s += `<path d="M822,268 V60" stroke="#3b2a0c" stroke-width="7"/><path class="sx-canal" d="M822,268 V60" stroke="#d9a441" stroke-width="3.8"/>${txt(560, 262, "galeria principală", { fs: 9.5, w: 700, f: "#2a1d06", halo: true })}</g>`;
+  // retur din chiulasă (canal de scurgere) și joja cu sonda termometrului
+  s += `<path d="M862,140 V372" stroke="#55585c" stroke-width="7"/><path d="M862,140 V372" stroke="#2f353b" stroke-width="4"/>`;
+  s += `<path d="M846,20 V512" stroke="#2b2f34" stroke-width="5"/><path d="M846,20 V510" stroke="#9aa1a8" stroke-width="2"/><circle cx="846" cy="16" r="5" fill="#ffd400" stroke="#8a7300"/>${txt(846, 10, "tubul jojei – sonda termometrului", { fs: 8.5, a: "end" })}`;
+  // arborele cotit, biele, pistoane (desenate dinamic)
+  s += `<g id="sx-mobil"></g>`;
+  // lanțul de antrenare a pompei
+  s += `<rect x="200" y="${YC - 7}" width="40" height="14" fill="url(#${Pf}-otel)" stroke="#444"/><rect x="218" y="${YC - 19}" width="9" height="38" rx="2" fill="#555b62" stroke="#222"/>
+    <rect x="218.5" y="${YC - 19}" width="8" height="${436 - YC + 19 + 15}" rx="4" fill="none" stroke="#2b2b2b" stroke-width="2.4" stroke-dasharray="2.4 1.2" id="sx-lant"/>`;
+  // pompa (vedere laterală) și sorbul
+  s += `<g data-comp="pompa"><rect x="236" y="406" width="58" height="52" rx="6" fill="url(#${Pf}-hasAl)" stroke="#444"/><rect x="218" y="420" width="9" height="32" rx="2" fill="#555b62" stroke="#222"/><rect x="226" y="432" width="12" height="8" fill="#777"/>${txt(265, 436, "A", { fs: 10, w: 700 })}</g>`;
+  s += `<g data-comp="sorb"><path d="M272,458 V490 H360 V500" stroke="#555b62" stroke-width="10" fill="none"/><path class="sx-canal" d="M272,458 V490 H360 V500" stroke="#d9a441" stroke-width="5" fill="none"/><path d="M336,500 H384 L392,516 H328 Z" fill="#7b8189" stroke="#222"/>${[0, 1, 2, 3, 4, 5, 6].map(k => `<line x1="${334 + k * 9}" y1="510" x2="${334 + k * 9}" y2="516" stroke="#d5dbe1" stroke-width=".8"/>`).join("")}<line x1="330" y1="513" x2="390" y2="513" stroke="#d5dbe1" stroke-width=".8"/></g>`;
+  // refularea: canalul ascendent → răcitor → filtru → galerie
+  s += `<path d="M234,406 V205 H204" stroke="#3b2a0c" stroke-width="7" fill="none"/><path class="sx-canal" d="M234,406 V205 H204" stroke="#d9a441" stroke-width="4" fill="none"/>
+    <path d="M160,190 H248 V268" stroke="#3b2a0c" stroke-width="7" fill="none"/><path class="sx-canal" d="M160,190 H248 V268" stroke="#d9a441" stroke-width="4" fill="none"/>`;
+  s += `<g data-comp="racitor"><rect x="116" y="194" width="92" height="24" rx="3" fill="#9aa3ab" stroke="#3d444b"/>${[0, 1, 2, 3, 4].map(k => `<line x1="118" y1="${198 + k * 4.5}" x2="206" y2="${198 + k * 4.5}" stroke="${k % 2 ? "#5aa0d8" : "#c48a2a"}" stroke-width="2"/>`).join("")}
+    <path d="M116,200 H96 V160" stroke="#3b82c4" stroke-width="6" fill="none"/><path d="M116,212 H86 V160" stroke="#3b82c4" stroke-width="6" fill="none"/>${txt(92, 152, "lichid de răcire", { fs: 8.5 })}</g>`;
+  s += `<g data-comp="filtru"><path d="M114,222 H206 V350 Q206,362 194,362 H126 Q114,362 114,350 Z" fill="url(#${Pf}-filtru)" stroke="#0a2a5a"/>
+    <path d="M122,230 H198 V346 H122 Z" fill="#2f353b"/><path d="M128,234 H192 V342 H128 Z" fill="#efe6cf"/>${Array.from({ length: 15 }, (_, k) => `<line x1="${130 + k * 4.2}" y1="236" x2="${130 + k * 4.2}" y2="340" stroke="#c6b58a" stroke-width="1.1"/>`).join("")}
+    <rect x="152" y="234" width="16" height="108" fill="#8d949b" stroke="#555"/>${Array.from({ length: 9 }, (_, k) => `<circle cx="160" cy="${242 + k * 11.5}" r="2.2" fill="#2f353b"/>`).join("")}
+    <path d="M122,226 Q140,236 152,228 M168,228 Q180,236 198,226" stroke="#7b1f1f" stroke-width="2.4" fill="none"/>
+    <rect x="152" y="342" width="16" height="10" fill="#5d646b"/><rect id="sx-bypass" x="155" y="344" width="10" height="5" fill="#d9dde1"/>
+    ${txt(160, 378, "filtru: element pliat, tub central,", { fs: 8.5 })}${txt(160, 389, "membrană antiretur, bypass", { fs: 8.5 })}</g>`;
+  // turbosuflanta (carcasa centrală cu lagărele)
+  s += `<g data-comp="turbo"><path d="M914,268 V104 H996 V124" stroke="#2b2f34" stroke-width="6" fill="none"/><path class="sx-canal" d="M914,268 V104 H996 V124" stroke="#d9a441" stroke-width="3" fill="none"/>
+    <path d="M996,192 V214 H944 V470 H878" stroke="#2b2f34" stroke-width="8" fill="none"/><path class="sx-canal" d="M996,192 V214 H944 V470 H878" stroke="#a87a2c" stroke-width="4" fill="none" opacity=".8"/>
+    <circle cx="940" cy="160" r="36" fill="url(#${Pf}-turbo)" stroke="#2b241f"/><circle cx="1058" cy="160" r="32" fill="#c3c8cd" stroke="#555"/><rect x="964" y="132" width="66" height="58" rx="6" fill="url(#${Pf}-hasAl)" stroke="#444"/>
+    <rect x="936" y="156" width="124" height="8" fill="url(#${Pf}-otel)" stroke="#333"/><rect x="976" y="150" width="14" height="20" fill="url(#${Pf}-cuz)"/><rect x="1004" y="150" width="14" height="20" fill="url(#${Pf}-cuz)"/>
+    <g id="sx-rotT">${[0, 1, 2, 3, 4, 5].map(k => `<rect x="935" y="128" width="4" height="64" fill="#9c9188" transform="rotate(${k * 30} 940 160)"/>`).join("")}</g><g id="sx-rotC">${[0, 1, 2, 3, 4, 5].map(k => `<rect x="1056" y="132" width="4" height="56" fill="#eef1f3" stroke="#888" stroke-width=".5" transform="rotate(${k * 30} 1058 160)"/>`).join("")}</g>
+    ${txt(997, 92, "turbosuflanta", { fs: 9.5, w: 700 })}${txt(1000, 234, "retur liber în baie", { fs: 8.5, a: "start" })}</g>`;
+  // racordul de la capătul galeriei: manocontact sau adaptorul manometrului + manometrul
+  s += `<g data-comp="senzor"><rect x="880" y="260" width="18" height="16" fill="url(#${Pf}-alama)" stroke="#6b5214"/><g id="sx-sw"><path d="M898,258 h10 l3,4 v12 l-3,4 h-10 z" fill="url(#${Pf}-alama)" stroke="#6b5214"/><rect x="911" y="262" width="14" height="12" rx="2" fill="#1e2226"/><rect x="925" y="265.5" width="7" height="5" fill="#c9a043"/><path d="M932,268 C946,268 948,250 962,246" stroke="#2e7d32" stroke-width="2.2" fill="none"/></g>
+    <g id="sx-hose"><path d="M898,268 C930,268 960,300 985,330" stroke="#151515" stroke-width="6" fill="none"/></g></g>`;
+  s += `<g id="sx-man"></g>`;
+  // detaliul A–A: pompa în secțiune transversală (roți dințate evolventice, supapa de siguranță)
+  s += `<path d="M236,432 L210,452" stroke="#333" stroke-dasharray="3 2"/>${txt(118, 420, "secțiunea A–A prin pompă", { fs: 9.5, w: 700 })}`;
+  s += `<g data-comp="supapa"><circle cx="${SX.C[0]}" cy="${SX.C[1]}" r="102" fill="#f4f5f6" stroke="#333" stroke-width="1.5"/><g clip-path="url(#${Pf}-clipA)">
+    <rect x="10" y="420" width="220" height="220" fill="url(#${Pf}-hasAl)"/>
+    <circle cx="${SX.ra1[0]}" cy="${SX.ra1[1]}" r="${SX.m * (SX.z / 2 + 1) + 1}" fill="url(#${Pf}-ulei)"/><circle cx="${SX.ra2[0]}" cy="${SX.ra2[1]}" r="${SX.m * (SX.z / 2 + 1) + 1}" fill="url(#${Pf}-ulei)"/>
+    <rect x="103" y="440" width="30" height="${SX.C[1] - 440}" fill="url(#${Pf}-ulei)"/><rect x="103" y="${SX.C[1] + 20}" width="30" height="${640 - SX.C[1]}" fill="url(#${Pf}-ulei)"/>
+    <rect x="133" y="456" width="56" height="12" fill="#2f353b"/><rect x="133" y="457" width="56" height="10" fill="url(#${Pf}-ulei)" opacity=".85"/>
+    <path d="M145,468 V496 H190 V604 H118" stroke="#2f353b" stroke-width="11" fill="none"/><path id="sx-retC" d="M145,468 V496 H190 V604 H118" stroke="#8a5a14" stroke-width="7" fill="none"/>
+    <rect id="sx-plj" x="134" y="457" width="16" height="10" rx="1.5" fill="url(#${Pf}-otel)" stroke="#444" stroke-width=".6"/><path id="sx-arc" d="" stroke="#e3e6e9" stroke-width="1.6" fill="none"/><rect x="189" y="454" width="8" height="16" fill="#5d646b"/>
+    <g id="sx-ga" transform="translate(${SX.ra1[0]} ${SX.ra1[1]})"><path d="${profilEvolventa(SX.z, SX.m)}" fill="url(#${Pf}-otel)" stroke="#2b2f34" stroke-width=".8"/><circle r="6" fill="#4b5157"/><rect x="-1.5" y="-7" width="3" height="4" fill="#222"/></g>
+    <g id="sx-gb" transform="translate(${SX.ra2[0]} ${SX.ra2[1]})"><path d="${profilEvolventa(SX.z, SX.m)}" fill="url(#${Pf}-otel)" stroke="#2b2f34" stroke-width=".8"/><circle r="6" fill="#4b5157"/></g>
+    <g id="sx-partA"></g></g>
+    ${txt(70, 452, "refulare", { fs: 8.5, w: 700 })}${txt(70, 616, "aspirație", { fs: 8.5, w: 700 })}${txt(196, 448, "supapă", { fs: 8.5, a: "end" })}</g>`;
+  s += `<g id="sx-part"></g><g id="sx-pic"></g>`;
+  // afișajele: termometrul și turația (OBD)
+  s += `<g transform="translate(900 520)"><rect width="92" height="46" rx="6" fill="#f2c200" stroke="#7a6000"/><rect x="6" y="6" width="80" height="24" rx="3" fill="#a7b39b"/><text id="sx-T" x="82" y="25" text-anchor="end" font-size="17" font-family="'Courier New',monospace" font-weight="700" fill="#1d2618">--</text>${txt(46, 41, "°C ulei (sonda K)", { fs: 7.5, f: "#2b2100" })}</g>`;
+  s += `<g transform="translate(998 520)"><rect width="92" height="46" rx="6" fill="#1d2228" stroke="#000"/><rect x="6" y="6" width="80" height="24" rx="3" fill="#0b1b14"/><text id="sx-n" x="82" y="25" text-anchor="end" font-size="17" font-family="'Courier New',monospace" font-weight="700" fill="#6dff8e">0</text>${txt(46, 41, "rot/min · tester OBD", { fs: 7.5, f: "#cfd5db" })}</g>`;
+  s += `<path d="M846,20 C870,-4 960,20 946,520" stroke="#222" stroke-width="1.6" fill="none" opacity=".7"/>`;
+  s += `<text id="sx-scala" x="244" y="626" font-size="9.5" fill="currentColor" opacity=".75"></text>`;
   return s;
 }
-function construiesteSchema() {
-  const el = $("#svg-schema"); el.innerHTML = schemaSVG();
-  $$("#svg-schema [data-comp]").forEach(g => { g.style.cursor = "pointer"; g.addEventListener("click", () => { const k = g.dataset.comp; sim.comp[k] = true; sim.selectat = k; $("#comp-desc").innerHTML = `<b>${COMP[k][0]}.</b> ${COMP[k][1]}`; actualizeazaPasi(); }); });
-  // particulele de ulei pe traseul principal
-  const traseu = [[250, 510], [140, 510], [140, 450], [163, 410], [163, 250], [150, 250], [150, 330], [500, 330], [830, 330], [830, 110], [220, 110]];
-  sim.part = []; const g = $("#sc-part");
-  for (let k = 0; k < 40; k++) { const c = document.createElementNS("http://www.w3.org/2000/svg", "circle"); c.setAttribute("r", 2.3); c.setAttribute("fill", "#fff3c4"); g.appendChild(c); sim.part.push({ s: Math.random(), el: c }); }
-  SCH.traseu = traseu; let tot = 0; SCH.L = traseu.slice(1).map((p, i) => { const l = Math.hypot(p[0] - traseu[i][0], p[1] - traseu[i][1]); tot += l; return l; }); SCH.tot = tot;
-  desenManometru();
+function construiesteSectiune() {
+  const el = $("#svg-sx"); if (!el) return; el.innerHTML = sectiuneSVG();
+  $$("#svg-sx [data-comp]").forEach(g => { g.style.cursor = "pointer"; g.addEventListener("click", ev => { ev.stopPropagation(); alegeComp(g.dataset.comp); }); });
+  // particulele de ulei pe fiecare traseu
+  sim.part = [];
+  TRASEE.forEach(t => { const g = $(t.inset ? "#sx-partA" : "#sx-part"); for (let k = 0; k < t.n; k++) { const c = document.createElementNS("http://www.w3.org/2000/svg", "circle"); c.setAttribute("r", t.inset ? 2.4 : 2); c.setAttribute("fill", "#ffe7a3"); c.setAttribute("opacity", 0); g.appendChild(c); sim.part.push({ t, s: k / t.n + Math.random() * 0.3 / t.n, el: c }); } });
+  sim.picaturi = [];
 }
-function punctTraseu(s) {
-  let r = s * SCH.tot; for (let i = 0; i < SCH.L.length; i++) { if (r <= SCH.L[i]) { const a = SCH.traseu[i], b = SCH.traseu[i + 1], f = r / SCH.L[i]; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; } r -= SCH.L[i]; }
-  return SCH.traseu[SCH.traseu.length - 1];
+function alegeComp(k) { sim.comp[k] = true; sim.selectat = k; $("#comp-desc").innerHTML = `<b>${COMP[k][0]}.</b> ${COMP[k][1]}`; actualizeazaPasi(); }
+
+/** debitele relative: pompa (∝ n), prin motor (p/p_liniar) și prin supapa de siguranță */
+function debite() {
+  const pr = P(); if (!sim.merge && sim.n < 30) return { Q: 0, Qm: 0, Qr: 0, desch: 0 };
+  const Q = sim.n / 3500, mu = Math.pow(MD.niu(pr, sim.T) / MD.niu(pr, 90), pr.m);
+  let a = pr.a90, b = pr.b90; if (sim.defect === "lagare") { b *= sim.T > 70 ? 0.62 : 0.85; a *= 0.6; }
+  const lin = Math.max(0.05, (a + b * sim.n / 1000) * mu * (sim.defect === "diluat" ? 0.72 : 1));
+  const fr = cl(1 - sim.p / lin, 0, 1), rel = sim.defect === "supapa" ? 2.2 : pr.pRel;
+  return { Q, Qm: Q * (1 - fr), Qr: Q * fr, desch: cl((sim.p - rel * 0.86) / (rel * 0.14), 0, 1) };
 }
-function desenManometru() {
-  const g = $("#sc-man"); if (!g) return;
-  g.innerHTML = sim.man ? svgGauge("sc", 918, 150, 56, 10, sim.p, { maj: 1, unit: "bar", marca: "ULEI · GLYCERINE", benzi: [[0, 0.5, "#d32f2f"]] }) + txt(918, 232, `citire: ${fx(sim.p, 2)} bar`, { fs: 12, w: 700, halo: true }) : txt(940, 150, "manometrul nemontat", { fs: 11, f: "var(--text-sec)" });
-}
-function actualizeazaSchema(dt) {
-  const el = $("#svg-schema"); if (!el || !SCH.tot) return;
-  const pr = P(), p = sim.p, k = cl(p / 5, 0, 1);
-  sim.rot += sim.n / 60 * 360 * dt * 0.08;
-  $("#sc-g1").setAttribute("transform", `translate(118 415) rotate(${sim.rot})`); $("#sc-g2").setAttribute("transform", `translate(163 415) rotate(${-sim.rot + 16})`);
-  const linDes = MD.presiune(pr, sim.n, sim.T, sim.defect) >= (sim.defect === "supapa" ? 2.2 : pr.pRel) * 0.97 && sim.merge;
-  const desch = cl((p - pr.pRel * 0.9) / (pr.pRel * 0.1), 0, 1) * (sim.merge ? 1 : 0) || (linDes ? 1 : 0);
-  $("#sc-psup").setAttribute("x", 46 + desch * 18);
-  let d = `M${58 + desch * 18},363`; for (let i = 1; i <= 6; i++) d += ` L${58 + desch * 18 + (80 - 58 - desch * 18) * i / 6},${363 + (i % 2 ? -5 : 5)}`; $("#sc-arc").setAttribute("d", d);
-  $("#sc-retsup").setAttribute("opacity", desch > 0.3 ? 0.9 : 0);
-  $$("#svg-schema .sc-canal").forEach(c => c.setAttribute("stroke", sim.merge ? `hsl(${40 - 25 * k}, ${70 + 20 * k}%, ${55 - 12 * k}%)` : "#b88a3a"));
-  $$("#svg-schema .sc-film").forEach(c => c.setAttribute("stroke-width", sim.merge ? 2 + 2 * k : 1.5));
-  const v = sim.n / 3500;
-  sim.part.forEach(pt => { pt.s = (pt.s + dt * 0.12 * v) % 1; const [x, y] = punctTraseu(pt.s); pt.el.setAttribute("cx", x); pt.el.setAttribute("cy", y); pt.el.setAttribute("opacity", sim.merge ? 0.95 : 0); });
-  $("#sc-sw").style.display = sim.senzor ? "" : "none"; $("#sc-hose").style.display = sim.man ? "" : "none";
-  const lampa = sim.contact && sim.senzor && p < pr.pSw;
-  $("#sc-lampa").setAttribute("fill", lampa ? "#ff3b1f" : "#3a2a10"); $("#sc-lampa").setAttribute("filter", lampa ? "url(#sc-umbra)" : "");
-  $("#sc-T").textContent = fx(sim.T, 1); $("#sc-n").textContent = fx(sim.n, 0);
-  $$("#svg-schema [data-comp]").forEach(g => g.setAttribute("opacity", sim.selectat && g.dataset.comp !== sim.selectat && sim.vedereSel ? 0.5 : 1));
-  desenManometru();
+/** cursa supapei (0…1) în funcție de unghiul ciclului φ [°RAC]; admisie 350…590, evacuare 140…380 */
+function cursaSupapa(phi, adm) { const [a, d] = adm ? [350, 240] : [140, 240]; const x = ((phi - a) % 720 + 720) % 720; return x < d ? Math.pow(Math.sin(Math.PI * x / d), 2) : 0; }
+const VIZ = 1 / 40;   // animația încetinită: 1 s de animație = 1/40 s real (altfel rotația ar fi doar o pată)
+function actualizeazaSectiune(dt) {
+  const el = $("#svg-sx"); if (!el || !el.getClientRects().length) return;
+  const pr = P(), { YC, r, l, CIL, PAL, OF } = SX, D = debite(), k = cl(sim.p / 5, 0, 1);
+  sim.th = ((sim.th || 0) + sim.n / 60 * 360 * dt * VIZ) % 720;
+  const th = sim.th;
+  // arborele cotit, bielele și pistoanele (proiecție laterală – mecanismul bielă-manivelă)
+  let m = "";
+  const pinY = a => YC - r * Math.cos(a * RAD);
+  PAL.forEach((x, i) => { m += `<circle cx="${x}" cy="${YC}" r="14" fill="url(#sx-otel)" stroke="#333"/>`; });
+  PAL.forEach((x, i) => { const x0 = i === 0 ? 236 : x - 24, x1 = i === 4 ? 850 : x + 24; m += `<rect x="${x0}" y="${YC - 14}" width="${x1 - x0}" height="28" fill="url(#sx-otel)" stroke="#333" stroke-width=".8"/>`; });
+  CIL.forEach((x, i) => {
+    const a = th + (i === 1 || i === 2 ? 180 : 0), ca = Math.cos(a * RAD), py = pinY(a), sa = Math.sin(a * RAD), yb = YC - (r * ca + Math.sqrt(l * l - r * r * sa * sa));
+    const cwy = YC + 38 * ca, y1 = Math.min(py, cwy) - 15, y2 = Math.max(py, cwy) + 15;
+    // brațele (cu contragreutăți) văzute din lateral, fusul maneton, găurile de ungere oblice
+    [x - 46, x + 30].forEach(xw => { m += `<rect x="${xw}" y="${y1.toFixed(1)}" width="16" height="${(y2 - y1).toFixed(1)}" rx="5" fill="#7d858d" stroke="#3d434a" stroke-width=".8"/>`; });
+    m += `<rect x="${x - 30}" y="${(py - 13).toFixed(1)}" width="60" height="26" rx="4" fill="url(#sx-otel)" stroke="#333" stroke-width=".8"/><path d="M${x - 62},${YC} L${x - 8},${py.toFixed(1)}" stroke="#3b2a0c" stroke-width="1.6" stroke-dasharray="3 2"/>`;
+    // pistonul (secționat: capul cu segmenții, mantaua, bolțul)
+    const pt = yb - 22;
+    m += `<rect x="${x - 48}" y="${pt.toFixed(1)}" width="96" height="17" rx="2" fill="url(#sx-piston)" stroke="#555"/>${[4, 8.5, 13].map(d => `<line x1="${x - 48}" y1="${(pt + d).toFixed(1)}" x2="${x + 48}" y2="${(pt + d).toFixed(1)}" stroke="#3d4349" stroke-width="1.5"/>`).join("")}
+      <rect x="${x - 48}" y="${(pt + 17).toFixed(1)}" width="7" height="29" fill="url(#sx-piston)" stroke="#555" stroke-width=".7"/><rect x="${x + 41}" y="${(pt + 17).toFixed(1)}" width="7" height="29" fill="url(#sx-piston)" stroke="#555" stroke-width=".7"/><rect x="${x - 41}" y="${(yb - 5).toFixed(1)}" width="82" height="10" rx="5" fill="url(#sx-otel)" stroke="#444" stroke-width=".7"/>`;
+    // biela (văzută din lateral: corpul în I, piciorul, capul cu capacul și cuzineții)
+    m += `<path d="M${x - 5},${yb.toFixed(1)} L${x - 8},${(py - 18).toFixed(1)} H${x + 8} L${x + 5},${yb.toFixed(1)} Z" fill="url(#sx-otelV)" stroke="#333" stroke-width=".8"/><rect x="${x - 9}" y="${(yb - 9).toFixed(1)}" width="18" height="18" rx="4" fill="url(#sx-otelV)" stroke="#333" stroke-width=".8"/>
+      <rect x="${x - 13}" y="${(py - 21).toFixed(1)}" width="26" height="42" rx="5" fill="url(#sx-otelV)" stroke="#333" stroke-width=".8"/><line x1="${x - 13}" y1="${py.toFixed(1)}" x2="${x + 13}" y2="${py.toFixed(1)}" stroke="#333" stroke-width="1"/><rect x="${x - 11}" y="${(py - 15).toFixed(1)}" width="22" height="30" rx="3" fill="url(#sx-cuz)" opacity=".85"/><rect x="${x - 9}" y="${(py - 12).toFixed(1)}" width="18" height="24" rx="2" fill="url(#sx-otel)"/>`;
+    // aprinderea (ordinea 1-3-4-2): flacăra în camera de ardere la începutul destinderii
+    const phi = ((th - OF[i]) % 720 + 720) % 720, fl = $(`#sx-fl${x}`);
+    if (fl) fl.setAttribute("opacity", sim.merge && phi < 40 ? ((1 - phi / 40) * 0.9).toFixed(2) : 0);
+    sim.pinY = sim.pinY || []; sim.pinY[i] = py;
+  });
+  $("#sx-mobil").innerHTML = m;
+  // camele (proiecție laterală) și supapele: arborele cu came la jumătatea turației
+  let c = "", v = "";
+  CIL.forEach((x, i) => {
+    const phi = ((th - OF[i]) % 720 + 720) % 720;
+    [[x - 22, true], [x + 22, false]].forEach(([xv, adm]) => {
+      const L = cursaSupapa(phi, adm), Lop = cursaSupapa(phi + 360, adm), dy = 7 * L;   // arborele cu came la ½ din turație: vârful camei e sus după 360 °RAC
+      c += `<rect x="${xv - 8}" y="${(79 - 7 * Lop).toFixed(1)}" width="16" height="${(18 + 7 * Lop + dy).toFixed(1)}" rx="7" fill="url(#sx-otelV)" stroke="#333" stroke-width=".7"/>`;
+      v += `<rect x="${xv - 2}" y="${(97 + dy).toFixed(1)}" width="4" height="28" fill="#8d949b"/><path d="M${xv - 12},${(129 + dy).toFixed(1)} L${xv - 2},${(124 + dy).toFixed(1)} H${xv + 2} L${xv + 12},${(129 + dy).toFixed(1)} V${(131 + dy).toFixed(1)} H${xv - 12} Z" fill="#7a8188" stroke="#333" stroke-width=".6"/>`;
+      let sp = `M${xv - 6},${(102 + dy).toFixed(1)}`; for (let j = 1; j <= 6; j++) sp += ` L${xv + (j % 2 ? 6 : -6)},${(102 + dy + (114 - 102 - dy) * j / 6).toFixed(1)}`;
+      v += `<path d="${sp}" stroke="#c6cbd0" stroke-width="1.3" fill="none"/><rect x="${xv - 7}" y="${(97 + dy).toFixed(1)}" width="14" height="5" rx="1" fill="#4b5157"/>`;
+    });
+  });
+  $("#sx-came").innerHTML = c; $("#sx-supape").innerHTML = v;
+  // lanțul pompei
+  $("#sx-lant").setAttribute("stroke-dashoffset", (-th * 0.6).toFixed(1));
+  // pompa A–A: roțile în angrenare (raport 1:1), turația pompei ≈ n (lanț 1:1 la K7J ≈ 0,8)
+  const ap = th * 0.8;
+  $("#sx-ga").setAttribute("transform", `translate(${SX.ra1[0]} ${SX.ra1[1]}) rotate(${ap.toFixed(2)})`);
+  $("#sx-gb").setAttribute("transform", `translate(${SX.ra2[0]} ${SX.ra2[1]}) rotate(${(180 + 180 / SX.z - ap).toFixed(2)})`);
+  // supapa de siguranță: deplasarea plonjorului ∝ (p − p_deschidere); arcul se comprimă
+  const x0 = 134 + D.desch * 16;
+  $("#sx-plj").setAttribute("x", x0.toFixed(1));
+  let d = `M${x0 + 16},462`; const xe = 189, nsp = 7; for (let i = 1; i <= nsp * 2; i++) d += ` L${(x0 + 16 + (xe - x0 - 16) * i / (nsp * 2)).toFixed(1)},${i % 2 ? 457.5 : 466.5}`; $("#sx-arc").setAttribute("d", d);
+  $("#sx-retC").setAttribute("stroke", D.Qr > 0.004 ? "#d9a441" : "#6e4a12");
+  // uleiul din baie: nivelul scade când uleiul circulă (≈ 0,5 l în galerii și chiulasă) și revine lent la oprire
+  sim.circ = (sim.circ || 0) + ((D.Q > 0 ? Math.min(1, D.Q * 2.2) : 0) - (sim.circ || 0)) * (1 - Math.exp(-dt / (D.Q > 0 ? 3 : 18)));
+  const niv = 466 + 12 * sim.circ, und = sim.merge ? 1.2 + 1.5 * (sim.n / 3500) : 0;
+  $("#sx-ulei").setAttribute("y", niv.toFixed(1));
+  let w = `M238,${niv}`; for (let x = 238; x <= 878; x += 16) w += ` L${x},${(niv + und * Math.sin(x / 23 + sim.t * 6)).toFixed(1)}`; $("#sx-val").setAttribute("d", w);
+  // culoarea uleiului în canale: presiunea (mai închis = presiune mai mare)
+  $$("#svg-sx .sx-canal").forEach(e => e.setAttribute("stroke", D.Q > 0 ? `hsl(${42 - 16 * k}, ${72 + 18 * k}%, ${56 - 14 * k}%)` : "#a77b33"));
+  $$("#svg-sx .sx-film").forEach(e => { e.setAttribute("stroke-width", D.Q > 0 ? (1.2 + 2.2 * k).toFixed(2) : 0.8); e.setAttribute("stroke", D.Q > 0 ? "#e2a93f" : "#9c7432"); });
+  // particulele: viteza ∝ debitul fiecărei ramuri (încetinită ca rotația)
+  const omP = sim.merge || sim.n > 30 ? sim.n * 0.8 / 60 * 2 * Math.PI * VIZ : 0;
+  sim.part.forEach(pt => { const t = pt.t, q = t.q === "pompa" ? D.Q : t.q === "motor" ? D.Qm : D.Qr, vit = t.roata ? omP * SX.m * SX.z / 2 / t.tot : q * t.f * (t.inset ? 1.6 : 1) * 2400 * VIZ * 8 / t.tot;
+    pt.s = (pt.s + vit * dt) % 1; const [x, y] = pctTraseu(t, pt.s); pt.el.setAttribute("cx", x.toFixed(1)); pt.el.setAttribute("cy", y.toFixed(1)); pt.el.setAttribute("opacity", q * t.f > 0.004 ? 0.9 : 0); });
+  // picăturile care se scurg din chiulasă, de pe arborele cotit și din lagăre spre baie
+  if (D.Qm > 0.01 && Math.random() < D.Qm * dt * 60) { const i = Math.floor(Math.random() * 4); sim.picaturi.push({ x: SX.CIL[i] + (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 20), y: (sim.pinY ? sim.pinY[i] : YC) + 20, vy: 20 }); }
+  if (D.Qm > 0.01 && Math.random() < D.Qm * dt * 25) sim.picaturi.push({ x: 862, y: 150, vy: 30, canal: 1 });
+  if (!D.Q && sim.circ > 0.05 && Math.random() < sim.circ * dt * 10) sim.picaturi.push({ x: 862, y: 150, vy: 20, canal: 1 });
+  sim.picaturi.forEach(p => { p.vy += 380 * dt; p.y += p.vy * dt; });
+  sim.picaturi = sim.picaturi.filter(p => p.y < niv);
+  if (sim.picaturi.length > 60) sim.picaturi.splice(0, sim.picaturi.length - 60);
+  $("#sx-pic").innerHTML = sim.picaturi.map(p => `<ellipse cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" rx="1.6" ry="${(2 + Math.min(4, p.vy / 80)).toFixed(1)}" fill="#e3a943" opacity=".9"/>`).join("");
+  // turbosuflanta
+  sim.thT = ((sim.thT || 0) + (sim.merge ? 1 : 0) * (40 + sim.n / 10) * dt * 4) % 360;
+  $("#sx-rotT").setAttribute("transform", `rotate(${sim.thT.toFixed(1)} 940 160)`); $("#sx-rotC").setAttribute("transform", `rotate(${sim.thT.toFixed(1)} 1058 160)`);
+  // racordul: manocontact sau furtunul manometrului
+  $("#sx-sw").style.display = sim.senzor ? "" : "none"; $("#sx-hose").style.display = sim.man ? "" : "none";
+  $("#sx-man").innerHTML = sim.man ? svgGauge("sx", 1030, 380, 50, 10, sim.pAc, { maj: 2, unit: "bar", benzi: [[0, 0.5, "#d32f2f"]] }) : "";
+  $("#sx-T").textContent = fx(sim.Tafis, 1); $("#sx-n").textContent = fx(sim.nAfis, 0);
+  $("#sx-scala").textContent = sim.merge ? `Animație încetinită de 40 de ori: arborele cotit face real ${fx(sim.n / 60, 1)} rot/s, pompa ≈ ${fx(sim.n * 0.8 / 60, 1)} rot/s; ordinea de aprindere 1-3-4-2.` : "Motor oprit: uleiul din galerii și din chiulasă se scurge înapoi în baie.";
+  $$("#svg-sx [data-comp]").forEach(g => g.classList.toggle("sel", g.dataset.comp === sim.selectat));
 }
 
-/* ------------------------------------------------------------------ panoplia cu pompe de ulei */
+/* ------------------------------------------------------------------ vederea „Standul” (fotografia standului K7J + aparatele de măsură) */
+const FOTO = { x: 8, y: 6, w: 465, h: 620, jojă: [152, 412], manoc: [128, 352], busonU: [230, 318], turbo: [404, 280] };
+function standSVG() {
+  const Pf = "ft", L = [640, 182], RL = 142;
+  let s = defsInstr(Pf) + defsSectiune(Pf) + `<defs>
+    <clipPath id="${Pf}-lupa"><circle cx="${L[0]}" cy="${L[1]}" r="${RL}"/></clipPath>
+    <linearGradient id="${Pf}-bloc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9bec3"/><stop offset=".55" stop-color="#8e959c"/><stop offset="1" stop-color="#5f666d"/></linearGradient>
+    <linearGradient id="${Pf}-filtruC" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#08214a"/><stop offset=".3" stop-color="#2f66bb"/><stop offset=".45" stop-color="#6b9be0"/><stop offset=".7" stop-color="#1b4e9b"/><stop offset="1" stop-color="#061a3a"/></linearGradient>
+    <linearGradient id="${Pf}-hex" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6dd97"/><stop offset=".3" stop-color="#d4ab4c"/><stop offset=".55" stop-color="#9b7724"/><stop offset=".8" stop-color="#d9b55e"/><stop offset="1" stop-color="#7f5f17"/></linearGradient>
+    <linearGradient id="${Pf}-plastic" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3f45"/><stop offset=".5" stop-color="#16191c"/><stop offset="1" stop-color="#2b3035"/></linearGradient>
+    <linearGradient id="${Pf}-cauciuc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b3f44"/><stop offset="1" stop-color="#0d0f11"/></linearGradient>
+    <linearGradient id="${Pf}-galben" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9a400"/><stop offset=".5" stop-color="#ffcf2e"/><stop offset="1" stop-color="#c79200"/></linearGradient>
+    <radialGradient id="${Pf}-led" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffe0d0"/><stop offset=".35" stop-color="#ff3b1f"/><stop offset="1" stop-color="#ff3b1f" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${Pf}-ledG" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff1c8"/><stop offset=".35" stop-color="#ff9a1f"/><stop offset="1" stop-color="#ff9a1f" stop-opacity="0"/></radialGradient></defs>`;
+  // fotografia standului (vibrează pe tampoanele elastice cu motorul pornit)
+  s += `<g id="ft-motor"><image href="img/stand.webp" x="${FOTO.x}" y="${FOTO.y}" width="${FOTO.w}" height="${FOTO.h}" preserveAspectRatio="xMidYMid meet"/></g>`;
+  // punctele de măsură pe fotografie
+  const mk = (p, t, a = "start", dx = 14, dy = 4) => `<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="none" stroke="#ffd400" stroke-width="2.4"/><circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="#ffd400"/><text x="${p[0] + (a === "end" ? -dx : dx)}" y="${p[1] + dy}" font-size="11" font-weight="700" text-anchor="${a}" fill="#fff" paint-order="stroke" style="stroke:#000;stroke-width:3px">${t}</text>`;
+  s += `<circle cx="${FOTO.manoc[0]}" cy="${FOTO.manoc[1]}" r="20" fill="none" stroke="#ffd400" stroke-width="2" stroke-dasharray="5 3"/>${mk(FOTO.manoc, "manocontact (sub galeria de admisie)", "start", 24, -22)}`;
+  s += mk(FOTO.jojă, "joja → sonda termometrului", "start", 14, 18) + mk(FOTO.busonU, "bușonul de umplere") + mk(FOTO.turbo, "alimentarea turbosuflantei", "end");
+  // lupa: zona manocontactului de pe bloc, lângă filtrul de ulei (vedere de aproape)
+  s += `<path d="M${FOTO.manoc[0] + 18},${FOTO.manoc[1] - 8} L${L[0] - RL * 0.93},${L[1] + RL * 0.35}" stroke="#ffd400" stroke-width="2" stroke-dasharray="6 4"/>`;
+  s += `<circle cx="${L[0]}" cy="${L[1]}" r="${RL + 6}" fill="#111" stroke="#cfd5db" stroke-width="3"/><g clip-path="url(#${Pf}-lupa)">
+    <rect x="${L[0] - RL}" y="${L[1] - RL}" width="${2 * RL}" height="${2 * RL}" fill="url(#${Pf}-bloc)" filter="url(#${Pf}-turnare)"/>
+    <path d="M${L[0] - RL},${L[1] - 60} C${L[0] - 60},${L[1] - 70} ${L[0] + 60},${L[1] - 66} ${L[0] + RL},${L[1] - 80}" stroke="#6f767d" stroke-width="3" fill="none" opacity=".7"/>
+    <path d="M${L[0] - RL},${L[1] + 96} H${L[0] + RL}" stroke="#4d545b" stroke-width="5" opacity=".6"/><path d="M${L[0] - RL},${L[1] + 100} H${L[0] + RL} V${L[1] + RL} H${L[0] - RL} Z" fill="#3c4248" opacity=".85"/>
+    ${[[-100, -12], [-28, -30], [52, -12]].map(([dx, dy]) => `<g transform="translate(${L[0] + dx} ${L[1] + dy - 100})"><path d="M-36,-60 C-40,10 -30,40 0,52 C30,40 40,10 36,-60 Z" fill="url(#${Pf}-plastic)" stroke="#000"/><path d="M-24,-60 C-26,5 -18,30 0,40" stroke="#4a5057" stroke-width="2" fill="none"/></g>`).join("")}
+    ${txt(L[0] + 40, L[1] - 112, "galeria de admisie (plastic)", { fs: 9, f: "#e6e9ec" })}
+    <g transform="translate(${L[0] + 58} ${L[1] - 8})"><rect x="-44" y="0" width="88" height="10" fill="#2b2f34"/><rect x="-42" y="8" width="84" height="132" rx="6" fill="url(#${Pf}-filtruC)"/><rect x="-42" y="40" width="84" height="44" fill="#f2f4f6" opacity=".92"/><text x="0" y="58" font-size="11" text-anchor="middle" font-weight="800" fill="#123f88">FILTRU</text><text x="0" y="73" font-size="9" text-anchor="middle" fill="#123f88">ULEI · K7J</text>
+      ${Array.from({ length: 13 }, (_, k) => `<rect x="${-40 + k * 6.5}" y="118" width="3.4" height="22" fill="#061a3a" opacity=".55"/>`).join("")}</g>
+    <g transform="translate(${L[0] - 36} ${L[1] + 34})"><ellipse cx="0" cy="0" rx="26" ry="30" fill="#9aa1a8" stroke="#555"/><ellipse cx="-2" cy="0" rx="18" ry="21" fill="#7d848b"/><ellipse id="ft-gaura" cx="-4" cy="0" rx="9" ry="10.5" fill="#1b1612" opacity="0"/></g>
+    <g id="ft-sw"></g><g id="ft-adapt"></g><g id="ft-pic"></g>
+    ${txt(L[0] - 50, L[1] + 122, "blocul motor – partea admisiei", { fs: 9, f: "#e6e9ec" })}</g>
+    <circle cx="${L[0]}" cy="${L[1]}" r="${RL}" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="10"/>
+    <text id="ft-et" x="${L[0]}" y="${L[1] + RL + 22}" font-size="11" text-anchor="middle" font-weight="700" fill="currentColor"></text>`;
+  // furtunul manometrului (iese din lupă spre manometru)
+  s += `<path id="ft-furtun" d="M${L[0] - 6},${L[1] + 34} C${L[0] + 80},${L[1] + 60} ${L[0] + 110},${L[1] + 170} ${L[0] + 230},${L[1] + 120} S ${L[0] + 248},${L[1] + 40} ${L[0] + 242},${L[1] + 30}" stroke="#141414" stroke-width="7" fill="none" stroke-linecap="round" opacity="0"/>`;
+  s += `<g id="ft-man"></g>`;
+  // termometrul de atelier (sonda K în tubul jojei)
+  s += `<path id="ft-cabluT" d="M${FOTO.jojă[0]},${FOTO.jojă[1]} C${FOTO.jojă[0] + 120},${FOTO.jojă[1] + 30} 470,560 560,470" stroke="#202020" stroke-width="2.6" fill="none"/>`;
+  s += `<g transform="translate(520 380)" filter="url(#${Pf}-umbra)"><rect width="122" height="218" rx="18" fill="url(#${Pf}-galben)" stroke="#7a5a00"/><rect x="10" y="12" width="102" height="194" rx="11" fill="#2b2f34"/>
+    <rect x="18" y="24" width="86" height="56" rx="5" fill="#a7b39b"/><text id="ft-T" x="98" y="64" text-anchor="end" font-size="27" font-family="'Courier New',monospace" font-weight="700" fill="#1d2618">--</text><text x="24" y="38" font-size="9" fill="#1d2618" font-weight="700">°C</text><text x="98" y="38" font-size="8" text-anchor="end" fill="#1d2618">T1  K</text>
+    ${[[34, 112, "ON"], [88, 112, "HOLD"], [34, 150, "°C/°F"], [88, 150, "MAX"]].map(([x, y, t]) => `<rect x="${x - 20}" y="${y - 12}" width="40" height="24" rx="11" fill="#3e444a" stroke="#111"/><text x="${x}" y="${y + 4}" font-size="8" text-anchor="middle" fill="#d6dbe0">${t}</text>`).join("")}
+    <text x="61" y="190" font-size="9" text-anchor="middle" fill="#ffcf2e" font-weight="700" letter-spacing="1">THERMOMETER</text><rect x="44" y="-10" width="34" height="12" rx="3" fill="#222"/></g>`;
+  s += txt(581, 616, "termometru digital, sondă K în tubul jojei", { fs: 10 });
+  // testerul OBD (turația)
+  s += `<path d="M760,600 C760,640 700,640 690,620" stroke="#202020" stroke-width="2.6" fill="none"/><g transform="translate(674 380)" filter="url(#${Pf}-umbra)"><rect width="150" height="216" rx="14" fill="#1f2328" stroke="#000"/><rect x="10" y="12" width="130" height="102" rx="5" fill="#081521"/>
+    <text x="20" y="32" font-size="9.5" fill="#7fb7e8">K7J · Date curente</text><text x="20" y="54" font-size="9" fill="#9fb3c6">Turație motor</text><text id="ft-n" x="130" y="82" text-anchor="end" font-size="26" font-family="'Courier New',monospace" font-weight="700" fill="#6dff8e">0</text><text x="130" y="100" text-anchor="end" font-size="9" fill="#9fb3c6">rot/min</text>
+    <rect x="22" y="130" width="106" height="20" rx="4" fill="#2d333a"/><text x="75" y="144" font-size="9" text-anchor="middle" fill="#cfd5db">◀  OK  ▶</text><circle cx="75" cy="178" r="17" fill="#2d333a" stroke="#111"/><text x="75" y="182" font-size="9" text-anchor="middle" fill="#cfd5db">ESC</text></g>`;
+  s += txt(749, 616, "tester OBD (citire turație)", { fs: 10 });
+  // panoul de comandă al standului: cheia de contact și martorii din bord
+  s += `<g transform="translate(846 380)" filter="url(#${Pf}-umbra)"><rect width="146" height="216" rx="8" fill="#111417" stroke="#000"/>${Array.from({ length: 40 }, (_, k) => `<circle cx="${(k * 37) % 140 + 3}" cy="${(k * 53) % 210 + 3}" r=".8" fill="#5b6168"/>`).join("")}
+    <rect x="12" y="14" width="122" height="70" rx="10" fill="#050607" stroke="#2b3035"/>
+    <g transform="translate(42 50)"><circle r="22" fill="url(#${Pf}-led)" id="ft-halo" opacity="0"/><path id="ft-lampa" d="M-17,5 h20 l8,-8 h6 v-3 h-8 l-5,5 h-21 v-7 h-4 v13 z M14,-10 q5,7 0,11" fill="#2a1b0c" stroke="#3a2a10" stroke-width=".8"/></g>
+    <g transform="translate(104 50)"><circle r="22" fill="url(#${Pf}-ledG)" id="ft-halo2" opacity="0"/><path id="ft-baterie" d="M-14,-8 h28 v16 h-28 z M-9,-12 v4 M9,-12 v4 M-10,0 h6 M4,0 h6 M7,-3 v6" fill="none" stroke="#2a1b0c" stroke-width="2"/></g>
+    <text x="73" y="98" font-size="8.5" text-anchor="middle" fill="#9aa1a8">martor presiune ulei · încărcare</text>
+    <circle cx="73" cy="152" r="34" fill="#2b3035" stroke="#000"/><circle cx="73" cy="152" r="24" fill="url(#${Pf}-crom)"/><g id="ft-cheie"><rect x="69" y="122" width="8" height="40" rx="2" fill="#1b1d20"/><rect x="62" y="116" width="22" height="14" rx="6" fill="#1b1d20"/></g>
+    <text x="40" y="196" font-size="8" fill="#9aa1a8">0</text><text x="98" y="128" font-size="8" fill="#9aa1a8">I</text><text x="108" y="150" font-size="8" fill="#9aa1a8">II</text></g>`;
+  s += txt(919, 616, "panoul standului", { fs: 10 });
+  s += `<text id="ft-stare" x="16" y="22" font-size="12" font-weight="700" fill="#fff" paint-order="stroke" style="stroke:#000;stroke-width:3px"></text>`;
+  return s;
+}
+function construiesteStand() { const el = $("#svg-ft"); if (el) el.innerHTML = standSVG(); sim.picF = []; }
+/** manocontactul (desen realist): corp hexagonal din alamă, filet, izolator negru cu borna tip lamelă și fișa cu fir */
+function desenManocontact(x, y, rotit, cuFisa) {
+  const f = (rotit * 6) % 1, fete = [0, 1, 2].map(j => (((j + f) / 3) * 26).toFixed(1));
+  return `<g transform="translate(${x} ${y})">
+    <rect x="0" y="-7" width="14" height="14" fill="#a68a3c"/>${Array.from({ length: 7 }, (_, k) => `<line x1="${2 + k * 2}" y1="-7" x2="${1 + k * 2}" y2="7" stroke="#6d5718" stroke-width=".8"/>`).join("")}
+    <path d="M-22,-15 h22 v30 h-22 z" fill="url(#ft-hex)" stroke="#5b4510"/>${fete.map(o => `<line x1="-22" y1="${-15 + +o * 30 / 26}" x2="0" y2="${-15 + +o * 30 / 26}" stroke="#7a5c16" stroke-width="1"/>`).join("")}
+    <path d="M-40,-11 h18 v22 h-18 z" fill="#15181b" stroke="#000"/><rect x="-52" y="-3" width="13" height="6" fill="#d8c27a" stroke="#8a7330" stroke-width=".6"/>
+    ${cuFisa ? `<path d="M-74,-9 h22 v18 h-22 z" fill="#2b2f34" stroke="#000"/><path d="M-74,0 C-100,0 -110,-30 -150,-40" stroke="#2e7d32" stroke-width="3.2" fill="none"/>` : ""}</g>`;
+}
+/** adaptorul manometrului cu furtunul */
+function desenAdaptor(x, y, rotit) {
+  const f = (rotit * 6) % 1;
+  return `<g transform="translate(${x} ${y})"><rect x="0" y="-6" width="14" height="12" fill="#a68a3c"/><path d="M-18,-13 h18 v26 h-18 z" fill="url(#ft-hex)" stroke="#5b4510"/><line x1="-18" y1="${(-13 + f * 26).toFixed(1)}" x2="0" y2="${(-13 + f * 26).toFixed(1)}" stroke="#7a5c16"/>
+    <rect x="-34" y="-8" width="16" height="16" fill="#c9cdd1" stroke="#555"/><path d="M-46,-11 h12 v22 h-12 z" fill="url(#ft-hex)" stroke="#5b4510"/><path d="M-46,0 h-14" stroke="#141414" stroke-width="8"/></g>`;
+}
+function actualizeazaStand(dt) {
+  const el = $("#svg-ft"); if (!el || !el.getClientRects().length) return;
+  const pr = P(), L = [640, 182], GX = L[0] + 250;
+  // vibrația motorului pe tampoane (mai puternică la ralanti, la frecvența de aprindere)
+  const A = sim.merge ? (sim.reg === "ral" ? 0.9 : 0.45) : 0, f2 = sim.n / 30;
+  $("#ft-motor").setAttribute("transform", A ? `translate(${(A * Math.sin(sim.t * f2 * 2 * Math.PI * 0.13)).toFixed(2)} ${(A * 0.7 * Math.cos(sim.t * f2 * 2 * Math.PI * 0.11)).toFixed(2)})` : "");
+  // manocontactul: desfacerea/înșurubarea animată (≈ 6 ture de filet)
+  sim.vSw += ((sim.senzor ? 0 : 1) - sim.vSw) * Math.min(1, dt / 0.45); sim.vMan += ((sim.man ? 1 : 0) - sim.vMan) * Math.min(1, dt / 0.45);
+  if (Math.abs(sim.vSw - (sim.senzor ? 0 : 1)) < 0.004) sim.vSw = sim.senzor ? 0 : 1;
+  if (Math.abs(sim.vMan - (sim.man ? 1 : 0)) < 0.004) sim.vMan = sim.man ? 1 : 0;
+  const bx = L[0] - 46, by = L[1] + 34;
+  $("#ft-sw").innerHTML = sim.vSw < 0.999 ? desenManocontact(bx - sim.vSw * 70, by, sim.vSw, sim.vSw < 0.02) : "";
+  $("#ft-adapt").innerHTML = sim.vMan > 0.001 ? desenAdaptor(bx - (1 - sim.vMan) * 60, by, sim.vMan) : "";
+  $("#ft-gaura").setAttribute("opacity", sim.vSw > 0.6 && sim.vMan < 0.4 ? 1 : 0);
+  $("#ft-furtun").setAttribute("opacity", sim.vMan > 0.95 ? 1 : 0);
+  $("#ft-furtun").setAttribute("d", `M${bx - 60},${by} C${bx - 120},${by + 60} ${L[0] + 40},${L[1] + 190} ${L[0] + 170},${L[1] + 150} S ${GX - 4},${L[1] + 110} ${GX},${L[1] + 104}`);
+  // picurarea uleiului din orificiul deschis (după demontare, câteva picături)
+  if (!sim.senzor && !sim.man && sim.vSw > 0.9 && (sim.dripLeft || 0) > 0 && Math.random() < dt * 3) { sim.picF.push({ x: bx - 6, y: by + 8, vy: 0 }); sim.dripLeft--; }
+  sim.picF.forEach(p => { p.vy += 300 * dt; p.y += p.vy * dt; }); sim.picF = sim.picF.filter(p => p.y < L[1] + RLUPA);
+  $("#ft-pic").innerHTML = sim.picF.map(p => `<ellipse cx="${p.x}" cy="${p.y.toFixed(1)}" rx="2.4" ry="3.6" fill="#b07a24"/>`).join("");
+  $("#ft-et").textContent = sim.senzor ? (sim.vSw > 0.001 ? "se înșurubează manocontactul…" : "manocontactul montat pe bloc (cu fișa conectată)") : sim.man ? (sim.vMan < 0.999 ? "se înșurubează adaptorul manometrului…" : "manometrul montat în locul manocontactului") : (sim.vSw < 0.999 ? "se deșurubează manocontactul…" : "racord deschis – nu porniți motorul!");
+  // manometrul de control (cadran glicerină, husă de cauciuc)
+  const g = $("#ft-man");
+  if (sim.man) { const cx = GX, cy = L[1] + 2, R = 78;
+    g.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${R + 18}" fill="url(#ft-cauciuc)"/><rect x="${cx - 9}" y="${cy + R + 6}" width="18" height="18" fill="url(#ft-hex)"/>` + svgGauge("ft", cx, cy, R, 10, sim.pAc, { maj: 1, unit: "bar", marca: "OIL PRESSURE · GLYCERINE", s2: { max: 140, maj: 20, unit: "psi", f: 140 / 145.04 }, benzi: [[0, 0.5, "#d32f2f"]] }) + `<ellipse cx="${cx + 18}" cy="${cy - R * 0.72}" rx="6" ry="3" fill="#fff" opacity=".55"/>` + txt(cx, cy + R + 46, "manometru de control 0…10 bar", { fs: 10.5 });
+  } else g.innerHTML = txt(GX, L[1], "manometrul de control", { fs: 11, f: "var(--text-sec)" }) + txt(GX, L[1] + 16, "(nemontat)", { fs: 10, f: "var(--text-sec)" });
+  // afișajele aparatelor (termometrul: 1 actualizare/s; testerul: 2/s, ca aparatele reale)
+  $("#ft-T").textContent = fx(sim.Tafis, 1); $("#ft-n").textContent = fx(sim.nAfis, 0);
+  // martorii: presiune ulei (manocontact închis) și încărcare (alternatorul nu debitează cu motorul oprit)
+  const lampa = sim.contact && sim.senzor && sim.p < pr.pSw, bat = sim.contact && !sim.merge;
+  $("#ft-lampa").setAttribute("fill", lampa ? "#ff4a26" : "#2a1b0c"); $("#ft-halo").setAttribute("opacity", lampa ? 0.75 : 0);
+  $("#ft-baterie").setAttribute("stroke", bat ? "#ffb02e" : "#2a1b0c"); $("#ft-halo2").setAttribute("opacity", bat ? 0.6 : 0);
+  $("#ft-cheie").setAttribute("transform", `rotate(${sim.merge ? 75 : sim.contact ? 45 : 0} 73 152)`);
+  $("#ft-stare").textContent = sim.merge ? `motor pornit – ${ET_REG[sim.reg]}` : sim.contact ? "contact pus – motor oprit" : "";
+}
+const RLUPA = 142;
+
+/* ------------------------------------------------------------------ panoplia cu pompe de ulei (desene după piesele reale) */
 const POMPE = {
-  roti: ["Pompa cu roți dințate exterioare", "Două roți în angrenare: uleiul este transportat pe la periferie, între dinți și carcasă. Robustă, debit ∝ turație; folosită la K7J."],
-  rotor: ["Pompa cu rotor (gerotor)", "Rotor interior cu z dinți în rotor exterior cu z + 1 lobi, excentric; montată direct pe arborele cotit, compactă."],
-  palete: ["Pompa cu palete și debit variabil", "Palete în rotor, inel excentric pivotant împins de un arc: presiunea din galerie (sau o electrovalvă comandată de ECU) micșorează excentricitatea și debitul."]
+  roti: ["Pompa cu roți dințate exterioare", "Două roți cu profil evolventic în angrenare: uleiul este transportat pe la periferie, în golurile dintre dinți și carcasă; în zona de angrenare dinții îl împing spre refulare. Robustă, debit ∝ turație; folosită la K7J."],
+  rotor: ["Pompa cu rotor (gerotor)", "Rotor interior cu z = 4 dinți în rotor exterior cu z + 1 = 5 lobi, excentric; ambele se rotesc în același sens (raport 5:4), camerele dintre lobi cresc la aspirație și scad la refulare. Montată de obicei direct pe arborele cotit."],
+  palete: ["Pompa cu palete și debit variabil", "Paletele din rotor sunt apăsate pe un inel pivotant; excentricitatea inelului dă cilindreea. Presiunea din galerie (sau o electrovalvă comandată de ECU) rotește inelul spre centru împotriva arcului: debitul scade – mai puțină putere absorbită."]
 };
 function panopliaSVG() {
   const Pf = "pn";
-  let s = defsInstr(Pf) + `<defs><linearGradient id="${Pf}-al" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6e9ec"/><stop offset=".5" stop-color="#b8bfc6"/><stop offset="1" stop-color="#8a9198"/></linearGradient><linearGradient id="${Pf}-ot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f4f6"/><stop offset=".5" stop-color="#a9b0b7"/><stop offset="1" stop-color="#5b626a"/></linearGradient></defs>`;
+  let s = defsInstr(Pf) + `<defs><linearGradient id="${Pf}-al" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6e9ec"/><stop offset=".5" stop-color="#b8bfc6"/><stop offset="1" stop-color="#8a9198"/></linearGradient><linearGradient id="${Pf}-ot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f4f6"/><stop offset=".5" stop-color="#a9b0b7"/><stop offset="1" stop-color="#5b626a"/></linearGradient><radialGradient id="${Pf}-ul" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#c98f2e"/><stop offset="1" stop-color="#7a4c12"/></radialGradient></defs>`;
   s += `<rect x="4" y="4" width="992" height="262" rx="12" fill="#5d4a36" stroke="#2b2118"/><rect x="14" y="14" width="972" height="242" rx="8" fill="#e8e1d4"/>`;
   const panou = (cx, k) => { s += `<g data-pompa="${k}" style="cursor:pointer"><rect x="${cx - 150}" y="26" width="300" height="200" rx="10" fill="#f6f2ea" stroke="${sim.pompe[k] ? "#2e9e44" : "#b9ad95"}" stroke-width="${sim.pompe[k] ? 3 : 1.5}"/>`; };
-  // roți dințate exterioare
-  panou(170, "roti"); s += `<rect x="70" y="60" width="200" height="120" rx="40" fill="url(#${Pf}-al)" stroke="#555"/><ellipse cx="135" cy="120" rx="46" ry="46" fill="#3b2a0c"/><ellipse cx="205" cy="120" rx="46" ry="46" fill="#3b2a0c"/>
-    <g id="pn-r1" transform="translate(135 120)">${roata(12, 44, 9, `fill="url(#${Pf}-ot)" stroke="#333"`)}<circle r="8" fill="#333"/></g><g id="pn-r2" transform="translate(205 120)">${roata(12, 44, 9, `fill="url(#${Pf}-ot)" stroke="#333"`)}<circle r="8" fill="#333"/></g>
-    ${txt(170, 205, "roți dințate exterioare", { fs: 12, w: 700, f: "#2b2118" })}</g>`;
-  // gerotor
-  panou(500, "rotor"); s += `<circle cx="500" cy="120" r="78" fill="url(#${Pf}-al)" stroke="#555"/><g id="pn-ext" transform="translate(500 120)"><circle r="66" fill="url(#${Pf}-ot)" stroke="#333"/>${[0, 1, 2, 3, 4].map(i => `<circle cx="${(44 * Math.cos(i * 1.2566)).toFixed(1)}" cy="${(44 * Math.sin(i * 1.2566)).toFixed(1)}" r="22" fill="#3b2a0c"/>`).join("")}<circle r="40" fill="#3b2a0c"/></g>
-    <g id="pn-int" transform="translate(510 120)">${(() => { let d = ""; for (let i = 0; i <= 72; i++) { const a = i / 72 * 2 * Math.PI, r = 30 + 9 * Math.cos(4 * a); d += `${i ? "L" : "M"}${(r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`; } return `<path d="${d}Z" fill="url(#${Pf}-ot)" stroke="#333"/>`; })()}<circle r="9" fill="#333"/></g>
-    ${txt(500, 215, "rotor (gerotor)", { fs: 12, w: 700, f: "#2b2118" })}</g>`;
-  // palete, debit variabil
-  panou(830, "palete"); s += `<circle cx="830" cy="120" r="78" fill="url(#${Pf}-al)" stroke="#555"/><circle id="pn-inel" cx="842" cy="120" r="62" fill="#3b2a0c" stroke="#222" stroke-width="7"/>
-    <g id="pn-rot" transform="translate(830 120)"><circle r="40" fill="url(#${Pf}-ot)" stroke="#333"/>${[0, 1, 2, 3, 4, 5, 6].map(i => `<rect x="34" y="-4" width="22" height="8" fill="#cfd5db" stroke="#444" transform="rotate(${i * 51.4})"/>`).join("")}<circle r="9" fill="#333"/></g>
-    <path d="M905,170 l18,20 l-14,4 l18,20" stroke="#c62828" stroke-width="3" fill="none"/>${txt(830, 215, "palete – debit variabil", { fs: 12, w: 700, f: "#2b2118" })}</g>`;
+  // roți dințate exterioare (profil evolventic, z = 10)
+  const m = 7, z = 10, rp = m * z / 2;
+  panou(170, "roti"); s += `<rect x="80" y="${120 - rp - m - 12}" width="180" height="${2 * rp + 2 * m + 24}" rx="34" fill="url(#${Pf}-al)" stroke="#555"/>
+    <circle cx="${170 - rp}" cy="120" r="${rp + m + 1}" fill="url(#${Pf}-ul)"/><circle cx="${170 + rp}" cy="120" r="${rp + m + 1}" fill="url(#${Pf}-ul)"/>
+    <rect x="160" y="${120 + rp - 4}" width="20" height="40" fill="url(#${Pf}-ul)"/><rect x="160" y="${120 - rp - 36}" width="20" height="40" fill="url(#${Pf}-ul)"/>
+    <g id="pn-r1" transform="translate(${170 - rp} 120)"><path d="${profilEvolventa(z, m)}" fill="url(#${Pf}-ot)" stroke="#333"/><circle r="8" fill="#333"/></g><g id="pn-r2" transform="translate(${170 + rp} 120)"><path d="${profilEvolventa(z, m)}" fill="url(#${Pf}-ot)" stroke="#333"/><circle r="8" fill="#333"/></g>
+    ${txt(170, 214, "roți dințate exterioare", { fs: 12, w: 700, f: "#2b2118" })}${txt(170, 42, "refulare ↑", { fs: 9, f: "#2b2118" })}</g>`;
+  // gerotor: rotor exterior 5 lobi, rotor interior 4 dinți (profil conjugat aproximat), excentricitate e
+  panou(500, "rotor"); s += `<circle cx="500" cy="120" r="84" fill="url(#${Pf}-al)" stroke="#555"/><path d="M430,120 A70,70 0 0 1 500,50 L500,78 A42,42 0 0 0 458,120 Z" fill="#c98f2e" opacity=".55"/><path d="M570,120 A70,70 0 0 1 500,190 L500,162 A42,42 0 0 0 542,120 Z" fill="#7a4c12" opacity=".55"/>
+    <g id="pn-ext"><circle cx="500" cy="120" r="70" fill="url(#${Pf}-ot)" stroke="#333"/><path d="${(() => { let d = ""; for (let i = 0; i <= 200; i++) { const a = i / 200 * 2 * Math.PI, rr = 52 - 10 * Math.cos(5 * a); d += `${i ? "L" : "M"}${(500 + rr * Math.cos(a)).toFixed(1)},${(120 + rr * Math.sin(a)).toFixed(1)}`; } return d; })()}Z" fill="url(#${Pf}-ul)" stroke="#333"/></g>
+    <g id="pn-int"><path d="${(() => { let d = ""; for (let i = 0; i <= 200; i++) { const a = i / 200 * 2 * Math.PI, rr = 40 - 9 * Math.cos(4 * a); d += `${i ? "L" : "M"}${(rr * Math.cos(a)).toFixed(1)},${(rr * Math.sin(a)).toFixed(1)}`; } return d; })()}Z" fill="url(#${Pf}-ot)" stroke="#333"/><circle r="11" fill="#333"/><rect x="-3" y="-13" width="6" height="5" fill="#111"/></g>
+    ${txt(500, 214, "rotor (gerotor) 4/5", { fs: 12, w: 700, f: "#2b2118" })}</g>`;
+  // palete cu inel pivotant
+  panou(830, "palete"); s += `<circle cx="830" cy="120" r="84" fill="url(#${Pf}-al)" stroke="#555"/><g id="pn-inelG"><circle id="pn-inel" cx="842" cy="120" r="62" fill="url(#${Pf}-ul)" stroke="#2b2f34" stroke-width="8"/></g>
+    <g id="pn-rot"></g><path id="pn-arcV" d="" stroke="#c62828" stroke-width="2.6" fill="none"/>${txt(830, 214, "palete – debit variabil", { fs: 12, w: 700, f: "#2b2118" })}</g>`;
   return s;
 }
 function construiestePanoplia() {
@@ -196,11 +471,20 @@ function construiestePanoplia() {
   $$("#svg-pan [data-pompa]").forEach(g => g.addEventListener("click", () => { const k = g.dataset.pompa; sim.pompe[k] = true; $("#pompa-desc").innerHTML = `<b>${POMPE[k][0]}.</b> ${POMPE[k][1]}`; construiestePanoplia(); actualizeazaPasi(); }));
 }
 function animaPanoplia(dt) {
-  if (!$("#pn-r1")) return; sim.rotP = (sim.rotP || 0) + dt * 60;
-  $("#pn-r1").setAttribute("transform", `translate(135 120) rotate(${sim.rotP})`); $("#pn-r2").setAttribute("transform", `translate(205 120) rotate(${-sim.rotP + 15})`);
-  $("#pn-int").setAttribute("transform", `translate(500 120) rotate(${sim.rotP}) translate(10 0) rotate(${0})`); $("#pn-ext").setAttribute("transform", `translate(500 120) rotate(${sim.rotP * 0.8})`);
-  $("#pn-rot").setAttribute("transform", `translate(830 120) rotate(${sim.rotP})`);
+  if (!$("#pn-r1") || !$("#svg-pan").getClientRects().length) return; sim.rotP = (sim.rotP || 0) + dt * 40;
+  const a = sim.rotP, z = 10, rp = 35;
+  $("#pn-r1").setAttribute("transform", `translate(${170 - rp} 120) rotate(${a.toFixed(2)})`); $("#pn-r2").setAttribute("transform", `translate(${170 + rp} 120) rotate(${(180 + 180 / z - a).toFixed(2)})`);
+  // gerotor: interiorul (4 dinți) se rotește în jurul centrului deplasat cu e; exteriorul (5 lobi) cu 4/5 din viteză
+  const e = 10; $("#pn-int").setAttribute("transform", `translate(${500 + e} 120) rotate(${a.toFixed(2)})`); $("#pn-ext").setAttribute("transform", `rotate(${(a * 4 / 5).toFixed(2)} 500 120)`);
+  // palete: excentricitatea inelului scade cu presiunea (comandă hidraulică), paletele ating mereu inelul
+  const ex = 12 * (1 - 0.7 * cl((sim.p - 1.5) / 3, 0, 1)), Rr = 58; $("#pn-inel").setAttribute("cx", 830 + ex);
+  let g = `<circle cx="830" cy="120" r="34" fill="url(#pn-ot)" stroke="#333"/>`;
+  for (let i = 0; i < 7; i++) { const u = (a + i * 360 / 7) * RAD, dd = ex * Math.cos(u) + Math.sqrt(Rr * Rr - ex * ex * Math.sin(u) * Math.sin(u)) - 1;
+    g += `<rect x="24" y="-3.5" width="${(dd - 24).toFixed(1)}" height="7" fill="#d5dade" stroke="#444" stroke-width=".7" transform="translate(830 120) rotate(${(a + i * 360 / 7).toFixed(2)})"/>`; }
+  g += `<circle cx="830" cy="120" r="9" fill="#333"/>`; $("#pn-rot").innerHTML = g;
+  let d = `M${905 + ex * 0},${120}`; for (let i = 1; i <= 8; i++) d += ` L${(905 + ex + (960 - 905 - ex) * i / 8).toFixed(1)},${120 + (i % 2 ? -7 : 7)}`; $("#pn-arcV").setAttribute("d", d);
 }
+
 /* ------------------------------------------------------------------ multimetrul (verificarea manocontactului) */
 function rSw() { if (!sim.senzor || !sim.mm) return null; return sim.merge && sim.p > P().pSw ? "OL" : P().rSw; }
 function desenMultimetru() {
@@ -233,16 +517,16 @@ function deseneazaLive() {
 const pe = (r, c) => Cadru.D.t.t41[r][c] !== "";
 const PASI = [
   { t: "Identificarea", tab: "panoplia cu pompe, Fig. 4.1", panou: "pan",
-    instr: ["NSSM: mănuși de nitril și ochelari; uleiul cald (80…110 °C) provoacă arsuri.", "Pe panoplie, faceți clic pe fiecare tip de pompă de ulei (roți dințate, rotor, debit variabil).", "Pe schema motorului, identificați elementele circuitului de ungere din Fig. 4.1 (clic pe ele)."],
-    ver: () => [[sim.manusi && sim.ochelari, "mănuși și ochelari"], [Object.keys(sim.pompe).length >= 3, `pompe identificate: ${Object.keys(sim.pompe).length}/3`], [Object.keys(sim.comp).length >= 7, `elemente ale circuitului: ${Object.keys(sim.comp).length}/9 (minim 7)`]],
+    instr: ["NSSM: mănuși de nitril și ochelari; uleiul cald (80…110 °C) provoacă arsuri.", "Pe panoplie, faceți clic pe fiecare tip de pompă de ulei (roți dințate, rotor, debit variabil).", "În vederea „Circuitul de ungere (secțiune)”, identificați elementele circuitului din Fig. 4.1 (clic pe ele)."],
+    ver: () => [[sim.manusi && sim.ochelari, "mănuși și ochelari"], [Object.keys(sim.pompe).length >= 3, `pompe identificate: ${Object.keys(sim.pompe).length}/3`], [Object.keys(sim.comp).length >= 7, `elemente ale circuitului: ${Object.keys(sim.comp).length}/${NCOMP} (minim 7)`]],
     prog: () => (sim.manusi && sim.ochelari ? 1 : 0) + (Object.keys(sim.pompe).length >= 3 ? 1 : 0) + (Object.keys(sim.comp).length >= 7 ? 1 : 0), tot: 3,
     ctl: `<div class="rand-butoane"><label class="bifa"><input type="checkbox" id="ck-man"> Mănuși de nitril</label><label class="bifa"><input type="checkbox" id="ck-och"> Ochelari</label></div>` },
-  { t: "Montarea manometrului", tab: "motor rece, oprit", panou: "schema",
+  { t: "Montarea manometrului", tab: "motor rece, oprit", panou: "stand",
     instr: ["Cu motorul rece și oprit, deconectați fișa și demontați manocontactul de presiune de pe galeria principală.", "Montați manometrul 0…10 bar cu adaptorul potrivit; fixați furtunul departe de curea și de colectorul de evacuare.", "Porniți scurt motorul și verificați etanșarea racordului."],
     ver: () => [[!sim.senzor, "manocontactul demontat"], [sim.man, "manometrul montat"], [sim.etans, "etanșarea verificată"]],
     prog: () => (!sim.senzor ? 1 : 0) + (sim.man ? 1 : 0) + (sim.etans ? 1 : 0), tot: 3,
     ctl: `<div class="rand-butoane"><button type="button" id="b-sw">Demontează manocontactul</button><button type="button" id="b-man">Montează manometrul</button></div><div class="rand-butoane"><button type="button" id="b-etans">Pornește scurt și verifică etanșarea</button></div>` },
-  { t: "Presiunea la încălzire", tab: "Tabelul 4.1 – 40, 60, 80 °C", panou: "schema",
+  { t: "Presiunea la încălzire", tab: "Tabelul 4.1 – 40, 60, 80 °C", panou: "stand",
     instr: ["Porniți motorul: uleiul se încălzește (cu atât mai repede cu cât turația e mai mare; „timp accelerat” ×10).", "La 40 °C (±2,5 °C) citiți presiunea la toate turațiile, de la ralanti la 3500 rot/min (pentru palierul supapei de siguranță) – rapid, temperatura crește.", "La 60 și 80 °C citiți presiunea la ralanti și la 2000 rot/min."],
     ver: () => [[sim.man, "manometrul montat"], [sim.merge, sim.merge ? `motor pornit – ${ET_REG[sim.reg]}` : "motorul oprit"], [randT(sim.T) != null, randT(sim.T) != null ? `ulei ${fx(sim.T, 1)} °C – rândul ${randT(sim.T)} °C` : `ulei ${fx(sim.T, 1)} °C – în afara rândurilor (40/60/80/90 ±2,5 °C)`], [stabil(), stabil() ? "presiune stabilă" : "stabilizare…"]],
     prog: () => MD.TURATII.filter(k => pe("t40", k)).length + ["t60", "t80"].reduce((a, r) => a + ["ral", "n2000"].filter(k => pe(r, k)).length, 0), tot: 10,
@@ -250,7 +534,7 @@ const PASI = [
       <div class="rand-butoane">${MD.TURATII.map(k => `<button type="button" data-reg="${k}">${k === "ral" ? "ralanti" : MD.NREG[k]}</button>`).join("")}</div>
       <label class="bifa"><input type="checkbox" id="ck-rapid"> Timp accelerat ×10 (încălzirea)</label>`,
     buton: ["● Presiunea → Tabelul 4.1", e => inregP(e)] },
-  { t: "Caracteristica la 90 °C", tab: "Tabelul 4.1 – 90 °C", panou: "schema",
+  { t: "Caracteristica la 90 °C", tab: "Tabelul 4.1 – 90 °C", panou: "stand",
     instr: ["Lăsați uleiul să ajungă la ≈ 90 °C.", "Citiți presiunea la toate turațiile, de la ralanti la 3500 rot/min: caracteristica completă p = f(n)."],
     ver: () => [[sim.merge, "motor pornit"], [Math.abs(sim.T - 90) <= 2.5, `ulei ${fx(sim.T, 1)} °C (90 ± 2,5)`], [stabil(), stabil() ? "presiune stabilă" : "stabilizare…"]],
     prog: () => MD.TURATII.filter(k => pe("t90", k)).length, tot: 6,
@@ -277,6 +561,7 @@ function alegePas(i) {
   pasActiv = i; const p = PASI[i];
   $$("#pasi .pas").forEach(el => el.classList.toggle("activ", +el.dataset.pas === i));
   $("#panou-pan").hidden = p.panou !== "pan"; $("#panou-mm").hidden = p.panou !== "mm";
+  aratVedere(i === 0 ? "sectiune" : "stand");
   desenMultimetru(); actualizeazaPasi();
 }
 function actualizeazaPasi() {
@@ -291,6 +576,10 @@ function actualizeazaPasi() {
   $("#af-p").textContent = sim.man ? fx(sim.p, 2) : "—"; $("#af-r").textContent = randT(sim.T) != null ? `${randT(sim.T)} °C` : "—";
 }
 
+function aratVedere(v) {
+  sim.vedere = v; $("#svg-ft").hidden = v !== "stand"; $("#svg-sx").hidden = v !== "sectiune";
+  $$("[data-vedere]").forEach(b => b.classList.toggle("activ", b.dataset.vedere === v));
+}
 /* ------------------------------------------------------------------ comenzile */
 function on(id, f) { const b = $(id); if (b) b.addEventListener("click", f); }
 function porneste() {
@@ -303,7 +592,7 @@ function legaComenzi() {
   $("#ck-man").addEventListener("change", e => { sim.manusi = e.target.checked; }); $("#ck-och").addEventListener("change", e => { sim.ochelari = e.target.checked; });
   ["#ck-rapid", "#ck-rapid2", "#ck-rapid3"].forEach(id => $(id).addEventListener("change", e => { sim.rapid = e.target.checked; ["#ck-rapid", "#ck-rapid2", "#ck-rapid3"].forEach(j => $(j).checked = sim.rapid); }));
   const rece = () => { if (sim.merge) { Cadru.mesajTemporar("NSSM: se lucrează la racord numai cu motorul oprit.", "pericol"); return false; } if (sim.T > 50) { Cadru.mesajTemporar(`NSSM: uleiul are ${fx(sim.T, 0)} °C – nu se desface nimic la cald (așteptați răcirea sub 50 °C).`, "pericol"); return false; } if (!sim.manusi) { Cadru.mesajTemporar("Mănuși de nitril.", "atentie"); return false; } return true; };
-  on("#b-sw", () => { if (!rece()) return; if (sim.man) return Cadru.mesajTemporar("Pe racord este montat manometrul.", "atentie"); sim.senzor = !sim.senzor; sim.mm = false; });
+  on("#b-sw", () => { if (!rece()) return; if (sim.man) return Cadru.mesajTemporar("Pe racord este montat manometrul.", "atentie"); sim.senzor = !sim.senzor; sim.mm = false; if (!sim.senzor) sim.dripLeft = 5; });
   on("#b-man", () => { if (!rece()) return; if (sim.senzor) return Cadru.mesajTemporar("Demontați întâi manocontactul.", "atentie"); sim.man = !sim.man; sim.etans = false; });
   on("#b-etans", () => { if (!sim.man) return Cadru.mesajTemporar("Montați manometrul.", "atentie"); porneste(); if (sim.merge) { sim.etans = true; Cadru.mesajTemporar("Racordul manometrului este etanș (fără scurgeri).", "ok"); } });
   on("#b-contact", () => { if (sim.merge) return opreste(); sim.contact = !sim.contact; });
@@ -417,7 +706,10 @@ const TEST = [
 const CSS = `<style>
 .saa4-afis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.4rem; margin:.5rem 0; }
 .saa4-afis div { background:var(--suprafata-2); border-radius:8px; padding:.35rem .5rem; } .saa4-afis span { display:block; font-size:.72rem; color:var(--text-sec); } .saa4-afis b { font-size:1.05rem; }
-#svg-schema, #svg-pan, #svg-mm { width:100%; height:auto; display:block; color:var(--text); }
+#svg-ft, #svg-sx, #svg-pan, #svg-mm { width:100%; height:auto; display:block; color:var(--text); }
+#svg-ft[hidden], #svg-sx[hidden] { display:none; }
+#svg-sx [data-comp].sel { filter:drop-shadow(0 0 3px #ffb300) drop-shadow(0 0 6px #ffb300); }
+.saa4-vederi { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.4rem; } .saa4-vederi button.activ { background:color-mix(in srgb, var(--accent) 18%, var(--suprafata)); border-color:var(--accent); }
 #comp-desc, #pompa-desc { min-height:2.4em; }
 .tk-pasi .pasi { list-style:none; margin:.4rem 0; padding:0; display:grid; gap:.45rem; }
 .pas { border:1px solid var(--linie); border-radius:8px; background:var(--suprafata); }
@@ -493,8 +785,10 @@ Cadru.porneste({
   sim: {
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena">
-      <svg id="svg-schema" viewBox="0 0 1000 560" role="img" aria-label="Circuitul de ungere al motorului K7J, în secțiune"></svg>
-      <p class="nota" id="comp-desc">Clic pe o componentă a circuitului pentru descrierea ei.</p>
+      <div class="saa4-vederi"><button type="button" data-vedere="stand">Standul (foto) și aparatele</button><button type="button" data-vedere="sectiune">Circuitul de ungere (secțiune)</button></div>
+      <svg id="svg-ft" viewBox="0 0 1000 630" role="img" aria-label="Standul K7J din laborator cu manometrul, termometrul, testerul OBD și panoul de comandă"></svg>
+      <svg id="svg-sx" viewBox="0 0 1100 640" role="img" aria-label="Secțiune prin motorul K7J: circuitul de ungere animat" hidden></svg>
+      <p class="nota" id="comp-desc">În secțiune: clic pe o componentă a circuitului pentru descrierea ei.</p>
       <div class="saa4-afis"><div><span>Stare</span><b id="af-st">—</b></div><div><span>Turație [rot/min]</span><b id="af-n">0</b></div><div><span>Ulei [°C]</span><b id="af-T">—</b></div><div><span>Presiune ulei [bar]</span><b id="af-p">—</b></div><div><span>Rândul tabelului</span><b id="af-r">—</b></div></div>
       <div id="panou-pan"><h3>Panoplia cu pompe de ulei</h3><svg id="svg-pan" viewBox="0 0 1000 270" role="img" aria-label="Pompe de ulei: roți dințate, rotor, palete cu debit variabil"></svg><p class="nota" id="pompa-desc">Clic pe fiecare pompă.</p></div>
       <div id="panou-mm" hidden><h3>Verificarea manocontactului cu multimetrul</h3><svg id="svg-mm" viewBox="0 0 800 340" role="img" aria-label="Multimetrul conectat la manocontact"></svg></div>
@@ -509,22 +803,28 @@ Cadru.porneste({
     </aside>
   </div>`,
     init(C) {
-      construiesteSchema(); construiestePanoplia(); construiestePasi();
-      sim.T = P().T0;
+      construiesteSectiune(); construiesteStand(); construiestePanoplia(); construiestePasi();
+      $$("[data-vedere]").forEach(b => b.addEventListener("click", () => aratVedere(b.dataset.vedere)));
+      sim.T = P().T0; sim.Tafis = sim.T;
       if (!MOD.eval) { C.D.date.nRal = P().nRal; C.construiesteDateLucru(); }
       $("#in-defect").addEventListener("change", e => { sim.defect = e.target.value; });
       C.mesaj("Urmați pașii din panoul „Desfășurarea lucrării”.", "");
     },
     aplicaEval(P, C) { Object.assign(C.D.date, { nRal: P.nRal }); sim.defect = "none"; sim.T = P.T0; const d = $("#in-defect"); if (d) d.disabled = true; },
-    reset() { Object.assign(sim, { contact: false, merge: false, n: 0, senzor: true, man: false, etans: false, mm: false, T: P().T0 }); },
+    reset() { Object.assign(sim, { contact: false, merge: false, n: 0, senzor: true, man: false, etans: false, mm: false, T: P().T0, Tafis: P().T0, nAfis: 0, vSw: 0, vMan: 0, pAc: 0 }); },
     cadru(dt0, C, vizibil) {
       const dt = Math.min(0.05, dt0 || 0.016), dtT = dt * (sim.rapid ? 10 : 1), pr = P();
       sim.t += dt;
       const nt = nTinta(); sim.n += (nt - sim.n) * (1 - Math.exp(-dt / 0.5)); if (Math.abs(nt - sim.n) < 1.5) sim.n = nt;
       if (sim.merge) sim.T = Math.min(96, sim.T + MD.incalzire(sim.n, sim.T) * dtT); else sim.T = Math.max(pr.T0, sim.T - 0.012 * (sim.T - pr.T0) * dtT);
       const pT = pAdev(); sim.p += (pT - sim.p) * (1 - Math.exp(-dt / 0.35)); if (Math.abs(pT - sim.p) < 0.004) sim.p = pT;
+      // aparatele: acul manometrului amortizat de glicerină (cu pulsații mici ale pompei), termometrul 1 citire/s, testerul OBD 2/s
+      const puls = sim.merge ? 0.012 * Math.sin(sim.t * 37) * (sim.reg === "ral" ? 1.6 : 1) : 0;
+      sim.pAc += ((sim.man ? sim.p : 0) + puls - sim.pAc) * (1 - Math.exp(-dt / 0.3)); if (sim.pAc < 0) sim.pAc = 0;
+      sim._tT = (sim._tT || 0) + dt; if (sim._tT > 1) { sim._tT = 0; sim.Tafis = Math.round(sim.T * 10) / 10; }
+      sim._tN = (sim._tN || 0) + dt; if (sim._tN > 0.5) { sim._tN = 0; sim.nAfis = Math.round(sim.n); }
       if (!vizibil) return;
-      actualizeazaSchema(dt); animaPanoplia(dt);
+      actualizeazaStand(dt); actualizeazaSectiune(dt); animaPanoplia(dt);
       const now = performance.now();
       if (now - (this._ts || 0) > 250) { this._ts = now; actualizeazaPasi(); if (PASI[pasActiv].panou === "mm") desenMultimetru(); deseneazaLive();
         C.stare(1, sim.merge ? `motor pornit – ${ET_REG[sim.reg]}` : "motor oprit", sim.merge ? "inc" : ""); C.stare(2, `ulei ${fx(sim.T, 1)} °C · pasul ${pasActiv + 1}`); }
