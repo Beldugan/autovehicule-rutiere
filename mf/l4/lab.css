@@ -1,0 +1,6 @@
+/* stiluri specifice Lucrării 4 */
+.citiri4 { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: .35rem; margin: 0 0 .6rem; }
+.citiri4 span { display: flex; flex-direction: column; align-items: center; padding: .25rem .1rem; border: 1px solid var(--linie, #cfd6dd); border-radius: 6px; background: var(--fundal-card, transparent); font-variant-numeric: tabular-nums; }
+.citiri4 small { font-size: .72rem; color: var(--text-sec); }
+.citiri4 b { font-size: 1rem; }
+@media (max-width: 600px) { .citiri4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
