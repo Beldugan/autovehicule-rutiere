@@ -47,7 +47,7 @@ function cadranFoto(parent, o) {
   for (let v = 0; v <= max + 1e-9; v += o.min) {
     const maj = Math.abs(v / o.maj - Math.round(v / o.maj)) < 1e-6, [x1, y1] = P(r - 2.5, v), [x2, y2] = P(r - (maj ? 9 : 5.5), v);
     mk("line", { x1, y1, x2, y2, stroke: "#151515", "stroke-width": maj ? 1.4 : 0.6 }, g);
-    if (maj) { const [xt, yt] = P(r * 0.6, v), t = mk("text", { x: xt, y: yt + r * 0.07, "font-size": r * 0.27, "text-anchor": "middle", fill: "#151515", "font-family": "Arial, sans-serif", "font-weight": 800 }, g); t.textContent = o.et ? o.et(v) : v; }
+    if (maj) { const [xt, yt] = P(r * 0.6, v), t = mk("text", { x: xt, y: yt + r * 0.07, "font-size": r * 0.27, "text-anchor": "middle", fill: "#151515", "font-family": "Arial, sans-serif", "font-weight": 800 }, g); const vv = +v.toFixed(6); t.textContent = o.et ? o.et(vv) : vv; }
   }
   const tu = mk("text", { x: cx, y: cy + r * 0.38, "font-size": r * 0.19, "text-anchor": "middle", fill: "#222", "font-family": "Arial, sans-serif", "font-weight": 700 }, g); tu.textContent = o.unit;
   const ts = mk("text", { x: cx, y: cy + r * 0.58, "font-size": r * 0.14, "text-anchor": "middle", fill: "#555", "font-family": "Arial, sans-serif" }, g); ts.textContent = o.sub || "";
@@ -117,7 +117,6 @@ function construiesteSVG() {
   SV.cote = mk("g", {}, g);
   // etichete
   SV.et = mk("g", {}, g);
-  eticheta(SV.et, 288, 86, 175, 40, "Articulația pedalei", "end");
   eticheta(SV.et, 430, 100, 395, 16, "Rezervor de vacuum + vacuummetru", "end");
   eticheta(SV.et, 600, 180, 640, 14, "Servofrâna cu vacuum Ø250 mm");
   eticheta(SV.et, 820, 160, 900, 58, "Rezervorul lichidului de frână");
