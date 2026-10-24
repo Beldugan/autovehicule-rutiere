@@ -127,7 +127,6 @@ function construiesteSVG() {
   eticheta(SV.et, 1400, 180, 1520, 14, "Etrier flotant – celula de forță între plăcuțe", "end");
   eticheta(SV.et, 1300, 610, 1240, 690, "Afișajul celulei de forță", "end");
   prefixeazaId(svg, "p3-");
-  construiesteSectiune();
   actualizeazaCote();
   actualizeazaSVG();
 }
@@ -161,145 +160,6 @@ function actualizeazaSVG() {
   SV.ferLichid.setAttribute("fill", `hsl(${42 - 30 * clamp(sim.p1 / 120, 0, 1)}, 75%, ${58 - 10 * clamp(sim.p1 / 120, 0, 1)}%)`);
   SV.et.style.display = sim.etichete ? "" : "none";
   SV.cote.style.display = sim.etichete ? "" : "none";
-  actualizeazaSectiune();
-}
-
-/* ------------------------------------------------------------------ secțiunea funcțională: servofrână, pompă centrală tandem, etrier */
-const SS = {};
-function construiesteSectiune() {
-  const svg = $("#svg-sectiune"); if (!svg) return; svg.innerHTML = "";
-  const defs = mk("defs", {}, svg); defsComune(defs);
-  grad(defs, "gCarcasa", [[0, "#5b6168"], [0.25, "#2b2f34"], [0.75, "#1b1e22"], [1, "#4a5056"]]);
-  grad(defs, "gAlumin", [[0, "#9aa1a8"], [0.2, "#e4e7ea"], [0.45, "#bfc5cb"], [0.8, "#8c949c"], [1, "#6c737a"]]);
-  grad(defs, "gFonta", [[0, "#8d8f91"], [0.3, "#c9cbcd"], [0.7, "#9c9ea1"], [1, "#6f7173"]], { x1: 0, y1: 0, x2: 1, y2: 1 });
-  grad(defs, "gRez", [[0, "#fffcef", 0.95], [1, "#e8dfc0", 0.92]], { x1: 0, y1: 0, x2: 1, y2: 0 });
-  grad(defs, "gPlacuta", [[0, "#3b3734"], [1, "#5a5550"]], { x1: 0, y1: 0, x2: 1, y2: 0 });
-  const g = mk("g", { "font-family": "system-ui, sans-serif" }, svg); SS.g = g;
-  const Y = 200;                                                     // axa comună servofrână – pompă
-  /* --- servofrâna (secțiune longitudinală) */
-  const bx0 = 40, bx1 = 300, bR = 120;
-  mk("path", { d: `M${bx0 + 40} ${Y - bR} H${bx1 - 30} Q ${bx1} ${Y - bR} ${bx1} ${Y - bR + 30} V${Y + bR - 30} Q ${bx1} ${Y + bR} ${bx1 - 30} ${Y + bR} H${bx0 + 40} Q ${bx0} ${Y + bR} ${bx0} ${Y + bR - 40} V${Y - bR + 40} Q ${bx0} ${Y - bR} ${bx0 + 40} ${Y - bR} Z`, fill: "url(#gCarcasa)", stroke: "#0b0c0d", "stroke-width": 2 }, g);
-  SS.camFata = mk("rect", { x: 0, y: Y - bR + 8, width: 0, height: 2 * bR - 16, fill: "#2c4566" }, g);   // camera de vacuum (spre pompă)
-  SS.camSpate = mk("rect", { x: bx0 + 8, y: Y - bR + 8, width: 0, height: 2 * bR - 16, fill: "#2c4566" }, g); // camera de lucru
-  SS.diafr = mk("g", {}, g);
-  mk("rect", { x: -4, y: Y - bR + 14, width: 8, height: 2 * bR - 28, rx: 3, fill: "url(#gOtelO)", stroke: "#333" }, SS.diafr);               // talerul
-  mk("path", { d: `M-2 ${Y - bR + 12} q 14 -8 22 -2 M-2 ${Y + bR - 12} q 14 8 22 2`, fill: "none", stroke: "#0d0d0d", "stroke-width": 5, "stroke-linecap": "round" }, SS.diafr);   // diafragma rulantă
-  mk("rect", { x: -26, y: Y - 26, width: 34, height: 52, rx: 4, fill: "#3b3f45", stroke: "#111" }, SS.diafr);   // corpul supapei (butucul)
-  mk("rect", { x: -18, y: Y - 9, width: 7, height: 18, rx: 2, fill: "#111" }, SS.diafr);                      // discul de reacție (cauciuc)
-  mk("rect", { x: 8, y: Y - 6, width: 172, height: 12, rx: 3, fill: "url(#gCrom)" }, SS.diafr);              // tija de ieșire
-  SS.arcB = mk("path", { d: "", fill: "none", stroke: "#a9b0b7", "stroke-width": 2.4 }, g);
-  SS.tijaIn = mk("g", {}, g);
-  mk("rect", { x: -175, y: Y - 5, width: 155, height: 10, rx: 3, fill: "url(#gCrom)" }, SS.tijaIn);            // tija de intrare (de la pedală)
-  mk("rect", { x: -22, y: Y - 7, width: 10, height: 14, rx: 2, fill: "url(#gOtel)" }, SS.tijaIn);            // pistonașul supapei de aer
-  SS.aer = mk("g", {}, g);
-  for (let k = 0; k < 6; k++) mk("circle", { r: 2.4, fill: "#eaf3ff", opacity: 0 }, SS.aer);
-  mk("rect", { x: 6, y: Y - 22, width: 34, height: 44, rx: 6, fill: "#20242a", stroke: "#000" }, g);           // burduful și filtrul de aer
-  const tvac = mk("text", { x: 170, y: Y - bR - 10, "font-size": 13, "text-anchor": "middle", fill: "var(--text)", "font-weight": 700 }, g); tvac.textContent = "Servofrâna (secțiune)";
-  mk("path", { d: `M${bx1 - 50} ${Y - bR} v-22 h40`, fill: "none", stroke: "#111", "stroke-width": 7 }, g);   // racordul de vacuum cu supapă de reținere
-  mk("circle", { cx: bx1 - 50, cy: Y - bR - 4, r: 7, fill: "url(#gAlama)", stroke: "#5f430f" }, g);
-  SS.tCam = mk("text", { x: 20, y: Y + bR + 24, "font-size": 12, "text-anchor": "start", fill: "var(--text-sec)" }, g);
-  SS.tCam2 = mk("text", { x: 20, y: Y + bR + 40, "font-size": 12, "text-anchor": "start", fill: "var(--text-sec)" }, g);
-  /* --- pompa centrală tandem (secțiune) */
-  const mx0 = 330, mx1 = 690, bore = 26;
-  SS.mx0 = mx0;
-  mk("rect", { x: mx0, y: Y - 40, width: mx1 - mx0, height: 80, rx: 10, fill: "url(#gAlumin)", stroke: "#4c535c" }, g);
-  mk("rect", { x: mx0 - 14, y: Y - 56, width: 18, height: 112, rx: 3, fill: "url(#gAlumin)", stroke: "#4c535c" }, g);     // flanșa
-  mk("rect", { x: mx0 + 6, y: Y - bore / 2 - 2, width: mx1 - mx0 - 20, height: bore + 4, fill: "#24282d" }, g);          // alezajul
-  SS.ch1 = mk("rect", { x: 0, y: Y - bore / 2, width: 0, height: bore, fill: "url(#gLichid)" }, g);                       // camera primară
-  SS.ch2 = mk("rect", { x: 0, y: Y - bore / 2, width: 0, height: bore, fill: "url(#gLichid)" }, g);                       // camera secundară
-  // rezervorul și orificiile (alimentare + compensare)
-  mk("rect", { x: mx0 + 60, y: Y - 120, width: 230, height: 62, rx: 12, fill: "url(#gRez)", stroke: "#b9b19a" }, g);
-  mk("rect", { x: mx0 + 63, y: Y - 98, width: 224, height: 37, rx: 8, fill: "#e6c35c", opacity: 0.85 }, g);
-  mk("rect", { x: mx0 + 155, y: Y - 136, width: 40, height: 18, rx: 4, fill: "#1a1a1a" }, g);
-  const tMax = mk("text", { x: mx0 + 280, y: Y - 100, "font-size": 9, "text-anchor": "end", fill: "#6b5d2a" }, g); tMax.textContent = "MAX";
-  SS.porturi = [];
-  [[mx0 + 95, "1"], [mx0 + 235, "2"]].forEach(([x, k]) => {
-    mk("rect", { x: x - 9, y: Y - 60, width: 30, height: 20, fill: "url(#gAlumin)" }, g);
-    mk("rect", { x: x + 8, y: Y - 60, width: 6, height: 47, fill: "#e6c35c" }, g);                   // orificiul de alimentare (larg)
-    SS.porturi.push(mk("rect", { x: x - 6, y: Y - 60, width: 3, height: 47, fill: "#e6c35c" }, g)); // orificiul de compensare (îngust)
-  });
-  SS.pist = [0, 1].map(k => {
-    const p = mk("g", {}, g), L = k ? 54 : 50;
-    mk("rect", { x: 0, y: Y - bore / 2 + 1, width: L, height: bore - 2, rx: 3, fill: "url(#gOtel)", stroke: "#3c4248" }, p);
-    mk("path", { d: `M${L} ${Y - bore / 2} l7 2 v${bore - 4} l-7 2 Z`, fill: "#141414" }, p);           // garnitura primară (manșeta)
-    mk("rect", { x: 4, y: Y - bore / 2, width: 6, height: bore, rx: 1.5, fill: "#141414" }, p);           // garnitura secundară
-    if (k) mk("rect", { x: 22, y: Y - bore / 2, width: 6, height: bore, rx: 1.5, fill: "#141414" }, p);
-    return p;
-  });
-  SS.arc = [0, 1].map(() => mk("path", { d: "", fill: "none", stroke: "#cfd5db", "stroke-width": 2 }, g));
-  // ieșirile spre circuite
-  const xo1 = mx0 + 200, xo2 = mx1 - 34;
-  [[xo1, "1"], [xo2, "2"]].forEach(([x, k]) => { mk("rect", { x: x - 8, y: Y + 38, width: 16, height: 18, fill: "url(#gAlama)", stroke: "#5f430f" }, g); });
-  SS.cond1 = mk("path", { d: `M${xo1} ${Y + 56} V${Y + 92} H860 V${Y + 30}`, fill: "none", stroke: "#b87333", "stroke-width": 6, "stroke-linejoin": "round" }, g);
-  SS.cond2 = mk("path", { d: `M${xo2} ${Y + 56} V${Y + 130} H780`, fill: "none", stroke: "#b87333", "stroke-width": 6, "stroke-linejoin": "round" }, g);
-  mk("rect", { x: 780, y: Y + 122, width: 18, height: 16, rx: 2, fill: "url(#gAlama)", stroke: "#5f430f" }, g);
-  const tm = mk("text", { x: 510, y: Y - 136, "font-size": 13, "text-anchor": "middle", fill: "var(--text)", "font-weight": 700 }, g); tm.textContent = "Pompa centrală tandem (secțiune)";
-  SS.tComp = mk("text", { x: 510, y: Y + 172, "font-size": 12, "text-anchor": "middle", fill: "var(--text-sec)" }, g);
-  const tc1 = mk("text", { x: xo1 + 12, y: Y + 110, "font-size": 11, fill: "var(--text-sec)" }, g); tc1.textContent = "circuit 1 → etrier";
-  const tc2 = mk("text", { x: 804, y: Y + 134, "font-size": 11, fill: "var(--text-sec)" }, g); tc2.textContent = "circuit 2 → manometru 2";
-  /* --- etrierul flotant (secțiune), cu celula de forță în locul discului */
-  const ex = 860, eY = Y - 10;
-  SS.ex = ex; SS.eY = eY;
-  mk("path", { d: `M${ex - 30} ${eY - 92} H${ex + 250} V${eY + 92} H${ex + 196} V${eY - 52} H${ex + 100} V${eY + 92} H${ex - 30} Z`, fill: "url(#gFonta)", stroke: "#4b4d50", "stroke-width": 1.5 }, g);
-  mk("rect", { x: ex - 6, y: eY - 54, width: 92, height: 108, fill: "#25292e" }, g);                      // cilindrul
-  SS.cilL = mk("rect", { x: ex - 4, y: eY - 52, width: 10, height: 104, fill: "url(#gLichid)" }, g);
-  SS.pistE = mk("g", {}, g);
-  mk("path", { d: `M${ex + 6} ${eY - 50} h86 v100 h-86 Z M${ex + 22} ${eY - 34} h70 v68 h-70 Z`, fill: "url(#gCromO)", "fill-rule": "evenodd", stroke: "#444" }, SS.pistE);   // pistonul tubular
-  SS.seal = [eY - 58, eY + 50].map(y => mk("rect", { x: ex + 40, y, width: 10, height: 8, fill: "#111" }, g));   // garnitura cu secțiune pătrată (rollback)
-  SS.pl1 = mk("g", {}, g);
-  mk("rect", { x: ex + 94, y: eY - 62, width: 8, height: 124, fill: "url(#gOtelO)" }, SS.pl1);              // placa-suport
-  mk("rect", { x: ex + 102, y: eY - 58, width: 16, height: 116, fill: "url(#gPlacuta)" }, SS.pl1);          // garnitura de frecare
-  SS.celula = mk("g", {}, g);
-  mk("rect", { x: ex + 120, y: eY - 34, width: 42, height: 68, rx: 4, fill: "url(#gOtelO)", stroke: "#333" }, SS.celula);
-  mk("circle", { cx: ex + 141, cy: eY, r: 9, fill: "url(#gOtelR)", stroke: "#333" }, SS.celula);
-  mk("path", { d: `M${ex + 141} ${eY + 34} C ${ex + 141} ${eY + 90}, ${ex + 220} ${eY + 120}, ${ex + 250} ${eY + 140}`, fill: "none", stroke: "#111", "stroke-width": 3 }, g);
-  mk("rect", { x: ex + 164, y: eY - 58, width: 16, height: 116, fill: "url(#gPlacuta)" }, g);
-  mk("rect", { x: ex + 180, y: eY - 62, width: 8, height: 124, fill: "url(#gOtelO)" }, g);
-  mk("rect", { x: ex - 30, y: eY - 104, width: 280, height: 10, rx: 5, fill: "url(#gCrom)" }, g);            // bolțul de ghidare
-  const te = mk("text", { x: ex + 110, y: eY - 116, "font-size": 13, "text-anchor": "middle", fill: "var(--text)", "font-weight": 700 }, g); te.textContent = "Etrier flotant (secțiune)";
-  SS.sagF = [mk("path", { d: "", fill: "#d32f2f" }, g), mk("path", { d: "", fill: "#d32f2f" }, g)];
-  SS.tEt = mk("text", { x: ex + 110, y: eY + 130, "font-size": 12, "text-anchor": "middle", fill: "var(--text-sec)" }, g);
-  prefixeazaId(svg, "s3-");
-}
-function actualizeazaSectiune() {
-  if (!SS.g) return;
-  const pr = prEfectiv(), Y = 200, i = M3.ip(pr), Fin = sim.Fp * i * pr.etaP;
-  const Amax = sim.vac * 1e5 * M3.aria(M3.D_MEMBR) * 1e-6 * pr.etaM, asist = sim.vac > 0.02 ? Math.min((pr.kS - 1) * Fin, Amax) : 0;
-  const sat = sim.vac > 0.05 && asist >= Amax - 1e-6 && sim.Fp > 1, fr = sim.vac > 0.05 ? clamp(asist / Math.max(Amax, 1e-6), 0, 1) : 1;
-  const sm = sim.sp / i, dx = sm * 3;                                                     // cursa pistonului primar (×3 pentru vizibilitate)
-  const xd = 170 + dx;
-  SS.diafr.setAttribute("transform", `translate(${xd},0)`);
-  SS.tijaIn.setAttribute("transform", `translate(${xd - (sim.Fp > 2 && sim.vac > 0.05 ? 3 : 0)},0)`);
-  const cVac = `rgb(${44 + 0 * fr},69,102)`, cSp = sim.vac > 0.05 ? `rgb(${Math.round(44 + 190 * fr)},${Math.round(69 + 165 * fr)},${Math.round(102 + 135 * fr)})` : "#e9eef4";
-  SS.camFata.setAttribute("x", xd + 4); SS.camFata.setAttribute("width", Math.max(0, 292 - xd - 4)); SS.camFata.setAttribute("fill", sim.vac > 0.05 ? cVac : "#e9eef4");
-  SS.camSpate.setAttribute("width", Math.max(0, xd - 4 - 48)); SS.camSpate.setAttribute("fill", cSp);
-  let d = `M${xd + 30} ${Y}`; for (let k = 1; k <= 9; k++) d += ` L${xd + 30 + (290 - xd - 30) * k / 9} ${Y + (k % 2 ? -18 : 18)}`; SS.arcB.setAttribute("d", d);
-  const aerActiv = sim.vac > 0.05 && sim.Fp > 2 && !sat && asist > 1;
-  $$("circle", SS.aer).forEach((c, k) => { const t = (performance.now() / 600 + k / 6) % 1; c.setAttribute("cx", 30 + t * (xd - 60)); c.setAttribute("cy", Y + (k % 2 ? -14 : 14) * (0.4 + t)); c.setAttribute("opacity", aerActiv ? 0.9 * (1 - t) : 0); });
-  SS.tCam.textContent = sim.vac > 0.05 ? (sat ? "camera de lucru: aer la presiunea atmosferică – saturație" : sim.Fp > 2 ? `camera de lucru: intră aer (Δp = ${fmt(fr * sim.vac, 2)} bar)` : "camera de lucru: vacuum (repaus)") : "fără vacuum: servofrâna nu asistă";
-  SS.tCam2.textContent = sim.vac > 0.05 ? `camera de vacuum: −${fmt(sim.vac, 2)} bar` : "";
-  // pompa centrală: pistonul primar urmează tija; pistonul secundar (flotant) e împins de presiunea primară
-  const x0 = SS.mx0, s2 = Math.max(0, sm - 1.5) * 0.85 + Math.min(sm, 1.5), xp1 = x0 + 20 + dx, xp2 = x0 + 160 + s2 * 3;
-  SS.pist[0].setAttribute("transform", `translate(${xp1},0)`); SS.pist[1].setAttribute("transform", `translate(${xp2},0)`);
-  SS.ch1.setAttribute("x", xp1 + 57); SS.ch1.setAttribute("width", Math.max(0, xp2 - xp1 - 57));
-  SS.ch2.setAttribute("x", xp2 + 61); SS.ch2.setAttribute("width", Math.max(0, 674 - xp2 - 61));
-  const col = p => `hsl(${42 - 32 * clamp(p / 120, 0, 1)}, 78%, ${58 - 12 * clamp(p / 120, 0, 1)}%)`;
-  SS.ch1.setAttribute("fill", col(sim.p1)); SS.ch2.setAttribute("fill", col(sim.p2));
-  SS.cond1.setAttribute("stroke", sim.p1 > 1 ? col(sim.p1) : "#b87333"); SS.cond2.setAttribute("stroke", sim.p2 > 1 ? col(sim.p2) : "#b87333");
-  const inchis = sm > 1.5;
-  SS.porturi.forEach(p => p.setAttribute("opacity", inchis ? 0.25 : 1));
-  SS.tComp.textContent = inchis ? `orificiile de compensare închise de manșete → presiunea crește (s_m = ${fmt(sm, 1)} mm)` : `cursa moartă: orificiile de compensare deschise spre rezervor (s_m = ${fmt(sm, 1)} mm < 1,5 mm)`;
-  let a1 = `M${xp1 + 57} ${Y}`, a2 = `M${xp2 + 61} ${Y}`;
-  for (let k = 1; k <= 8; k++) { a1 += ` L${xp1 + 57 + (xp2 - xp1 - 57) * k / 8} ${Y + (k % 2 ? -9 : 9)}`; a2 += ` L${xp2 + 61 + (674 - xp2 - 61) * k / 8} ${Y + (k % 2 ? -9 : 9)}`; }
-  SS.arc[0].setAttribute("d", a1); SS.arc[1].setAttribute("d", a2);
-  // etrierul: jocul plăcuțelor se preia, garnitura pătrată se deformează (rollback la eliberare)
-  const ex = SS.ex, eY = SS.eY, de = clamp(sim.p1 / 3, 0, 1) * 6, def = clamp(sim.p1 / 60, 0, 1);
-  SS.pistE.setAttribute("transform", `translate(${de},0)`); SS.pl1.setAttribute("transform", `translate(${de},0)`);
-  SS.cilL.setAttribute("width", 10 + de); SS.cilL.setAttribute("fill", col(sim.p1));
-  SS.seal.forEach((s, k) => s.setAttribute("transform", `rotate(${(k ? -1 : 1) * 22 * def} ${ex + 45} ${eY + (k ? 54 : -54)})`));
-  const lf = clamp(sim.Fc / 8000, 0, 1) * 34;
-  SS.sagF[0].setAttribute("d", lf > 2 ? `M${ex + 118 + de} ${eY} l${lf} -7 v14 z` : ""); SS.sagF[1].setAttribute("d", lf > 2 ? `M${ex + 164} ${eY} l${-lf} -7 v14 z` : "");
-  SS.tEt.textContent = sim.p1 > 0.5 ? `F_c = p·A_c·η_c ≈ ${fmt(sim.Fc, 0)} N (d_c = ${pr.dc} mm)` : `repaus: joc între plăcuțe și celulă (d_c = ${pr.dc} mm)`;
 }
 
 /* ------------------------------------------------------------------ comenzi și înregistrare */
@@ -533,9 +393,6 @@ Cadru.porneste({
     html: `<div class="sim-grila">
     <div class="card sim-scena scena">
       <svg id="svg-pascal" viewBox="0 0 1536 760" role="img" aria-label="Fotografia standului de frânare, animată: pedală cu dinamometru, servofrână cu vacuum, pompă centrală tandem cu fereastră de secțiune, manometre și etrier cu celulă de forță"></svg>
-      <details class="setari sectiune" open><summary>Secțiune funcțională: servofrână – pompă centrală tandem – etrier (se mișcă odată cu standul)</summary>
-        <svg id="svg-sectiune" viewBox="0 0 1130 385" role="img" aria-label="Secțiune prin servofrână, pompa centrală tandem și etrierul flotant"></svg>
-      </details>
       <div class="afisaje">
         <div class="afisaj"><span>Forța pe pedală</span><b id="af-F">0</b><small>N (dinamometru)</small></div>
         <div class="afisaj"><span>Presiunea – circuit 1 / 2</span><b id="af-p">0,0</b><small>bar</small></div>
