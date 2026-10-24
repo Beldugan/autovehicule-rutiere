@@ -155,6 +155,50 @@ function desenX431() {
   s += txt((X0 + X1) / 2, Y0 - 6, "Sonda λ amonte [V] – 1 s/div", { fs: 10, f: "#1b2733", w: 700 }) + txt(X1 - 4, Y0 + 12, "bogat", { fs: 9, a: "end", f: "#ffe14d" }) + txt(X1 - 4, Y1 - 5, "sărac", { fs: 9, a: "end", f: "#ffe14d" });
   el.innerHTML = s;
 }
+/** sonda de prelevare reală: pre-filtru cu separator de apă, furtun, mâner cauciucat, țeavă din inox cu vârf flexibil și clemă cu arc;
+    introdusă ≥ 30 cm în țeava de evacuare sau așezată pe suport */
+function sondaPrelevare(I, inEvac, motor) {
+  let s = `<defs><linearGradient id="${I}-inox" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6f8"/><stop offset=".3" stop-color="#c3c9cf"/><stop offset=".6" stop-color="#8b939b"/><stop offset="1" stop-color="#5a6168"/></linearGradient>
+    <linearGradient id="${I}-inoxV" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5a6168"/><stop offset=".4" stop-color="#f4f6f8"/><stop offset=".7" stop-color="#a9b0b7"/><stop offset="1" stop-color="#5a6168"/></linearGradient>
+    <linearGradient id="${I}-teava" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6e2dc"/><stop offset=".25" stop-color="#b9a98f"/><stop offset=".55" stop-color="#8a6f52"/><stop offset=".8" stop-color="#5c4632"/><stop offset="1" stop-color="#3a2c20"/></linearGradient>
+    <linearGradient id="${I}-maner" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3b3f45"/><stop offset=".45" stop-color="#16181b"/><stop offset="1" stop-color="#2b2f34"/></linearGradient>
+    <linearGradient id="${I}-sticla" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cfe3f2" stop-opacity=".7"/><stop offset=".3" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#9fb8cc" stop-opacity=".7"/></linearGradient>
+    <radialGradient id="${I}-fum" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#9aa3ac" stop-opacity=".45"/><stop offset="1" stop-color="#9aa3ac" stop-opacity="0"/></radialGradient></defs>`;
+  // racordul analizorului și furtunul spre pre-filtru
+  s += `<rect x="604" y="238" width="16" height="22" rx="3" fill="#8a949e" stroke="#555"/><path d="M620,249 C650,250 640,290 668,286" fill="none" stroke="#1a1c1f" stroke-width="7" stroke-linecap="round"/>`;
+  // pre-filtrul cu separator de apă (corp transparent, element filtrant, apă condensată)
+  s += `<rect x="664" y="200" width="34" height="96" rx="7" fill="url(#${I}-sticla)" stroke="#6f8aa0"/><rect x="671" y="212" width="20" height="62" rx="3" fill="#f3f1ea" stroke="#cfc8b8"/>`;
+  for (let k = 0; k < 9; k++) s += `<line x1="671" y1="${216 + k * 7}" x2="691" y2="${216 + k * 7}" stroke="#d8d0bd" stroke-width="1"/>`;
+  s += `<rect x="666" y="282" width="30" height="12" rx="4" fill="#9cc7e6" opacity=".7"/><rect x="660" y="190" width="42" height="12" rx="3" fill="#c62828"/><rect x="660" y="294" width="42" height="9" rx="3" fill="#c62828"/>`;
+  s += txt(681, 318, "pre-filtru / separator apă", { fs: 9 });
+  if (inEvac) {
+    // țeava de evacuare (inox decolorat termic) cu sonda introdusă ≥ 30 cm
+    s += `<path d="M681,190 C681,150 700,150 742,158" fill="none" stroke="#1a1c1f" stroke-width="7" stroke-linecap="round"/>`;
+    s += `<rect x="842" y="128" width="158" height="44" fill="url(#${I}-teava)"/><ellipse cx="842" cy="150" rx="9" ry="22" fill="#2a2420" stroke="#6b5a48"/><ellipse cx="842" cy="150" rx="6" ry="18" fill="#0d0b0a"/>`;
+    s += `<line x1="852" y1="153" x2="992" y2="153" stroke="#c3c9cf" stroke-width="4" stroke-dasharray="7 5" opacity=".75"/><path d="M992,153 q6,-1 8,4" fill="none" stroke="#c3c9cf" stroke-width="4" opacity=".75"/>`;
+    s += `<path d="M852,${190} H992" stroke="#37474f" stroke-width="1"/><path d="M852,186 v8 M992,186 v8" stroke="#37474f" stroke-width="1"/>` + txt(922, 205, "≥ 30 cm în țeavă", { fs: 10, w: 700 });
+    // mânerul, țeava sondei și clema cu arc pe marginea țevii
+    s += `<rect x="742" y="146" width="60" height="18" rx="7" fill="url(#${I}-maner)"/>`;
+    for (let k = 0; k < 7; k++) s += `<line x1="${750 + k * 7}" y1="148" x2="${750 + k * 7}" y2="162" stroke="#4a4f55" stroke-width="1.6"/>`;
+    s += `<rect x="802" y="149" width="12" height="12" rx="2" fill="url(#${I}-inox)"/><rect x="814" y="150" width="40" height="7" fill="url(#${I}-inox)"/>`;
+    s += `<path d="M826,150 L826,120 Q826,112 834,112 L850,112 Q856,112 856,120 L856,132" fill="none" stroke="url(#${I}-inoxV)" stroke-width="4" stroke-linecap="round"/><path d="M826,128 q-8,4 0,8 q-8,4 0,8" fill="none" stroke="#8b939b" stroke-width="2"/>`;
+    if (motor) for (let k = 0; k < 3; k++) { const ph = (performance.now() / 900 + k / 3) % 1; s += `<circle cx="${838 - ph * 70}" cy="${150 - ph * 25 + k * 6}" r="${10 + ph * 26}" fill="url(#${I}-fum)" opacity="${1 - ph}"/>`; }
+    s += txt(790, 100, "clemă cu arc pe țeavă", { fs: 9.5 }) + txt(772, 186, "mâner", { fs: 9 });
+  } else {
+    // sonda pe suportul analizorului (vertical), cu vârful flexibil în sus
+    s += `<path d="M681,190 C681,150 740,250 772,236" fill="none" stroke="#1a1c1f" stroke-width="7" stroke-linecap="round"/>`;
+    s += `<rect x="756" y="176" width="34" height="14" rx="3" fill="#7f8891" stroke="#4b5259"/><path d="M790,183 h28 v-150" fill="none" stroke="#9aa3ac" stroke-width="5"/>`;
+    s += `<rect x="764" y="180" width="18" height="62" rx="7" fill="url(#${I}-maner)"/>`;
+    for (let k = 0; k < 7; k++) s += `<line x1="766" y1="${188 + k * 7}" x2="780" y2="${188 + k * 7}" stroke="#4a4f55" stroke-width="1.6"/>`;
+    s += `<rect x="767" y="168" width="12" height="13" rx="2" fill="url(#${I}-inox)"/><rect x="770" y="40" width="7" height="130" fill="url(#${I}-inoxV)"/>`;
+    s += `<path d="M773,40 C773,20 790,14 800,20" fill="none" stroke="url(#${I}-inoxV)" stroke-width="7" stroke-linecap="round"/><path d="M773,32 C774,22 786,16 798,19" fill="none" stroke="#6b737c" stroke-width="1" stroke-dasharray="2 2"/>`;
+    s += `<path d="M778,120 q10,-4 10,-14 v-16" fill="none" stroke="url(#${I}-inoxV)" stroke-width="3"/>`;
+    s += txt(850, 60, "vârf flexibil", { fs: 9.5, a: "start" }) + txt(850, 120, "sondă inox Ø 8 mm", { fs: 9.5, a: "start" }) + txt(850, 214, "mâner + clemă", { fs: 9.5, a: "start" }) + txt(850, 250, "pe suport", { fs: 10.5, a: "start", w: 700 });
+    s += `<path d="M806,22 L846,57 M790,110 L846,117 M792,205 L846,210" stroke="var(--text-sec, #888)" stroke-width=".8"/>`;
+  }
+  return s;
+}
+
 /** analizorul de gaze AVL (4 gaze + λ), cu sonda de prelevare */
 function desenAVL() {
   const el = $("#svg-avl"); if (!el) return;
@@ -172,7 +216,7 @@ function desenAVL() {
   s += `<rect x="484" y="54" width="112" height="240" rx="8" fill="#e3e8ee" stroke="#9aa5b1"/>` + txt(540, 76, "Stare", { fs: 11, f: "#1b2733", w: 700 });
   st.split(" – ").forEach((l, i) => { s += txt(540, 100 + i * 16, l, { fs: 10.5, f: st.startsWith("MĂSURARE") ? "#1b7f3b" : "#8a4b00", w: 700 }); });
   [["PORNIT", A.pornit], ["ÎNCĂLZIT", A.tInc >= 60], ["ETANȘ", A.etans], ["ZERO", A.zero], ["SONDĂ", A.sonda]].forEach(([n, on], i) => { const y = 150 + i * 26; s += `<circle cx="502" cy="${y}" r="6" fill="${on ? "#2e9e44" : "#9aa3ac"}"/>` + txt(514, y + 4, n, { fs: 10, a: "start", f: "#1b2733", w: 600 }); });
-  s += `<path d="M610,250 C680,250 690,140 760,120" fill="none" stroke="#1b1b1b" stroke-width="6"/><rect x="752" y="108" width="54" height="10" rx="3" fill="url(#${I}-c)" stroke="#555" transform="rotate(-20 760 120)"/>` + txt(712, 175, A.sonda ? "sonda în țeava de evacuare (≥ 30 cm)" : "sonda pe suport", { fs: 10.5, w: 600 });
+  s += sondaPrelevare(I, A.sonda, sim.merge);
   el.innerHTML = s;
 }
 
@@ -581,10 +625,10 @@ Cadru.porneste({
       <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <div id="motor3d"><p class="nota">Se încarcă motorul 3D…</p></div>
       <div class="da4-afis"><div><span>Stare</span><b id="af-st">—</b></div><div><span>Turație [rot/min]</span><b id="af-n">0</b></div><div><span>Lichid / ulei [°C]</span><b id="af-T">—</b></div><div><span>Presiune rampă [bar]</span><b id="af-p">—</b></div><div><span>Defect provocat</span><b id="af-prov">—</b></div></div>
-      <div class="instr" data-panou="prep"><h3>Pregătirea standului și a analizorului</h3><svg id="svg-avl0" data-pre="av0" viewBox="0 0 820 330" role="img" aria-label="Analizorul de gaze"></svg><p class="nota">Analizorul are nevoie de încălzire, de testul de etanșeitate al traseului de prelevare și de aducerea la zero cu aer curat înainte de orice măsurare.</p></div>
+      <div class="instr" data-panou="prep"><h3>Pregătirea standului și a analizorului</h3><svg id="svg-avl0" data-pre="av0" viewBox="0 0 1000 330" role="img" aria-label="Analizorul de gaze"></svg><p class="nota">Analizorul are nevoie de încălzire, de testul de etanșeitate al traseului de prelevare și de aducerea la zero cu aer curat înainte de orice măsurare.</p></div>
       <div class="instr" data-panou="pres" hidden><h3>Trusa de presiune pe turul de combustibil</h3><svg id="svg-pres" viewBox="0 0 860 300" role="img" aria-label="Rampa de combustibil, regulatorul, adaptorul în T și manometrul"></svg></div>
       <div class="instr" data-panou="debit" hidden><h3>Debitul pompei – vasul gradat pe retur</h3><svg id="svg-debit" viewBox="0 0 820 300" role="img" aria-label="Vasul gradat, cronometrul și testul activ X431"></svg></div>
-      <div class="instr" data-panou="gaze" hidden><h3>Analizorul de gaze AVL și testerul X431</h3><svg id="svg-avl" viewBox="0 0 820 330" role="img" aria-label="Analizorul de gaze AVL"></svg><svg id="svg-x431" viewBox="0 0 820 330" role="img" aria-label="Testerul Launch X431 – date live" style="margin-top:.5rem"></svg></div>
+      <div class="instr" data-panou="gaze" hidden><h3>Analizorul de gaze AVL și testerul X431</h3><svg id="svg-avl" viewBox="0 0 1000 330" role="img" aria-label="Analizorul de gaze AVL"></svg><svg id="svg-x431" viewBox="0 0 820 330" role="img" aria-label="Testerul Launch X431 – date live" style="margin-top:.5rem"></svg></div>
       <div class="instr" data-panou="diag" hidden><h3>Rezumatul măsurărilor</h3><div id="rezumat" class="tabel-scroll"></div></div>
     </div>
     <aside class="card sim-comenzi tk-pasi">
