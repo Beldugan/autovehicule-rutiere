@@ -520,7 +520,7 @@ const TEST = [
 const SV = { m3d: null };
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=12").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", map: "MAP", reg: "regulator", l1: "sonda λ amonte", l2: "sonda λ aval" }, onSelect: () => {} }); })
+  import(BAZA_COMUN + "motor3d.js?v=13").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", map: "MAP", reg: "regulator", l1: "sonda λ amonte", l2: "sonda λ aval" }, onSelect: () => {} }); })
     .catch(e => { el.innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 const CSS = `<style>

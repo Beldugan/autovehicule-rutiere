@@ -588,7 +588,7 @@ function alegeCil3D(k) {
 }
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=12").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { cil1: "cil. 1", cil2: "cil. 2", cil3: "cil. 3", cil4: "cil. 4", map: "MAP" }, onSelect: alegeCil3D }); })
+  import(BAZA_COMUN + "motor3d.js?v=13").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { cil1: "cil. 1", cil2: "cil. 2", cil3: "cil. 3", cil4: "cil. 4", map: "MAP" }, onSelect: alegeCil3D }); })
     .catch(e => { el.innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 const CSS = `<style>

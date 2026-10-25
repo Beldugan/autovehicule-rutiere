@@ -4,7 +4,7 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
-import { MAT } from "./motor3d.js?v=12";
+import { MAT } from "./motor3d.js?v=13";
 import { SENZORI } from "./senzori-date.js?v=1";
 
 const CAT = () => globalThis.CATALOG_SENZORI;
@@ -464,7 +464,7 @@ export function creeaza(gazda, optiuni = {}) {
 
   /* --- macheta autoturismului (sistemul „senzori” în modul catalog) */
   let v3d = null;
-  import("./vehicul3d.js?v=20").then(m => { v3d = m.creeaza($(".sz-masina"), { sistem: "senzori", catalog: true, laSelectare: k => { const x = C.dupaK[k]; if (x) alege(x.id, false); } }); })
+  import("./vehicul3d.js?v=21").then(m => { v3d = m.creeaza($(".sz-masina"), { sistem: "senzori", catalog: true, laSelectare: k => { const x = C.dupaK[k]; if (x) alege(x.id, false); } }); })
     .catch(e => { $(".sz-masina").innerHTML = `<p class="nota">Macheta nu a putut fi încărcată (${esc(e.message)}).</p>`; });
 
   alege(optiuni.initial || "ckp", false);

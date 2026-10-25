@@ -4,7 +4,7 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=12";
+import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=13";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
