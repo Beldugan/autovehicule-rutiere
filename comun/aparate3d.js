@@ -600,3 +600,118 @@ export function creeazaStandMAP(gazda, opt = {}) {
     vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); }
   };
 }
+
+/* ===================================================================== MF L5: aparatul Reynolds
+   Rezervorul de nivel constant din acril (alimentarea cu robinet, preaplinul, grila de liniștire, termometrul), vasul de colorant cu
+   robinetul și acul injector în axa intrării profilate, tubul de sticlă d = 10 mm (L ≈ 1 m) pe suporturi, robinetul de reglare cu
+   roata de manevră, furtunul de ieșire (spre scurgere sau în vasul gradat de 1 L), cronometrul. Firul de colorant este format din
+   particule transportate cu profilul de viteze și perturbate după regim (laminar / tranziție intermitentă / turbulent). */
+export function creeazaReynolds(gazda, opt = {}) {
+  const S = scena(gazda, [0.1, 0.85, 2.0], [0.0, 0.25, 0.0]), sc = S.scene; S.ctl.maxDistance = 3.2; S.ctl.minDistance = 0.06;
+  const M = materialeMAM(), clic = [], k_ = (o, k, et) => { o.userData.k = k; o.userData.et = et; clic.push(o); return o; };
+  const acril = new THREE.MeshPhysicalMaterial({ color: 0xf4fbff, roughness: 0.04, transmission: 0.95, thickness: 0.006, ior: 1.49, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false });
+  const apa = new THREE.MeshPhysicalMaterial({ color: 0xbfe2f5, roughness: 0.05, transmission: 0.85, thickness: 0.1, ior: 1.33, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+  const sticla = sticlaM();
+  /* ---- suportul (cadru din profile de aluminiu) */
+  const YT = 0.3, X0 = -0.42, L = 0.95, R = 0.005;                 // axa tubului, începutul, lungimea, raza interioară
+  [[-0.62, -0.08], [-0.62, 0.12], [0.62, -0.08], [0.62, 0.12]].forEach(([x, z]) => add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.03), M.alu)).position.set(x, 0.1, z));
+  add(sc, new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.03, 0.03), M.alu)).position.set(0, 0.2, -0.08);
+  [-0.2, 0.15, 0.48].forEach(x => { add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.02), M.alu)).position.set(x, 0.25, -0.08); const c = add(sc, new THREE.Mesh(new THREE.TorusGeometry(0.009, 0.0025, 8, 20), M.negru)); c.position.set(x, YT, 0); });
+  /* ---- rezervorul de nivel constant */
+  const RX = -0.6, RW = 0.26, RH = 0.36, RD = 0.24, RY0 = 0.2, NIV = 0.5;
+  const rez = add(sc, new THREE.Mesh(new THREE.BoxGeometry(RW, RH, RD), acril)); rez.position.set(RX, RY0 + RH / 2, 0.02); rez.castShadow = false; k_(rez, "rezervor", "Rezervorul de nivel constant");
+  add(sc, new THREE.Mesh(new THREE.BoxGeometry(RW + 0.02, 0.012, RD + 0.02), M.gri)).position.set(RX, RY0 - 0.006, 0.02);
+  const apaR = add(sc, new THREE.Mesh(new THREE.BoxGeometry(RW - 0.01, NIV - RY0 - 0.005, RD - 0.01), apa)); apaR.position.set(RX, (NIV + RY0) / 2, 0.02); apaR.castShadow = false;
+  const grila = add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.004, RH * 0.6, RD - 0.012), mat({ color: 0xdfe5ea, roughness: 0.5, transparent: true, opacity: 0.6 }))); grila.position.set(RX - 0.06, RY0 + RH * 0.35, 0.02);
+  cyl(sc, 0.012, 0.012, 0.3, acril, RX + 0.09, RY0 + 0.15, 0.09, 24).castShadow = false;                                             // preaplinul (țeavă verticală)
+  sc.add(tubM([[RX + 0.09, RY0, 0.09], [RX + 0.09, 0.05, 0.12], [RX + 0.3, 0.01, 0.2]], 0.008, mat({ color: 0xe0e6ea, roughness: 0.4, transparent: true, opacity: 0.7 }), 24));
+  // alimentarea de la bancul hidraulic, cu robinetul de alimentare
+  sc.add(tubM([[RX - 0.12, RY0 + RH + 0.02, -0.06], [RX - 0.25, 0.7, -0.15], [RX - 0.3, 0.2, -0.3], [RX - 0.3, 0.0, -0.32]], 0.008, M.negru, 30));
+  const rob = cyl(sc, 0.012, 0.012, 0.04, M.alama, RX - 0.12, RY0 + RH + 0.02, -0.06, 16); rob.rotation.z = Math.PI / 2;
+  const rAlim = add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.01), mat({ color: 0x1565c0, roughness: 0.4 }))); rAlim.position.set(RX - 0.12, RY0 + RH + 0.045, -0.06); k_(rAlim, "alim", "Robinetul de alimentare (clic = deschis / închis)");
+  const jetA = add(sc, new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.004, 1, 8), apa)); jetA.position.set(RX - 0.1, 0, -0.04);
+  // termometrul cu tijă de sticlă în rezervor
+  const TM = new THREE.Group(); TM.position.set(RX + 0.05, RY0 + RH + 0.02, -0.07); sc.add(TM);
+  cyl(TM, 0.004, 0.004, 0.32, sticla, 0, -0.08, 0, 12); const col = cyl(TM, 0.0013, 0.0013, 1, mat({ color: 0xc62828, roughness: 0.3 }), 0, 0, 0, 8); cyl(TM, 0.004, 0.004, 0.012, mat({ color: 0xc62828, roughness: 0.3 }), 0, -0.235, 0, 12);
+  k_(TM.children[0], "termometru", "Termometrul (apa din rezervor)");
+  const eTM = ecran(256, 64); add(TM, new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.015), new THREE.MeshBasicMaterial({ map: eTM.t, transparent: true }))).position.set(0.035, 0.03, 0.0);
+  /* ---- vasul de colorant, robinetul și acul injector */
+  const CX = RX - 0.02;
+  const vas = cyl(sc, 0.03, 0.03, 0.09, sticla, CX, 0.78, 0.02, 24); vas.castShadow = false; k_(vas, "colorant", "Vasul de colorant (permanganat de potasiu diluat)");
+  const colLiq = cyl(sc, 0.028, 0.028, 1, mat({ color: 0xa0103f, roughness: 0.2, transparent: true, opacity: 0.8 }), CX, 0.76, 0.02, 24);
+  const rc = cyl(sc, 0.006, 0.006, 0.02, M.alama, CX, 0.72, 0.02, 12); const rcM = add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 0.008), mat({ color: 0x2e7d32, roughness: 0.4 }))); rcM.position.set(CX, 0.722, 0.035); k_(rcM, "robColorant", "Robinetul colorantului (clic = deschis / închis)");
+  sc.add(tubM([[CX, 0.71, 0.02], [CX, 0.5, 0.02], [CX + 0.02, 0.36, 0.0], [X0 - 0.05, YT, 0], [X0 - 0.01, YT, 0]], 0.0012, M.inox, 50));
+  /* ---- intrarea profilată (bell-mouth) și tubul de sticlă */
+  const bm = add(sc, new THREE.Mesh(new THREE.LatheGeometry([[0.03, 0], [0.022, 0.006], [0.014, 0.015], [0.009, 0.026], [0.007, 0.04]].map(([r, y]) => new THREE.Vector2(r, y)), 40), sticla)); bm.rotation.z = -Math.PI / 2; bm.position.set(X0 - 0.04, YT, 0);
+  const tub = cyl(sc, R + 0.002, R + 0.002, L, sticla, X0 + L / 2, YT, 0, 32, true); tub.rotation.z = Math.PI / 2; tub.castShadow = false; k_(tub, "tub", "Tubul de sticlă d = 10 mm");
+  const apT = cyl(sc, R, R, L, apa, X0 + L / 2, YT, 0, 24); apT.rotation.z = Math.PI / 2; apT.castShadow = false;
+  /* ---- robinetul de reglare la ieșire (roata de manevră) și furtunul */
+  const VX = X0 + L + 0.03;
+  cyl(sc, 0.014, 0.014, 0.05, M.alama, VX, YT, 0, 20).rotation.z = Math.PI / 2; cyl(sc, 0.006, 0.006, 0.05, M.alama, VX, YT + 0.03, 0, 12);
+  const roata = new THREE.Group(); roata.position.set(VX, YT + 0.06, 0); sc.add(roata);
+  const rr = add(roata, new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.004, 10, 40), mat({ color: 0xc62828, roughness: 0.4 }))); rr.rotation.x = Math.PI / 2; k_(rr, "robinet", "Robinetul de reglare (roata de manevră)");
+  [0, 1, 2].forEach(k => { const s = add(roata, new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.004, 0.005), mat({ color: 0xc62828, roughness: 0.4 }))); s.rotation.y = k * Math.PI / 3; k_(s, "robinet", "Robinetul de reglare (roata de manevră)"); });
+  let furt = null; const pFurt = (inVas) => { if (furt) { sc.remove(furt); furt.geometry.dispose(); } const a = [VX + 0.03, YT, 0], end = inVas ? [0.62, 0.17, 0.2] : [0.72, 0.03, -0.05];
+    furt = tubM([a, [VX + 0.08, YT - 0.02, 0.02], [VX + 0.12, 0.2, 0.1], end], 0.006, mat({ color: 0xd9eef8, roughness: 0.3, transparent: true, opacity: 0.75 }), 40); sc.add(furt); return new THREE.Vector3(...end); };
+  /* ---- scurgerea (pâlnie), vasul gradat de 1 L, cronometrul */
+  cyl(sc, 0.05, 0.015, 0.06, M.inox, 0.72, 0.03, -0.05, 24);
+  const VG = new THREE.Group(); VG.position.set(0.62, 0, 0.2); sc.add(VG);
+  const vgS = cyl(VG, 0.05, 0.05, 0.15, sticla, 0, 0.075, 0, 32, true); vgS.castShadow = false; cyl(VG, 0.05, 0.05, 0.004, sticla, 0, 0.002, 0, 32).castShadow = false; k_(vgS, "vas", "Vasul gradat de 1 L");
+  for (let k = 1; k <= 10; k++) { const l = add(VG, new THREE.Mesh(new THREE.BoxGeometry(k % 5 ? 0.012 : 0.022, 0.0012, 0.001), new THREE.MeshBasicMaterial({ color: 0x1b2733 }))); l.position.set(-0.01, 0.004 + k * 0.0127, 0.0505); }
+  const apV = cyl(VG, 0.048, 0.048, 1, apa, 0, 0, 0, 32); apV.castShadow = false;
+  const jetV = add(sc, new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.004, 1, 8), apa));
+  const CR = new THREE.Group(); CR.position.set(0.42, 0.0, 0.25); CR.rotation.x = -0.6; sc.add(CR);
+  k_(cyl(CR, 0.035, 0.035, 0.016, M.crom, 0, 0.012, 0, 40), "crono", "Cronometrul (clic = start / stop)").rotation.x = 0;
+  const eCR = ecran(220, 100); const fCR = add(CR, new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.02), new THREE.MeshBasicMaterial({ map: eCR.t }))); fCR.rotation.x = -Math.PI / 2; fCR.position.y = 0.0205;
+  cyl(CR, 0.005, 0.005, 0.01, M.otel, 0, 0.012, -0.04, 12).rotation.x = Math.PI / 2;
+  interactiune(S, clic, opt.laClic);
+  /* ---- firul de colorant: particule */
+  const NP = 4000, part = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 4), new THREE.MeshBasicMaterial({ color: 0xa3104a }), NP); part.frustumCulled = false; part.renderOrder = -1; sc.add(part);
+  const P_ = Array.from({ length: NP }, () => ({ x: -1, y: 0, z: 0, f: Math.random() * 6.28, a: false }));
+  // colorantul dispersat (nor roz în toată secțiunea): zona turbulentă și pufurile din tranziție
+  const mNor = new THREE.MeshBasicMaterial({ color: 0xc2185b, transparent: true, opacity: 0, depthWrite: false });
+  const nori = Array.from({ length: 8 }, () => { const o = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.97, R * 0.97, 1, 20), mNor.clone()); o.rotation.z = Math.PI / 2; o.visible = false; sc.add(o); return o; });
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3();
+  const V = { v: 0, st: "laminar", gamma: 0, colorant: false, alim: true, a: 0, colectare: false, Vvas: 0, crono: 0, T: 20, nivColorant: 1 };
+  let emis = 0, tt = 0, ultC = "", ultT = "", ultF = null, puf = [];
+  const gs = () => { let a = 0, b = 0; while (!a) a = Math.random(); while (!b) b = Math.random(); return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b); };
+  S.porneste(dt => {
+    tt += dt;
+    const u = V.v, g = V.gamma, lam = V.st === "laminar";
+    // pufurile turbulente (tranziție): zone care se deplasează cu viteza medie
+    if (V.st === "tranzitie") { if (Math.random() < dt * (0.6 + 2.5 * g)) puf.push({ x: X0 + 0.15 + Math.random() * 0.25, L: 0.05 + 0.25 * g }); }
+    puf = V.st === "tranzitie" ? puf.filter(p => { p.x += u * dt; return p.x - p.L < X0 + L; }) : [];
+    // emisia colorantului din vârful acului
+    if (V.colorant && u > 0.003 && V.nivColorant > 0) emis += dt * 1300;
+    for (let i = 0; i < NP && emis >= 1; i++) { const p = P_[i]; if (p.a) continue; p.a = true; p.x = X0 - 0.01 + 2 * u * dt * Math.random(); p.y = (Math.random() - 0.5) * 0.0004; p.z = (Math.random() - 0.5) * 0.0004; p.f = Math.random() * 6.28; emis -= 1; }
+    emis = Math.min(emis, 400);
+    let n = 0;
+    P_.forEach(p => {
+      if (!p.a) return;
+      const r = Math.hypot(p.y, p.z) / R, turbLocal = V.st === "turbulent" ? Math.min(1, (p.x - X0) / 0.06) : V.st === "tranzitie" && puf.some(q2 => p.x < q2.x && p.x > q2.x - q2.L) ? 1 : 0;
+      const ux = turbLocal ? u * 1.18 * Math.pow(Math.max(0.001, 1 - Math.min(r, 0.999)), 1 / 7) : 2 * u * (1 - Math.min(1, r * r));
+      p.x += Math.max(ux, 0.002) * dt;
+      if (turbLocal) { const sgm = R * 1.8 * Math.sqrt(dt) * (0.4 + u * 1.5); p.y += gs() * sgm; p.z += gs() * sgm; }
+      else if (V.st === "tranzitie") { const A = R * 0.45 * g * Math.min(1, (p.x - X0) / 0.4); p.y += (A * Math.sin(p.x * 60 - tt * 8 + p.f * 0.05) - p.y) * Math.min(1, dt * 4); }
+      else { p.y += gs() * 0.000006 * Math.sqrt(dt); p.z += gs() * 0.000006 * Math.sqrt(dt); }
+      const rr2 = Math.hypot(p.y, p.z); if (rr2 > R * 0.95) { p.y *= R * 0.95 / rr2; p.z *= R * 0.95 / rr2; }
+      if (p.x > X0 + L) { p.a = false; return; }
+      const sz = turbLocal ? 0.0009 : 0.0006;
+      m4.compose(v3.set(p.x, YT + p.y, p.z), q, s3.set(lam ? sz * 1.6 : sz, sz, sz)); part.setMatrixAt(n++, m4);
+    });
+    part.count = n; part.instanceMatrix.needsUpdate = true;
+    const zone = !V.colorant || u <= 0.003 ? [] : V.st === "turbulent" ? [[X0 + 0.04, X0 + L, 0.32]] : V.st === "tranzitie" ? puf.map(q2 => [Math.max(X0 + 0.1, q2.x - q2.L), Math.min(X0 + L, q2.x), 0.22]) : [];
+    nori.forEach((o, i) => { const z = zone[i]; o.visible = !!z && z[1] > z[0]; if (o.visible) { o.scale.y = z[1] - z[0]; o.position.set((z[0] + z[1]) / 2, YT, 0); o.material.opacity = z[2]; } });
+    // robinetul, alimentarea, jeturile de apă, nivelul din vas
+    roata.rotation.y = -V.a / 100 * Math.PI * 6;
+    rAlim.rotation.y = V.alim ? 0 : Math.PI / 2; jetA.visible = V.alim; jetA.scale.y = (RY0 + RH + 0.02) - NIV; jetA.position.y = (RY0 + RH + 0.02 + NIV) / 2;
+    const end = ultF === V.colectare ? null : pFurt(V.colectare); if (end) { ultF = V.colectare; jetV.userData.end = end; }
+    const e = jetV.userData.end; jetV.visible = u > 0.003 && !!e; if (e) { const y1 = V.colectare ? 0.004 + V.Vvas / 1 * 0.127 : 0.03; jetV.scale.y = Math.max(0.001, e.y - y1); jetV.position.set(e.x, (e.y + y1) / 2, e.z); jetV.scale.x = jetV.scale.z = 0.4 + Math.min(1.5, u * 2); }
+    const h = Math.max(0.0001, Math.min(1.2, V.Vvas) * 0.127); apV.scale.y = h; apV.position.y = 0.004 + h / 2;
+    colLiq.scale.y = Math.max(0.0001, 0.08 * V.nivColorant); colLiq.position.y = 0.737 + colLiq.scale.y / 2;
+    col.scale.y = 0.06 + (V.T - 0) / 50 * 0.18; col.position.y = -0.23 + col.scale.y / 2;
+    const tc = V.T.toFixed(1); if (tc !== ultT) { ultT = tc; const { x, c } = eTM; x.clearRect(0, 0, c.width, c.height); x.fillStyle = "rgba(255,255,255,.85)"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#c62828"; x.font = "bold 40px system-ui"; x.textAlign = "center"; x.fillText(tc + " °C", 128, 46); eTM.t.needsUpdate = true; }
+    const ct = V.crono.toFixed(2); if (ct !== ultC) { ultC = ct; const { x, c } = eCR; x.fillStyle = "#aab79c"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1b2416"; x.font = "bold 54px 'Courier New',monospace"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(ct, c.width / 2, 54); eCR.t.needsUpdate = true; }
+  });
+  return { seteaza(o) { Object.assign(V, o); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
+}
