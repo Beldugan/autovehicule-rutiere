@@ -4,7 +4,7 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=9";
+import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=10";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -234,7 +234,7 @@ export function creeaza(gazda, optiuni = {}) {
   /* --- sistemul de frânare */
   let motCtx = null;
   if (sistem === "retea" || sistem === "frana" || !sistem) { ascundeContur(ctx, ["motor", "cutie", "radiator"]); motCtx = motorAutoturism(caroserie, 0.5); }
-  const S = sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : sistem === "senzori" ? construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "retea" ? construiesteRetea({ caroserie, optiuni }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
+  const S = sistem === "racire" ? construiesteRacire({ caroserie, ctxMotor: ctx }) : sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : sistem === "senzori" ? construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "retea" ? construiesteRetea({ caroserie, optiuni }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
 
   // celelalte sisteme ale autoturismului (transmisie, direcție, baterie, combustibil, evacuare)
   { const mSist = motCtx || (S.motor || null); const gs = sistemeAutoturism(caroserie, mSist); if (motCtx) estompeaza(gs, 0.5); }
@@ -662,8 +662,8 @@ function sistemeAutoturism(caroserie, mot) {
 const CONTUR = { motor: [1.82, 0.62], cutie: [1.62, 0.5], radiator: [2.25, 0.55] };
 function ascundeContur(ctx, ce) { ctx.children.forEach(l => { const p = l.position; if (ce.some(k => Math.abs(p.x - CONTUR[k][0]) < 0.01 && Math.abs(p.y - CONTUR[k][1]) < 0.01)) l.visible = false; }); }
 /** motorul K7J complet (transmisia accesoriilor, evacuarea cu GPF, sistemul de răcire), montat transversal în autoturism */
-function motorAutoturism(caroserie, opacitate, interior) {
-  const mot = construiesteMotor({ stand: false, filtruAer: false, interior: !!interior });
+function motorAutoturism(caroserie, opacitate, interior, racire) {
+  const mot = construiesteMotor({ stand: false, filtruAer: false, interior: !!interior, racire: !!racire });
   mot.grup.rotation.y = -Math.PI / 2; mot.grup.position.set(1.78, 0.42, 0.02); mot.grup.scale.setScalar(0.98);
   if (opacitate) estompeaza(mot.grup, opacitate);
   caroserie.add(mot.grup); return mot;
@@ -794,6 +794,61 @@ function construiesteUngere({ THREE, caroserie, optiuni, ctxMotor }) {
     camereButoane: [["motor", "motorul (secționat)"], ["lateral", "motor – lateral"]], cameraInitiala: [[2.75, 1.05, 1.05], [X0, 0.45, 0]] };
 }
 
+
+/* ================================================================== răcirea motorului pe autoturism (SAA – L5): aerul de înaintare, electroventilatorul, termostatul */
+function construiesteRacire({ caroserie, ctxMotor }) {
+  ascundeContur(ctxMotor, ["motor", "radiator"]);
+  const mot = motorAutoturism(caroserie, 0, false, true); mot.modCarcasa("transparent");
+  const X0 = 1.78, et = [];
+  const ancora = k => { const o = new THREE.Object3D(); o.position.copy(mot.ancore[k]); mot.grup.add(o); return o; };
+  [["termostat", "Termostatul"], ["pompaApa", "Pompa de apă"], ["radiator", "Radiatorul"], ["ventilator", "Electroventilatorul"], ["vas", "Vasul de expansiune"], ["furtSup", "Furtunul superior"], ["furtInf", "Furtunul inferior"], ["incalzire", "Radiatorul de încălzire"], ["bypass", "Circuitul mic"]].forEach(([k, t]) => et.push({ obj: ancora(k), text: t }));
+  const html = `
+    <div class="v3d-grup">
+      <button type="button" class="primar" data-r="porneste">Pornire la rece</button><button type="button" data-r="opreste">Oprește motorul</button>
+    </div>
+    <div class="v3d-grup">
+      <label>Viteza <input type="range" data-r="v" min="0" max="130" step="5" value="0"> <output>0 km/h</output></label>
+      <label>Temperatura aerului <input type="range" data-r="Ta" min="-15" max="40" step="1" value="20"> <output>20 °C</output></label>
+      <label>Panta / sarcina <input type="range" data-r="s" min="0" max="100" step="10" value="0"> <output>0 %</output></label>
+      <label><input type="checkbox" data-r="cli"> Climatizare (condensator în fața radiatorului)</label>
+    </div>`;
+  const stare = { motor: false, Tm: 20, Tr: 20, x: 0, fan: false, v: 0, vT: 0, Ta: 20, sarc: 0, cli: false, t: 0, Q: 0, rpm: 0, Pin: 0 };
+  function leaga(cmd, st) {
+    const inp = k => cmd.querySelector(`[data-r="${k}"]`);
+    inp("v").addEventListener("input", e => { st.vT = +e.target.value; e.target.nextElementSibling.textContent = `${st.vT} km/h`; });
+    inp("Ta").addEventListener("input", e => { st.Ta = +e.target.value; e.target.nextElementSibling.textContent = `${st.Ta} °C`; if (!st.motor) { st.Tm = st.Tr = st.Ta; } });
+    inp("s").addEventListener("input", e => { st.sarc = +e.target.value; e.target.nextElementSibling.textContent = `${st.sarc} %`; });
+    inp("cli").addEventListener("change", e => { st.cli = e.target.checked; });
+    inp("porneste").addEventListener("click", () => { st.motor = true; st.Tm = st.Tr = st.Ta; st.x = 0; st.fan = false; st.t = 0; });
+    inp("opreste").addEventListener("click", () => { st.motor = false; st.vT = 0; });
+  }
+  const CP = 3.5, CM = 16, CR = 3, T0 = 89, DT = 13, TON = 99, TOFF = 95;
+  function pas(dt, st) {
+    const h = Math.min(dt, 0.05) * 12;   // timp accelerat ×12 (încălzirea durează minute)
+    st.v += ((st.motor ? st.vT : 0) - st.v) * (1 - Math.exp(-dt / 2));
+    st.rpm = st.motor ? 800 + st.v * 22 + st.sarc * 8 : 0;
+    st.Pin = st.motor ? 2.9 + 0.11 * st.v + 0.0011 * st.v * st.v + 0.12 * st.sarc + 0.0016 * st.sarc * st.v : 0;   // puterea termică în lichid [kW]
+    const xT = Math.max(0, Math.min(1, (st.Tm - T0) / DT)); st.x += (xT - st.x) * Math.min(1, h / 25);
+    if (st.motor || st.Tm > TOFF + 3) { if (st.Tm >= TON) st.fan = true; else if (st.Tm <= TOFF) st.fan = false; } else st.fan = false;
+    const md = (st.motor ? 0.22 * st.rpm / 800 : 0.02) * (0.005 + 0.995 * st.x);
+    const UA = (0.022 + 0.0075 * st.v) * (st.cli ? 0.8 : 1) + (st.fan ? 0.17 : 0);   // aerul de înaintare + ventilatorul
+    const q = md * CP * (st.Tm - st.Tr);
+    st.Tm += (st.Pin - q - 0.008 * (st.Tm - st.Ta) + (st.cli ? 0.3 : 0)) / CM * h; st.Tr += (q - UA * (st.Tr - st.Ta)) / CR * h;
+    st.Tm = Math.min(st.Tm, 126); st.Q = q; st.t += h;
+    mot.actualizeaza({ rpm: st.rpm, tps: st.sarc * 0.6, vent: st.fan, tEv: st.motor ? 300 + st.sarc * 4 : 60, racire: { Tm: st.Tm, Tr: st.Tr, x: st.x, Q: st.rpm / 4000, capVas: true } }, dt);
+  }
+  const f = (v, n = 1) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n).replace(".", ",");
+  function hud(st) {
+    return `<div><b>${f(st.v, 0)}</b> km/h · <b>${f(st.rpm, 0)}</b> rot/min</div>
+      <div>lichid motor <b>${f(st.Tm, 1)}</b> °C · ieșire radiator <b>${f(st.Tr, 1)}</b> °C</div>
+      <div>termostat deschis <b>${f(st.x * 100, 0)}</b> % · ventilator <b>${st.fan ? "PORNIT" : "oprit"}</b></div>
+      <div>putere termică <b>${f(st.Pin, 1)}</b> kW · evacuată de radiator <b>${f(st.Q, 1)}</b> kW</div>
+      <div>timp <b>${Math.floor(st.t / 60)}:${String(Math.floor(st.t % 60)).padStart(2, "0")}</b> min (accelerat ×12)</div>
+      ${st.Tm > 115 ? '<div class="v3d-blocare">● supraîncălzire</div>' : ""}`;
+  }
+  return { motor: mot, etichete: et, html, leaga, pas, hud, stare, camere: { motor: [[3.0, 1.2, 1.1], [X0, 0.5, 0]], lateral: [[X0, 0.6, 1.7], [X0, 0.5, 0]] },
+    camereButoane: [["motor", "motorul (transparent)"], ["lateral", "motor – lateral"]], cameraInitiala: [[2.9, 1.15, 1.2], [X0, 0.5, 0]] };
+}
 /* ================================================================== senzorii motorului și ai autovehiculului în mers (DA – L2) */
 function construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   ascundeContur(ctxMotor, ["motor", "cutie", "radiator"]);
