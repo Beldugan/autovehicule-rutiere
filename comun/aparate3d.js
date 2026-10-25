@@ -382,3 +382,221 @@ export function creeazaStandTemp(gazda, opt = {}) {
     vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); }
   };
 }
+
+/* ===================================================================== piese comune ale standurilor MAM (placa de test, Mega + OLED, multimetru, cronometru) */
+function materialeMAM() {
+  return { inox: mat({ color: 0xc9ced3, roughness: 0.22, metalness: 0.95 }), crom: mat({ color: 0xeef1f4, roughness: 0.12, metalness: 1 }), alama: mat({ color: 0xc9a043, roughness: 0.28, metalness: 1 }),
+    negru: mat({ color: 0x1b1d20, roughness: 0.5 }), cauciuc: mat({ color: 0x141516, roughness: 0.85 }), alb: mat({ color: 0xf2f2ee, roughness: 0.45 }), fonta: mat({ color: 0x2f3337, roughness: 0.6, metalness: 0.6 }),
+    galben: mat({ color: 0xf2b705, roughness: 0.6 }), gri: mat({ color: 0x3b3f45, roughness: 0.6 }), verde: mat({ color: 0x2e8b3e, roughness: 0.5 }), pcbT: mat({ color: 0x00878f, roughness: 0.5 }),
+    pcbR: mat({ color: 0xb71c1c, roughness: 0.5 }), pcbA: mat({ color: 0x16337a, roughness: 0.5 }), pcbV: mat({ color: 0x5b2c8f, roughness: 0.5 }), aur: mat({ color: 0xd8b25a, roughness: 0.3, metalness: 1 }),
+    albastru: mat({ color: 0x3949ab, roughness: 0.8 }), alu: mat({ color: 0xbfc5cb, roughness: 0.35, metalness: 0.9 }) };
+}
+const tubM = (pts, r, m, seg = 40) => { const o = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(v => Array.isArray(v) ? new THREE.Vector3(...v) : v)), seg, r, 8), m); o.castShadow = true; return o; };
+const sticlaM = () => new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.03, transmission: 1, thickness: 0.003, ior: 1.47, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false });
+/** placa de test cu imprimeu și puncte de test. TP: {cheie: [u, v, eticheta, culoare]}; texte: [[text, u, v]] */
+function placaTestG(sc, k_, BB, TP, texte) {
+  const BW = 0.165, BD = 0.055, K = 8000, cbb = document.createElement("canvas"); cbb.width = 1320; cbb.height = 440; const xb = cbb.getContext("2d");
+  const UV = (u, v) => [(u + BW / 2) * K, (v + BD / 2) * K];
+  xb.fillStyle = "#f3f1ea"; xb.fillRect(0, 0, 1320, 440); xb.fillStyle = "#c62828"; xb.fillRect(20, 14, 1280, 4); xb.fillStyle = "#1565c0"; xb.fillRect(20, 422, 1280, 4);
+  xb.fillStyle = "#bdb8ad"; for (let i = 0; i < 60; i++) { for (let j = 0; j < 2; j++) { xb.fillRect(30 + i * 21, 26 + j * 18, 8, 8); xb.fillRect(30 + i * 21, 384 + j * 18, 8, 8); } for (let j = 0; j < 10; j++) xb.fillRect(30 + i * 21, 90 + j * 26 + (j > 4 ? 20 : 0), 8, 8); }
+  xb.font = "bold 26px system-ui"; xb.fillStyle = "#222"; xb.textAlign = "center";
+  Object.values(TP).forEach(([u, v, et]) => { const [x, y] = UV(u, v); xb.fillText(et, x, y + (v > 0.01 ? 52 : -30)); });
+  xb.font = "22px system-ui"; (texte || []).forEach(([t, u, v]) => xb.fillText(t, ...UV(u, v)));
+  const tbb = new THREE.CanvasTexture(cbb); tbb.colorSpace = THREE.SRGBColorSpace; tbb.anisotropy = 8;
+  const p = add(sc, new THREE.Mesh(new RoundedBoxGeometry(BW, 0.009, BD, 2, 0.002), mat({ color: 0xf3f1ea, roughness: 0.7 }))); p.position.copy(BB).setY(0.0045); k_(p, "bb", "Placa de test");
+  const s = add(sc, new THREE.Mesh(new THREE.PlaneGeometry(BW - 0.002, BD - 0.002), mat({ map: tbb, roughness: 0.7 }))); s.rotation.x = -Math.PI / 2; s.position.copy(BB).setY(0.0092);
+  const W = (u, v, y = 0) => new THREE.Vector3(BB.x + u, 0.0092 + y, BB.z + v), TPW = {}, crom = mat({ color: 0xeef1f4, roughness: 0.12, metalness: 1 });
+  Object.entries(TP).forEach(([k, [u, v, et, c]]) => { cyl(sc, 0.0018, 0.0022, 0.006, mat({ color: c, roughness: 0.4 }), ...W(u, v, 0.003).toArray(), 16);
+    const b = add(sc, new THREE.Mesh(new THREE.TorusGeometry(0.0022, 0.0006, 8, 20), crom)); b.position.copy(W(u, v, 0.0085)); b.rotation.y = 0.6;
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 10, 8), new THREE.MeshBasicMaterial({ visible: false })); h.position.copy(W(u, v, 0.007)); sc.add(h); k_(h, k, et); TPW[k] = W(u, v, 0.009); });
+  return { W, TPW };
+}
+/** Arduino Mega 2560 cu OLED pe suport de acril; întoarce actualizatorul */
+function megaOledG(sc, k_, M, pos, posO) {
+  const MG = new THREE.Group(); MG.position.copy(pos); sc.add(MG);
+  const pm = add(MG, new THREE.Mesh(new RoundedBoxGeometry(0.1016, 0.0016, 0.0533, 1, 0.0008), M.pcbT)); pm.position.y = 0.008; k_(pm, "mega", "Arduino Mega 2560");
+  [[-0.045, -0.022], [0.045, -0.022], [-0.045, 0.022], [0.045, 0.022]].forEach(([x, z]) => cyl(MG, 0.0018, 0.0018, 0.008, mat({ color: 0xdddddd, roughness: 0.4 }), x, 0.004, z, 10));
+  add(MG, new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.011, 0.012), M.crom)).position.set(-0.05, 0.0145, -0.008);
+  add(MG, new THREE.Mesh(new THREE.BoxGeometry(0.013, 0.011, 0.009), M.negru)).position.set(-0.049, 0.0145, 0.016);
+  const chip = add(MG, new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.0014, 0.014), M.negru)); chip.position.set(0.012, 0.0095, 0.002); chip.rotation.y = Math.PI / 4;
+  [[0.0, -0.0245, 0.072], [-0.004, 0.0245, 0.07]].forEach(([x, z, l]) => add(MG, new THREE.Mesh(new THREE.BoxGeometry(l, 0.0085, 0.0025), M.negru)).position.set(x, 0.0132, z));
+  add(MG, new THREE.Mesh(new THREE.BoxGeometry(0.0052, 0.0085, 0.044), M.negru)).position.set(0.046, 0.0132, 0.0);
+  const led = (z, c) => cyl(MG, 0.0009, 0.0009, 0.001, new THREE.MeshBasicMaterial({ color: c }), -0.032, 0.0092, z, 8);
+  const ledON = led(-0.012, 0x113311), ledL = led(-0.016, 0x332a11), ledTX = led(-0.008, 0x332a11);
+  k_(cyl(MG, 0.002, 0.002, 0.003, mat({ color: 0xc62828, roughness: 0.4 }), -0.04, 0.0105, -0.02, 12), "rst", "Butonul RESET");
+  sc.add(tubM([[pos.x - 0.058, 0.0145, pos.z - 0.008], [pos.x - 0.1, 0.02, pos.z - 0.04], [pos.x - 0.16, 0.004, pos.z - 0.19], [pos.x - 0.2, 0.003, -0.34]], 0.0022, M.negru, 30));
+  const OL = new THREE.Group(); OL.position.copy(posO); OL.rotation.y = -0.25; sc.add(OL); const st = sticlaM();
+  add(OL, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.004, 0.03), st)).position.y = 0.002;
+  const pol = add(OL, new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.0025), st)); pol.position.set(0, 0.027, -0.004); pol.rotation.x = -0.25;
+  const OM = new THREE.Group(); OM.position.set(0, 0.034, -0.0015); OM.rotation.x = -0.25; OL.add(OM); OM.scale.setScalar(1.3);
+  k_(add(OM, new THREE.Mesh(new THREE.BoxGeometry(0.027, 0.0276, 0.0016), M.pcbA)), "oled", "Afișaj OLED SSD1306");
+  const eO = ecran(256, 128); add(OM, new THREE.Mesh(new THREE.PlaneGeometry(0.0245, 0.0125), new THREE.MeshBasicMaterial({ map: eO.t }))).position.set(0, -0.001, 0.0009);
+  [0, 1, 2, 3].forEach(i => add(OM, new THREE.Mesh(new THREE.BoxGeometry(0.0012, 0.004, 0.0012), M.aur)).position.set(-0.0038 + i * 0.00254, 0.0145, 0.0005));
+  const hdr = (x, z) => new THREE.Vector3(pos.x + x, 0.018, pos.z + z);
+  const jump = (a, b, c) => { const mid = a.clone().lerp(b, 0.5); mid.y = Math.max(a.y, b.y) + 0.025; sc.add(tubM([a, mid, b], 0.0009, mat({ color: c, roughness: 0.5 }), 24)); };
+  [0x222222, 0xe53935, 0x1e88e5, 0x43a047].forEach((c, i) => jump(new THREE.Vector3(posO.x - 0.004 + i * 0.003, 0.055, posO.z - 0.002), hdr(0.025 + i * 0.003, -0.0245), c));
+  let ult = "";
+  return { hdr, jump,
+    seteaza(V) {
+      ledON.material.color.set(V.run ? 0x3cff4a : 0x113311); ledL.material.color.set(V.rec ? 0xffd04a : 0x332a11); ledTX.material.color.set(V.tx ? 0xffd04a : 0x332a11);
+      const k = JSON.stringify([V.run, V.oled]); if (k === ult) return; ult = k;
+      const { x, c } = eO; x.fillStyle = "#050608"; x.fillRect(0, 0, c.width, c.height);
+      if (V.run) { x.font = "bold 17px 'Courier New',monospace"; x.fillStyle = "#ffd400"; x.textAlign = "left"; x.fillText(V.oled ? V.oled.titlu : "", 6, 18);
+        x.fillStyle = "#5fd3ff"; x.font = "bold 22px 'Courier New',monospace"; (V.oled ? V.oled.linii : ["pornire…"]).forEach((l, i) => x.fillText(l, 6, 46 + i * 23)); }
+      eO.t.needsUpdate = true;
+    } };
+}
+/** multimetrul cu sondele care se așază pe punctele de test */
+function multimetruG(sc, k_, M, TPW, pos, rot, loc) {
+  const DM = new THREE.Group(); DM.position.copy(pos); DM.rotation.set(...rot); sc.add(DM);
+  k_(add(DM, new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.17, 0.035, 4, 0.01), M.galben)), "dmm", "Multimetru"); k_(add(DM, new THREE.Mesh(new RoundedBoxGeometry(0.072, 0.155, 0.006, 3, 0.006), M.gri)), "dmm", "Multimetru").position.z = 0.016;
+  const eD = ecran(320, 128); add(DM, new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.024), new THREE.MeshBasicMaterial({ map: eD.t }))).position.set(0, 0.052, 0.0195);
+  const kn = cyl(DM, 0.019, 0.02, 0.008, M.negru, 0, -0.008, 0.022, 32); kn.rotation.x = Math.PI / 2; k_(kn, "dmmKnob", "Comutatorul rotativ (clic = OFF → V⎓ → Ω)");
+  add(kn, new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.009, 0.018), M.galben)).position.set(0, 0.0045, 0.006);
+  const cD = document.createElement("canvas"); cD.width = 256; cD.height = 256; { const x = cD.getContext("2d"); x.fillStyle = "#3b3f45"; x.fillRect(0, 0, 256, 256); x.fillStyle = "#fff"; x.font = "bold 28px system-ui"; x.textAlign = "center"; [["OFF", -60], ["V⎓", 0], ["Ω", 60]].forEach(([t, a]) => x.fillText(t, 128 + 100 * Math.sin(a * Math.PI / 180), 140 - 100 * Math.cos(a * Math.PI / 180))); }
+  const tD = new THREE.CanvasTexture(cD); tD.colorSpace = THREE.SRGBColorSpace; add(DM, new THREE.Mesh(new THREE.PlaneGeometry(0.068, 0.068), new THREE.MeshBasicMaterial({ map: tD, transparent: true }))).position.set(0, -0.008, 0.0192);
+  const bR = cyl(DM, 0.0045, 0.0045, 0.004, mat({ color: 0xd32f2f, roughness: 0.4 }), 0.02, -0.06, 0.02, 16), bN = cyl(DM, 0.0045, 0.0045, 0.004, M.negru, -0.02, -0.06, 0.02, 16); bR.rotation.x = bN.rotation.x = Math.PI / 2;
+  const sonda = cul => { const G = new THREE.Group(); sc.add(G); cyl(G, 0.0006, 0.0006, 0.018, M.crom, 0, 0.009, 0, 8); cyl(G, 0.0032, 0.0032, 0.05, mat({ color: cul, roughness: 0.5 }), 0, 0.045, 0, 16); cyl(G, 0.0045, 0.0045, 0.004, mat({ color: cul, roughness: 0.5 }), 0, 0.022, 0, 16); return G; };
+  const sR = sonda(0xd32f2f), sN = sonda(0x1b1d20); let fR = null, fN = null;
+  function sonde(r, b) {
+    sc.updateMatrixWorld(true);
+    const pune = (G, k, l, bor, fir, cul) => { const p = TPW[k] || l; G.position.copy(p); G.rotation.set(TPW[k] ? 0 : Math.PI / 2, 0, TPW[k] ? 0.15 : 0.4);
+      if (fir) { sc.remove(fir); fir.geometry.dispose(); }
+      const a = bor.getWorldPosition(new THREE.Vector3()), top = TPW[k] ? p.clone().add(new THREE.Vector3(-0.0105, 0.069, 0)) : p.clone().add(new THREE.Vector3(0.0, 0.004, -0.04));
+      const m = new THREE.Vector3((a.x + top.x) / 2, 0.004, Math.max(a.z, top.z) + 0.05);
+      const f = tubM([a, a.clone().add(new THREE.Vector3(0, -0.012, 0.02)), m, top.clone().add(new THREE.Vector3(0.01, 0.02, 0.02)), top], 0.0012, mat({ color: cul, roughness: 0.6 }), 48); sc.add(f); return f; };
+    fR = pune(sR, r, loc[0], bR, fR, 0xd32f2f); fN = pune(sN, b, loc[1], bN, fN, 0x1b1d20);
+  }
+  let ult = "", ultS = "";
+  return { seteaza(d) {
+    kn.rotation.y = { OFF: 1.05, V: 0, R: -1.05 }[d.mod];
+    const k = d.mod + d.txt + d.u; if (k !== ult) { ult = k; const { x, c } = eD; x.fillStyle = "#bfd0b0"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1d2414";
+      if (d.mod !== "OFF") { x.font = "bold 74px 'Courier New',monospace"; x.textAlign = "right"; x.fillText(d.txt, 290, 92); x.font = "bold 22px system-ui"; x.fillText(d.u, 300, 120); x.textAlign = "left"; x.fillText("AUTO", 10, 26); }
+      eD.t.needsUpdate = true; }
+    const ks = d.r + "|" + d.b; if (ks !== ultS) { ultS = ks; sonde(d.r, d.b); }
+  } };
+}
+function ceasG(sc, k_, M, pos, roty) {
+  const CS = new THREE.Group(); CS.position.copy(pos); CS.rotation.y = roty; sc.add(CS);
+  k_(add(CS, new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.06, 0.03, 3, 0.006), M.gri)), "ceas", "Cronometru de laborator").position.y = 0.03;
+  const eC = ecran(320, 160); add(CS, new THREE.Mesh(new THREE.PlaneGeometry(0.078, 0.039), new THREE.MeshBasicMaterial({ map: eC.t }))).position.set(0, 0.032, 0.0155);
+  let ult = "";
+  return { seteaza(t, p) { if (ult === t + p) return; ult = t + p; const { x, c } = eC; x.fillStyle = "#0f1a12"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#7dff8a"; x.font = "bold 76px 'Courier New',monospace"; x.textAlign = "center"; x.fillText(t, 160, 86); x.font = "20px system-ui"; x.fillStyle = "#ddd"; x.fillText(p, 160, 130); eC.t.needsUpdate = true; } };
+}
+/** interacțiunea comună: clic pe obiectele marcate și eticheta la trecerea mouse-ului */
+function interactiune(S, clic, laClic) {
+  const tip = document.createElement("div"); tip.className = "a3d-tip"; tip.hidden = true; S.cont.appendChild(tip);
+  const rc = new THREE.Raycaster(), mp = new THREE.Vector2(); let jos = null;
+  const tinta = e => { const r = S.canvas.getBoundingClientRect(); mp.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); rc.setFromCamera(mp, S.camera); const h = rc.intersectObjects(clic, false)[0]; return h ? h.object : null; };
+  S.canvas.addEventListener("pointerdown", e => { jos = [e.clientX, e.clientY]; });
+  S.canvas.addEventListener("pointerup", e => { if (!jos || Math.hypot(e.clientX - jos[0], e.clientY - jos[1]) > 5) return; const o = tinta(e); if (o && laClic) laClic(o.userData.k, e); });
+  S.canvas.addEventListener("pointermove", e => { if (e.buttons) { tip.hidden = true; return; } const o = tinta(e); S.canvas.style.cursor = o ? "pointer" : "";
+    if (o) { const r = S.cont.getBoundingClientRect(); tip.textContent = o.userData.et; tip.style.left = (e.clientX - r.left + 14) + "px"; tip.style.top = (e.clientY - r.top + 10) + "px"; tip.hidden = false; } else tip.hidden = true; });
+  S.canvas.addEventListener("pointerleave", () => { tip.hidden = true; });
+}
+
+/* ===================================================================== MAM I L5: standul de calibrare a senzorului MAP
+   Pompa manuală de vid/presiune cu manometru (selector, mâner, supapa de eliberare lentă și butonul de eliberare rapidă), furtunurile
+   de 6 mm cu coliere, teul de alamă, manometrul etalon digital pe suport, senzorul MAP pe colțarul de aluminiu cu mufa, placa de test cu
+   BMP280 și punctele de test, Arduino Mega cu OLED, multimetrul, ochelarii de protecție și cronometrul. */
+export function creeazaStandMAP(gazda, opt = {}) {
+  const S = scena(gazda, [0.02, 0.4, 0.82], [-0.02, 0.07, 0.0]), sc = S.scene; S.ctl.maxDistance = 1.5; S.ctl.minDistance = 0.08;
+  const M = materialeMAM(), clic = [], k_ = (o, k, et) => { o.userData.k = k; o.userData.et = et; clic.push(o); return o; };
+  const furt = new THREE.MeshPhysicalMaterial({ color: 0xd8eef7, roughness: 0.25, transmission: 0.55, thickness: 0.002, transparent: true, opacity: 0.85 });
+  /* ---- pompa manuală (tip pistol), culcată pe masă, cu manometrul cu fața în sus */
+  const PP = new THREE.Group(); PP.position.set(-0.37, 0, 0.07); PP.rotation.y = 0.35; sc.add(PP);
+  const corp = add(PP, new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.1, 6, 20), mat({ color: 0xc62828, roughness: 0.45 }))); corp.rotation.z = Math.PI / 2; corp.position.set(0, 0.017, 0); k_(corp, "pompa", "Pompa manuală (clic = o cursă)");
+  const maner = add(PP, new THREE.Mesh(new RoundedBoxGeometry(0.024, 0.02, 0.1, 3, 0.008), mat({ color: 0x2b2f35, roughness: 0.7 }))); maner.geometry.translate(0, 0, 0.05); maner.position.set(-0.045, 0.011, 0.01); maner.rotation.y = 0.25; k_(maner, "pompa", "Pompa manuală (clic = o cursă)");
+  const tragaci = add(PP, new THREE.Mesh(new RoundedBoxGeometry(0.018, 0.016, 0.095, 3, 0.006), mat({ color: 0x455a64, roughness: 0.6 }))); tragaci.geometry.translate(0, 0, 0.047); tragaci.position.set(0.0, 0.009, 0.012); k_(tragaci, "pompa", "Pompa manuală (clic = o cursă)");
+  const sel = add(PP, new THREE.Mesh(new RoundedBoxGeometry(0.012, 0.008, 0.012, 2, 0.002), mat({ color: 0xf2b705, roughness: 0.4 }))); sel.position.set(-0.03, 0.035, 0); k_(sel, "selector", "Selectorul vid / presiune");
+  const sup = cyl(PP, 0.0045, 0.0045, 0.01, M.crom, 0.035, 0.034, 0.0, 16); k_(sup, "lent", "Supapa de eliberare lentă (clic = deschide / închide)");
+  const rap = cyl(PP, 0.006, 0.006, 0.006, mat({ color: 0x1565c0, roughness: 0.4 }), 0.012, 0.035, 0.0, 16); k_(rap, "rapid", "Butonul de eliberare rapidă");
+  const MP = new THREE.Group(); MP.position.set(0.09, 0.017, 0.0); PP.add(MP);
+  k_(cyl(MP, 0.028, 0.028, 0.016, M.crom, 0, 0, 0, 40), "pompa", "Manometrul pompei (bar, relativ)");
+  const eP = ecran(256, 256), fp = add(MP, new THREE.Mesh(new THREE.CircleGeometry(0.025, 40), new THREE.MeshBasicMaterial({ map: eP.t }))); fp.rotation.x = -Math.PI / 2; fp.position.y = 0.0082;
+  cyl(MP, 0.0045, 0.0045, 0.014, M.alama, 0.034, -0.004, 0, 12).rotation.z = Math.PI / 2;
+  /* ---- teul de alamă, manometrul etalon, senzorul MAP */
+  const TE = new THREE.Vector3(-0.2, 0.012, 0.06);
+  const tee = new THREE.Group(); tee.position.copy(TE); sc.add(tee);
+  cyl(tee, 0.005, 0.005, 0.03, M.alama, 0, 0, 0, 16).rotation.z = Math.PI / 2; cyl(tee, 0.005, 0.005, 0.016, M.alama, 0, 0, -0.008, 16).rotation.x = Math.PI / 2;
+  k_(tee.children[0], "tee", "Teu de alamă");
+  // manometrul etalon digital pe suport
+  const ME = new THREE.Group(); ME.position.set(-0.2, 0, -0.1); ME.rotation.y = 0.15; sc.add(ME);
+  add(ME, new THREE.Mesh(new RoundedBoxGeometry(0.06, 0.012, 0.05, 2, 0.003), M.fonta)).position.y = 0.006;
+  cyl(ME, 0.004, 0.004, 0.08, M.crom, 0, 0.05, -0.01, 12);
+  const MEc = new THREE.Group(); MEc.position.set(0, 0.11, 0.0); MEc.rotation.x = -0.25; ME.add(MEc);
+  k_(cyl(MEc, 0.04, 0.04, 0.025, mat({ color: 0x37474f, roughness: 0.5 }), 0, 0, 0, 48), "etalon", "Manometrul etalon digital (presiune relativă)").rotation.x = Math.PI / 2;
+  const eM = ecran(320, 160); add(MEc, new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.025), new THREE.MeshBasicMaterial({ map: eM.t }))).position.set(0, 0.006, 0.0128);
+  [[-0.012, -0.022], [0.012, -0.022]].forEach(([x, y]) => cyl(MEc, 0.004, 0.004, 0.004, mat({ color: 0x90a4ae, roughness: 0.5 }), x, y, 0.013, 16).rotation.x = Math.PI / 2);
+  cyl(MEc, 0.005, 0.005, 0.02, M.alama, 0, -0.045, 0, 12);
+  // senzorul MAP pe colțar
+  const MS = new THREE.Group(); MS.position.set(-0.07, 0, 0.04); sc.add(MS);
+  add(MS, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.003, 0.04), M.alu)).position.y = 0.0015; add(MS, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.003), M.alu)).position.set(0, 0.025, -0.0185);
+  const cs = add(MS, new THREE.Mesh(new RoundedBoxGeometry(0.036, 0.03, 0.022, 3, 0.004), M.negru)); cs.position.set(0, 0.03, -0.006); k_(cs, "map", "Senzorul MAP (2,5 bar abs.)");
+  const ure = add(MS, new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.012, 0.004, 2, 0.002), M.negru)); ure.position.set(0, 0.03, -0.0165);
+  [-0.02, 0.02].forEach(x => cyl(MS, 0.0025, 0.0025, 0.006, M.crom, x, 0.03, -0.016, 12).rotation.x = Math.PI / 2);
+  const nip = cyl(MS, 0.003, 0.0035, 0.016, M.negru, -0.026, 0.025, -0.006, 16); nip.rotation.z = Math.PI / 2;
+  const muf = add(MS, new THREE.Mesh(new RoundedBoxGeometry(0.016, 0.014, 0.012, 2, 0.002), mat({ color: 0x5d4037, roughness: 0.6 }))); muf.position.set(0.024, 0.033, -0.006);
+  const NIP = new THREE.Vector3(MS.position.x - 0.034, 0.025, MS.position.z - 0.006);
+  /* ---- furtunurile și colierele */
+  const capPompa = () => { sc.updateMatrixWorld(true); return MP.localToWorld(new THREE.Vector3(0.041, -0.004, 0)); };
+  const fur = [];
+  function furtunuri(desprins) {
+    fur.forEach(f => { sc.remove(f); f.geometry.dispose(); }); fur.length = 0;
+    const a = capPompa(), tL = TE.clone().add(new THREE.Vector3(-0.015, 0, 0)), tR = TE.clone().add(new THREE.Vector3(0.015, 0, 0)), tB = TE.clone().add(new THREE.Vector3(0, 0, -0.016));
+    const meIn = ME.localToWorld(new THREE.Vector3(0, 0.11 - 0.055, 0));
+    const lin = (p, q, off, d) => { const end = d ? q.clone().add(new THREE.Vector3(0.012, 0.0, 0.014)) : q; const m = p.clone().lerp(end, 0.5).add(off); const f = tubM([p, m, end], 0.0032, furt, 40); sc.add(f); fur.push(f); };
+    lin(a, tL, new THREE.Vector3(0, 0.01, 0.04), desprins === 0); lin(tR, NIP, new THREE.Vector3(0, 0.012, 0.0), desprins === 1); lin(tB, meIn, new THREE.Vector3(0, 0.03, 0.0), desprins === 2);
+  }
+  const coliere = [TE.clone().add(new THREE.Vector3(-0.022, 0, 0)), NIP.clone().add(new THREE.Vector3(-0.004, 0, 0)), TE.clone().add(new THREE.Vector3(0, 0, -0.024))].map((p, i) => {
+    const c = add(sc, new THREE.Mesh(new THREE.TorusGeometry(0.0048, 0.0011, 8, 24), M.inox)); c.position.copy(p); c.rotation.y = i === 2 ? 0 : Math.PI / 2; k_(c, "colier" + i, "Colier (clic = strânge / slăbește)");
+    const s = add(c, new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.004, 0.004), M.inox)); s.position.set(0, 0.0055, 0); return c; });
+  /* ---- placa de test, BMP280, Mega + OLED, multimetrul, cronometrul, ochelarii */
+  const TP = { tU: [-0.03, -0.012, "TP U MAP (A0)", 0x43a047], t5V: [-0.072, -0.016, "TP 5V", 0xc62828], tGND: [-0.05, 0.018, "TP GND", 0x111111] };
+  const { W, TPW } = placaTestG(sc, k_, new THREE.Vector3(0.1, 0, 0.09), TP, [["MAP: +5V GND U", -0.06, 0.004], ["BMP280 (I²C 0x76)", 0.045, -0.014]]);
+  const bmp = add(sc, new THREE.Mesh(new RoundedBoxGeometry(0.015, 0.0016, 0.012, 1, 0.0005), M.pcbV)); bmp.position.copy(W(0.045, 0.006, 0.006)); k_(bmp, "bmp", "Modul BMP280 (presiune atmosferică și temperatură)");
+  add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.0025, 0.001, 0.002), mat({ color: 0xbfc5cb, metalness: 0.8, roughness: 0.3 }))).position.copy(W(0.047, 0.006, 0.0075));
+  add(sc, new THREE.Mesh(new RoundedBoxGeometry(0.009, 0.007, 0.004, 1, 0.001), M.negru)).position.copy(W(-0.06, -0.006, 0.0035));
+  // cablul senzorului (3 fire) de la mufă la placă
+  const mufW = MS.localToWorld(new THREE.Vector3(0.032, 0.033, -0.006)); [0xc62828, 0x222222, 0x43a047].forEach((c, i) => sc.add(tubM([mufW.clone().add(new THREE.Vector3(0, 0, (i - 1) * 0.003)), mufW.clone().add(new THREE.Vector3(0.03, 0.01, 0.02)), W(-0.06 + (i - 1) * 0.0025, -0.006, 0.006)], 0.0009, mat({ color: c, roughness: 0.5 }), 24)));
+  const MGo = megaOledG(sc, k_, M, new THREE.Vector3(0.1, 0, -0.06), new THREE.Vector3(0.205, 0, -0.07));
+  MGo.jump(W(-0.03, -0.012, 0.004), MGo.hdr(0.006, 0.0245), 0x43a047); MGo.jump(W(-0.08, -0.024, 0.002), MGo.hdr(-0.016, 0.0245), 0xe53935); MGo.jump(W(-0.08, 0.024, 0.002), MGo.hdr(-0.012, 0.0245), 0x222222);
+  MGo.jump(W(0.045, 0.0, 0.004), MGo.hdr(0.03, -0.0245), 0x1e88e5); MGo.jump(W(0.048, 0.0, 0.004), MGo.hdr(0.033, -0.0245), 0xfdd835);
+  const DMo = multimetruG(sc, k_, M, TPW, new THREE.Vector3(0.3, 0.03, 0.06), [-1.05, -0.3, 0], [new THREE.Vector3(0.26, 0.003, 0.2), new THREE.Vector3(0.24, 0.003, 0.21)]);
+  const CSo = ceasG(sc, k_, M, new THREE.Vector3(0.34, 0, -0.16), -0.4);
+  const OC = new THREE.Group(); OC.position.set(-0.05, 0.008, 0.22); OC.rotation.y = 0.3; sc.add(OC);
+  const lentila = new THREE.MeshPhysicalMaterial({ color: 0xe8f4ff, roughness: 0.05, transmission: 0.9, thickness: 0.002, transparent: true, opacity: 0.45 });
+  k_(add(OC, new THREE.Mesh(new RoundedBoxGeometry(0.15, 0.045, 0.004, 3, 0.012), lentila)), "ochelari", "Ochelari de protecție (clic = îi purtați)").rotation.x = -Math.PI / 2 + 0.25;
+  add(OC, new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.004, 0.006), mat({ color: 0x263238, roughness: 0.6 }))).position.set(0, 0.012, -0.006);
+  [-1, 1].forEach(s => { const b = add(OC, new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.004, 0.13), mat({ color: 0x263238, roughness: 0.6 }))); b.position.set(s * 0.074, 0.006, -0.07); });
+  interactiune(S, clic, opt.laClic);
+  /* ---- starea */
+  const V = { prel: 0, etalon: "0.0", mod: "vid", lent: false, coliere: [true, true, true], desprins: -1, ochelari: false, run: false, rec: false, tx: false, oled: null, dmm: { mod: "OFF", txt: "", u: "", r: "nc", b: "nc" }, ceas: "00:00", ceasP: "" };
+  let ultF = null, anim = 0, ultM = "", ultP = "";
+  function cadranPompa(prel) {
+    const { x, c } = eP, R = c.width / 2; x.fillStyle = "#fbfbf7"; x.beginPath(); x.arc(R, R, R, 0, Math.PI * 2); x.fill();
+    const A = v => (-225 + (v + 1) / 3 * 270) * Math.PI / 180;      // −1…+2 bar pe 270°
+    x.lineWidth = 8; x.strokeStyle = "#c62828"; x.beginPath(); x.arc(R, R, R - 14, A(-1), A(0)); x.stroke(); x.strokeStyle = "#1565c0"; x.beginPath(); x.arc(R, R, R - 14, A(0), A(2)); x.stroke();
+    for (let v = -1; v <= 2.0001; v += 0.1) { const a = A(v), l = Math.abs(v * 10 - Math.round(v)* 10) < 0.01 ? 22 : Math.abs(v * 10 % 5) < 0.01 ? 15 : 9; x.strokeStyle = "#111"; x.lineWidth = l > 20 ? 3 : 1.5; x.beginPath(); x.moveTo(R + Math.cos(a) * (R - 22), R + Math.sin(a) * (R - 22)); x.lineTo(R + Math.cos(a) * (R - 22 - l), R + Math.sin(a) * (R - 22 - l)); x.stroke(); }
+    x.fillStyle = "#111"; x.font = "bold 24px system-ui"; x.textAlign = "center"; x.textBaseline = "middle"; [-1, 0, 1, 2].forEach(v => { const a = A(v); x.fillText(String(v), R + Math.cos(a) * (R - 66), R + Math.sin(a) * (R - 66)); });
+    x.font = "16px system-ui"; x.fillText("bar", R, R + 46); x.fillText("vid  |  presiune", R, R + 70);
+    const a = A(Math.max(-1, Math.min(2.05, prel / 100))); x.strokeStyle = "#111"; x.lineWidth = 5; x.beginPath(); x.moveTo(R - Math.cos(a) * 20, R - Math.sin(a) * 20); x.lineTo(R + Math.cos(a) * (R - 30), R + Math.sin(a) * (R - 30)); x.stroke();
+    x.fillStyle = "#c62828"; x.beginPath(); x.arc(R, R, 10, 0, Math.PI * 2); x.fill(); eP.t.needsUpdate = true;
+  }
+  S.porneste(dt => {
+    if (anim > 0) { anim = Math.max(0, anim - dt); const f = Math.sin(anim / 0.35 * Math.PI); tragaci.rotation.y = 0.22 * f; }
+    const kf = V.desprins; if (kf !== ultF) { ultF = kf; furtunuri(kf); }
+    V.coliere.forEach((s, i) => { coliere[i].material = s ? M.inox : mat({ color: 0xff7043, roughness: 0.4, emissive: 0x5a1a00 }); coliere[i].scale.setScalar(s ? 1 : 1.35); });
+    sel.position.x = V.mod === "vid" ? -0.034 : -0.024; sel.material.color.set(V.mod === "vid" ? 0xf2b705 : 0x42a5f5);
+    sup.position.y = V.lent ? 0.039 : 0.034;
+    OC.visible = !V.ochelari;
+    const pk = V.prel.toFixed(1); if (pk !== ultP) { ultP = pk; cadranPompa(V.prel); }
+    if (ultM !== V.etalon) { ultM = V.etalon; const { x, c } = eM; x.fillStyle = "#c9d6c0"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1d2414"; x.font = "bold 92px 'Courier New',monospace"; x.textAlign = "right"; x.fillText(V.etalon, 300, 112); x.font = "bold 22px system-ui"; x.textAlign = "left"; x.fillText("kPa  REL", 10, 28); eM.t.needsUpdate = true; }
+    MGo.seteaza(V); DMo.seteaza(V.dmm); CSo.seteaza(V.ceas, V.ceasP);
+  });
+  return {
+    seteaza(o) { Object.assign(V, o); if (o.dmm) V.dmm = { ...o.dmm }; if (o.coliere) V.coliere = o.coliere.slice(); },
+    cursa() { anim = 0.35; },
+    vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); }
+  };
+}
