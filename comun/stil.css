@@ -365,6 +365,8 @@ table.x431 td:first-child { text-align: left; }
 .m3d-eticheta::before { content: ""; position: absolute; left: -.38rem; bottom: calc(-.5rem - var(--dy, 0px)); width: .36rem; height: .36rem; border-radius: 50%; background: #ffcf4d; box-shadow: 0 0 0 2px rgba(14, 22, 32, .6); }
 .m3d-vederi { position: absolute; left: .5rem; bottom: .5rem; display: flex; flex-wrap: wrap; gap: .25rem; max-width: calc(100% - 1rem); }
 .m3d-vederi button { font-size: .72rem; padding: .18rem .45rem; background: rgba(255, 255, 255, .85); color: #10161b; border: 1px solid #9aa6b1; border-radius: 6px; }
+.m3d-vederi button.activ { background: #ffb020; color: #1b1300; border-color: #a86f00; }
+.m3d-sep { width: .6rem; }
 .m3d-ajutor { position: absolute; right: .5rem; top: .5rem; font-size: .7rem; color: #fff; background: rgba(14, 22, 32, .55); padding: .12rem .45rem; border-radius: 6px; pointer-events: none; }
 @media (max-width: 640px) { .m3d-ajutor { display: none; } }
 .v3d-scena canvas.v3d-osc { position: absolute; right: .6rem; bottom: 2.2rem; width: 330px; height: 170px; border-radius: 8px; border: 1px solid rgba(160, 230, 190, .35); pointer-events: none; }

@@ -84,21 +84,17 @@ function svgGauge(P, cx, cy, r, max, val, o = {}) {
   if (o.et) s += `<text x="${cx}" y="${cy + r + 24}" font-size="10.5" text-anchor="middle" fill="${o.culEt || "currentColor"}" font-weight="600">${o.et}</text>`;
   return s;
 }
-function cilindriSVG(P, sel, opt = {}) {   // chiulasa K7J văzută de sus (capacul culbutorilor, puțurile bujiilor)
-  let s = `<g filter="url(#${P}-umbra)"><path d="M14,30 Q14,16 30,16 L412,16 Q428,16 428,30 L428,126 Q428,140 412,140 L30,140 Q14,140 14,126z" fill="url(#${P}-capac)" stroke="#1d2024"/></g>`;
-  for (let k = 0; k < 13; k++) s += `<path d="M${40 + k * 28},24 v8 M${40 + k * 28},124 v8" stroke="#6c737a" stroke-width="3" stroke-linecap="round"/>`;
-  s += `<rect x="370" y="40" width="44" height="22" rx="5" fill="#202328"/><circle cx="392" cy="51" r="7" fill="#c9a227" stroke="#7a5c00"/><text x="392" y="74" font-size="7.5" text-anchor="middle" fill="#cfd5db">bușon ulei</text>`;
+function cilindriSVG(P, sel, opt = {}) {   // alegerea cilindrului (motorul și racordul se văd pe macheta 3D de mai sus)
+  let s = `<text x="220" y="26" font-size="11" text-anchor="middle" fill="currentColor" font-weight="700">Cilindrul testat (clic aici sau pe puțul bujiei din macheta 3D)</text>`;
   for (let c = 1; c <= 4; c++) {
-    const x = 20 + c * 76, act = c === sel;
-    s += `<g class="cil" data-cil="${c}" style="cursor:pointer"><circle cx="${x}" cy="78" r="27" fill="${act ? "#5b4a1a" : "#22262b"}" stroke="${act ? "#ffb300" : "#111"}" stroke-width="${act ? 3 : 1.5}"/><circle cx="${x}" cy="78" r="19" fill="#0d0f11"/>
-      <text x="${x}" y="44" font-size="10.5" text-anchor="middle" fill="${act ? "#ffd36b" : "#e6ebf0"}" font-weight="700">cil. ${c}</text>`;
-    if (!sim.bujii) s += `<path d="M${x - 8},70 l8,-5 l8,5 v10 l-8,5 l-8,-5z" fill="#c4cad0" stroke="#555"/><circle cx="${x}" cy="75" r="5" fill="#f2efe6" stroke="#999"/><rect x="${x - 3}" y="52" width="6" height="18" rx="2" fill="#f2efe6" stroke="#999"/><rect x="${x - 4}" y="48" width="8" height="5" rx="1" fill="#9aa1a8"/>`;
-    else s += `<circle cx="${x}" cy="78" r="8" fill="#000" stroke="#7a828a" stroke-dasharray="1.5 1.5"/>`;
-    if (opt.ulei && sim.comp.ulei[c - 1]) s += `<circle cx="${x}" cy="78" r="6" fill="#c9a227" opacity=".85"/><text x="${x}" y="118" font-size="8" text-anchor="middle" fill="#ffd36b">ulei</text>`;
-    if (opt.furtun === c) s += `<path d="M${x},78 C${x},190 ${opt.fx - 60},${opt.fy + 60} ${opt.fx},${opt.fy}" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/><path d="M${x},78 C${x},190 ${opt.fx - 60},${opt.fy + 60} ${opt.fx},${opt.fy}" fill="none" stroke="#3a3f45" stroke-width="2" stroke-dasharray="2 6"/><circle cx="${x}" cy="78" r="10" fill="url(#${P}-alama)" stroke="#6b5214"/><path d="M${x - 6},78 h12 M${x},72 v12" stroke="#6b5214"/>`;
+    const x = 20 + c * 82, act = c === sel;
+    s += `<g class="cil" data-cil="${c}" style="cursor:pointer"><rect x="${x - 34}" y="40" width="68" height="62" rx="10" fill="${act ? "#5b4a1a" : "#22262b"}" stroke="${act ? "#ffb300" : "#111"}" stroke-width="${act ? 3 : 1.5}"/>
+      <text x="${x}" y="64" font-size="13" text-anchor="middle" fill="${act ? "#ffd36b" : "#e6ebf0"}" font-weight="700">cil. ${c}</text>
+      <text x="${x}" y="84" font-size="9" text-anchor="middle" fill="#cfd5db">${sim.bujii ? "bujia scoasă" : "bujia montată"}</text>`;
+    if (opt.ulei && sim.comp.ulei[c - 1]) s += `<text x="${x}" y="97" font-size="8.5" text-anchor="middle" fill="#ffd36b">+ ulei</text>`;
+    if (opt.furtun === c) s += `<text x="${x}" y="116" font-size="8.5" text-anchor="middle" fill="currentColor">▲ racordat</text>`;
     s += `</g>`;
   }
-  s += `<text x="220" y="158" font-size="10.5" text-anchor="middle" fill="currentColor" paint-order="stroke" style="stroke:var(--suprafata,#fff);stroke-width:5px;stroke-linejoin:round">capacul chiulasei (vedere de sus) – distribuția în dreapta</text>`;
   return s;
 }
 function desenComp() {
@@ -583,9 +579,16 @@ const TEST = [
 
 /* ------------------------------------------------------------------ 3D și interfața */
 const SV = { m3d: null };
+/** clic pe puțul bujiei din macheta 3D: alege cilindrul pentru compresometru / testerul de pierdere */
+function alegeCil3D(k) {
+  const m = /^cil(\d)$/.exec(k || ""); if (!m) return; const c = +m[1], pc = PASI[pasActiv].panou;
+  if (pc === "comp") { if (sim.comp.montat) return Cadru.mesajTemporar("Demontați întâi compresometrul.", "atentie"); sim.comp.c = c; sim.comp.p = 0; sim.comp.n = 0; desenComp(); }
+  else if (pc === "leak") { if (sim.leak.conectat) return Cadru.mesajTemporar("Deconectați întâi testerul.", "atentie"); sim.leak.c = c; sim.leak.aplicat = false; sim.leak.asc = ""; $("#asc").textContent = ""; desenLeak(); }
+  actualizeazaPasi();
+}
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=7").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { ckp: "CKP", map: "MAP", inj1: "inj. 1", inj4: "inj. 4" }, onSelect: () => {} }); })
+  import(BAZA_COMUN + "motor3d.js?v=8").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { cil1: "cil. 1", cil2: "cil. 2", cil3: "cil. 3", cil4: "cil. 4", map: "MAP" }, onSelect: alegeCil3D }); })
     .catch(e => { el.innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 const CSS = `<style>
@@ -728,7 +731,9 @@ Cadru.porneste({
       M.p = sim.contact || sim.merge ? (reg === "accel" ? pMap("accel", M.tReg) : pMap(reg, M.tReg)) + (Math.random() - 0.5) * 0.3 : M.p;
       if (sim.merge && reg === "accel" && M.tReg > 0.6) M.min = Math.min(M.min, M.p);
       if (sim.contact || sim.merge) { M.buf.push([sim.t, M.p]); while (M.buf.length && M.buf[0][0] < sim.t - 41) M.buf.shift(); }
-      if (SV.m3d) SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.merge && reg === "r2500" ? 7 : sim.clapeta ? 100 : 0, selectat: null, decuplat: {}, vent: false, tEv: sim.merge ? 380 : 120, eticheteVizibile: true });
+      if (SV.m3d) { const pc = PASI[pasActiv].panou, cil = pc === "leak" ? sim.leak.c : sim.comp.c;
+        SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.merge && reg === "r2500" ? 7 : sim.clapeta ? 100 : 0, selectat: pc === "comp" || pc === "leak" ? "cil" + cil : null, decuplat: {}, vent: false, tEv: sim.merge ? 380 : 120, eticheteVizibile: true, bujiiScoase: sim.bujii,
+          furtune: [sim.comp.montat ? { k: "cil" + sim.comp.c, c: 0x151515 } : null, sim.leak.conectat ? { k: "cil" + sim.leak.c, c: 0x1f4fa0 } : null].filter(Boolean) }); }
       if (!vizibil) return;
       if (PASI[pasActiv].panou === "avl" && (sim.cr || !this._avlOk)) { desenAVL(); this._avlOk = !sim.cr; }
       if (PASI[pasActiv].panou === "map") desenMAP();

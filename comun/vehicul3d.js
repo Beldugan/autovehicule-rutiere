@@ -4,7 +4,7 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=7";
+import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=8";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -662,8 +662,8 @@ function sistemeAutoturism(caroserie, mot) {
 const CONTUR = { motor: [1.82, 0.62], cutie: [1.62, 0.5], radiator: [2.25, 0.55] };
 function ascundeContur(ctx, ce) { ctx.children.forEach(l => { const p = l.position; if (ce.some(k => Math.abs(p.x - CONTUR[k][0]) < 0.01 && Math.abs(p.y - CONTUR[k][1]) < 0.01)) l.visible = false; }); }
 /** motorul K7J complet (transmisia accesoriilor, evacuarea cu GPF, sistemul de răcire), montat transversal în autoturism */
-function motorAutoturism(caroserie, opacitate) {
-  const mot = construiesteMotor({ stand: false, filtruAer: false });
+function motorAutoturism(caroserie, opacitate, interior) {
+  const mot = construiesteMotor({ stand: false, filtruAer: false, interior: !!interior });
   mot.grup.rotation.y = -Math.PI / 2; mot.grup.position.set(1.78, 0.42, 0.02); mot.grup.scale.setScalar(0.98);
   if (opacitate) estompeaza(mot.grup, opacitate);
   caroserie.add(mot.grup); return mot;
@@ -682,89 +682,18 @@ function construiesteUngere({ THREE, caroserie, optiuni, ctxMotor }) {
   const et = [];
   // ascundem conturul simplu al motorului din interiorul de context
   ascundeContur(ctxMotor, ["motor", "radiator"]);
-  const M = new THREE.Group(); caroserie.add(M);
-  const X0 = 1.86, YC = 0.44;                // axa arborelui cotit (motor transversal: axa pe z)
-  const ZC = [-0.21, -0.07, 0.07, 0.21];     // cilindrii
-  const ZL = [-0.28, -0.14, 0, 0.14, 0.28];  // lagărele paliere
-  const mBloc = new THREE.MeshPhysicalMaterial({ color: 0xc9ced4, metalness: 0.3, roughness: 0.4, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
-  const mLinii = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
-  const mOtel = new THREE.MeshStandardMaterial({ color: 0x9aa2ab, metalness: 0.9, roughness: 0.3 });
-  const mPiston = new THREE.MeshStandardMaterial({ color: 0xd2d6db, metalness: 0.7, roughness: 0.35 });
-  const mUlei = new THREE.MeshStandardMaterial({ color: 0xd9a03a, emissive: 0x6b3b00, emissiveIntensity: 0.4, roughness: 0.25, transparent: true, opacity: 0.92 });
-  const mTeava = new THREE.MeshStandardMaterial({ color: 0x8b939c, metalness: 0.5, roughness: 0.5, transparent: true, opacity: 0.35, depthWrite: false });
-  const mFiltru = new THREE.MeshStandardMaterial({ color: 0x1f5fb0, metalness: 0.3, roughness: 0.45 });
-  const cutie = (w, h, d, x, y, z, m = mBloc) => { const g = new THREE.BoxGeometry(w, h, d); const o = new THREE.Mesh(g, m); o.position.set(x, y, z); M.add(o); const l = new THREE.LineSegments(new THREE.EdgesGeometry(g), mLinii); l.position.copy(o.position); M.add(l); return o; };
-  const bloc = cutie(0.36, 0.42, 0.66, X0, 0.62, 0);
-  cutie(0.36, 0.13, 0.66, X0, 0.895, 0);                     // chiulasa
-  cutie(0.30, 0.05, 0.62, X0, 0.985, 0);                     // capacul culbutorilor
-  const baie = cutie(0.38, 0.16, 0.62, X0, 0.29, 0);         // baia de ulei (carterul inferior)
-  et.push({ obj: bloc, text: "Blocul motor (4 cilindri)" });
-  // uleiul din baie
-  const nivel = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.1, 0.6), mUlei); nivel.position.set(X0, 0.265, 0); M.add(nivel);
-  et.push({ obj: nivel, text: "Baia de ulei" });
-  // cilindri (cămăși) și pistoane cu biele
-  const piese = [];
-  ZC.forEach((z, i) => {
-    const cam = new THREE.Mesh(new THREE.CylinderGeometry(0.041, 0.041, 0.2, 24, 1, true), mTeava); cam.position.set(X0, 0.66, z); M.add(cam);
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.039, 0.039, 0.05, 24), mPiston); M.add(p);
-    const b = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.14, 0.012), mOtel); M.add(b);
-    piese.push({ p, b, z, faza: [0, Math.PI, Math.PI, 0][i] });
-  });
-  // arborele cotit (fusuri paliere + manetoane) – se rotește în jurul axei z
-  const cotit = new THREE.Group(); cotit.position.set(X0, YC, 0); M.add(cotit);
-  ZL.forEach(z => { const f = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.05, 20), mOtel); f.rotation.x = Math.PI / 2; f.position.z = z; cotit.add(f); });
-  piese.forEach(o => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.04, 16), mOtel); m.rotation.x = Math.PI / 2; m.position.set(Math.sin(o.faza) * 0.043, Math.cos(o.faza) * 0.043, o.z); cotit.add(m);
-    [-1, 1].forEach(s => { const w = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.014), mOtel); w.position.set(Math.sin(o.faza) * 0.02, Math.cos(o.faza) * 0.02, o.z + s * 0.03); w.rotation.z = -o.faza; cotit.add(w); }); });
-  et.push({ obj: cotit, text: "Arborele cotit" });
-  // cuzineții palieri: inele care se „umplu” cu ulei
-  const cuz = ZL.map(z => { const m = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: 0.6, roughness: 0.4, emissive: 0x000000 }); const r = new THREE.Mesh(new THREE.TorusGeometry(0.031, 0.007, 8, 24), m); r.position.set(X0, YC, z); M.add(r); return m; });
-  et.push({ obj: M.children[M.children.length - 1], text: "Lagăre paliere (cuzineți)" });
-  // arborele cu came în chiulasă
-  const came = new THREE.Group(); came.position.set(X0, 0.905, 0); M.add(came);
-  const ax = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.64, 12), mOtel); ax.rotation.x = Math.PI / 2; came.add(ax);
-  for (let k = 0; k < 8; k++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.016, 3), mOtel); l.rotation.x = Math.PI / 2; l.position.z = -0.245 + k * 0.07; l.rotation.y = k * 0.8; came.add(l); }
-  const cuzCame = ZL.map(z => { const m = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: 0.6, roughness: 0.4 }); const r = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.005, 8, 20), m); r.position.set(X0, 0.905, z); M.add(r); return m; });
-  et.push({ obj: came, text: "Arborele cu came" });
-  // pompa de ulei (pe capătul arborelui cotit), sorbul, filtrul
-  const pompa = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.04, 28), new THREE.MeshStandardMaterial({ color: 0x8f969e, metalness: 0.8, roughness: 0.35 }));
-  pompa.rotation.x = Math.PI / 2; pompa.position.set(X0, YC, -0.35); M.add(pompa);
-  const angr = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.006, 6, 16), mOtel); angr.position.set(X0, YC, -0.375); M.add(angr);
-  et.push({ obj: pompa, text: "Pompa de ulei" });
-  const filtru = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.1, 24), mFiltru); filtru.rotation.z = Math.PI / 2; filtru.position.set(1.63, 0.54, -0.22); M.add(filtru);
-  et.push({ obj: filtru, text: "Filtrul de ulei" });
-  const sorb = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.01, 16), mOtel); sorb.position.set(X0, 0.225, -0.1); M.add(sorb);
-  et.push({ obj: sorb, text: "Sorbul cu sită" });
-  // transmisia accesoriilor (aceeași construcție ca la motorul de pe stand): fulia arborelui cotit, rola întinzătoare, alternatorul, pompa de apă, cureaua Poly-V
-  const acc = transmisieAccesorii(); acc.grup.rotation.y = -Math.PI / 2; acc.grup.position.set(X0, YC, 0.42 - acc.XP); M.add(acc.grup);
-  // sistemul de răcire (aceeași construcție ca la celelalte lucrări): radiator, electroventilator, vas de expansiune, furtunuri
-  const rac = new THREE.Group(); rac.rotation.y = -Math.PI / 2; rac.position.set(X0, YC, 0); M.add(rac);
-  { const g = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.09), new THREE.MeshStandardMaterial({ color: 0xb7bcc2, metalness: 0.85, roughness: 0.4 })); g.position.set(-0.37, 0.45, 0.05); rac.add(g); }   // carcasa termostatului
-  const sr = sistemRacire(MAT(), { xc: 0.0, yR: 0.08, zR: -0.47, T: [-0.42, 0.45, 0.05], P: [0.36, 0.2, -0.15], retur: [-0.25, 0.2, 0.185], vas: [-0.5, 0.52, -0.27], suportVas: true, incalzire: [-0.3, 0.42, 0.62] });
-  rac.add(sr.grup);
-  et.push({ obj: sr.rot.vent, text: "Radiatorul și electroventilatorul" });
-  et.push({ obj: acc.rot.altern, text: "Alternatorul" }, { obj: acc.rot.pompa, text: "Pompa de apă (antrenată de curea)" });
-
-  // traseele de ulei: țeava (transparentă) + uleiul care o umple progresiv
+  // motorul K7J al autoturismului – aceeași machetă ca la stand –, secționat, cu sistemul de ungere în interior
+  const mot = motorAutoturism(caroserie, 0, true); mot.modCarcasa("sectionat", -1);   // secțiunea spre fața autoturismului (partea evacuării, tăiată)
+  const X0 = 1.78;
+  const ancora = k => { const o = new THREE.Object3D(); o.position.copy(mot.ancore[k]); mot.grup.add(o); return o; };
+  [["carter", "Baia de ulei"], ["sorb", "Sorbul cu sită"], ["pompa", "Pompa de ulei (roți dințate)"], ["supapa", "Supapa de siguranță"], ["filtru", "Filtrul de ulei"],
+   ["galerie", "Galeria principală de ulei"], ["lagare", "Lagăre paliere (cuzineți)"], ["came", "Arborele cu came, axele culbutorilor"], ["presUlei", "Manocontactul de presiune"]].forEach(([k, t]) => et.push({ obj: ancora(k), text: t }));
+  // traseele de ulei (volume care se umplu la pornire, în ordine): sorb, refulare, filtru, galeria principală, ramificațiile spre paliere, coloana, axele culbutorilor
   const trasee = [];
-  const traseu = (pts, V, nume) => {
-    const c = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)), false, "catmullrom", 0.15);
-    const segs = Math.max(20, pts.length * 16);
-    M.add(new THREE.Mesh(new THREE.TubeGeometry(c, segs, 0.011, 8, false), mTeava));
-    const g = new THREE.TubeGeometry(c, segs, 0.0085, 8, false);
-    const u = new THREE.Mesh(g, mUlei); M.add(u);
-    g.setDrawRange(0, 0);
-    const bile = []; for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe3a0 })); b.visible = false; M.add(b); bile.push({ b, u: k / 6 }); }
-    const t = { c, g, V, plin: 0, bile, nume, nIdx: g.index.count }; trasee.push(t); return t;
-  };
-  const xG = 1.70, yG = 0.47;
-  traseu([[X0, 0.23, -0.1], [X0, 0.24, -0.25], [X0, 0.33, -0.33], [X0, YC - 0.03, -0.35]], 0.05, "sorb");
-  traseu([[X0, YC + 0.04, -0.37], [1.75, 0.52, -0.37], [1.66, 0.54, -0.30], [1.63, 0.54, -0.27]], 0.06, "refulare");
-  traseu([[1.63, 0.54, -0.17], [1.66, 0.52, -0.20], [xG, yG, -0.30]], 0.22, "filtru");               // include volumul filtrului golit
-  traseu([[xG, yG, -0.30], [xG, yG, 0], [xG, yG, 0.30]], 0.06, "galeria principală");
-  const ramuri = ZL.map(z => traseu([[xG, yG, z], [X0 - 0.06, YC + 0.02, z], [X0 - 0.03, YC, z]], 0.006, "ramificație"));
-  traseu([[xG, yG, 0.30], [xG, 0.70, 0.32], [X0 - 0.05, 0.88, 0.32], [X0, 0.89, 0.30]], 0.05, "coloana spre chiulasă");
-  traseu([[X0, 0.89, 0.30], [X0, 0.89, 0], [X0, 0.89, -0.30]], 0.06, "galeria din chiulasă");
-  et.push({ obj: trasee[3].bile[2].b, text: "Galeria principală de ulei" });
+  const traseu = (V, nume) => { const t = { V, plin: 0, nume }; trasee.push(t); return t; };
+  traseu(0.05, "sorb"); traseu(0.06, "refulare"); traseu(0.22, "filtru"); traseu(0.06, "galeria principală");
+  const ramuri = [0, 1, 2, 3, 4].map(() => traseu(0.006, "ramificație"));
+  traseu(0.05, "coloana spre chiulasă"); traseu(0.06, "galeria din chiulasă");
   const Vtot = trasee.reduce((a, t) => a + t.V, 0);
 
   // ---------------------------------------------------------- comenzi
@@ -843,32 +772,10 @@ function construiesteUngere({ THREE, caroserie, optiuni, ctxMotor }) {
     }
     if (st.motor && st.tLag === null && ramuri.every(r => r.plin >= 1)) st.tLag = st.tPorn;
     if (st.motor && st.tCam === null && trasee[trasee.length - 1].plin >= 1) st.tCam = st.tPorn;
-    // rotirea pieselor (vizual încetinită de 40 de ori)
-    st.unghi += st.n / 60 * 2 * Math.PI * dt / 40; acc.roteste(st.n / 60 * 2 * Math.PI * dt / 40); if (st.motor && st.T > 95) sr.rot.vent.rotation.z -= dt * 22;
-    cotit.rotation.z = -st.unghi; came.rotation.z = -st.unghi / 2;
-    piese.forEach(o => {
-      const a = st.unghi + o.faza, r = 0.043, L = 0.14;
-      const yp = YC + r * Math.cos(a) + Math.sqrt(L * L - (r * Math.sin(a)) ** 2);
-      o.p.position.set(X0, yp + 0.025, o.z);
-      const xm = X0 + r * Math.sin(a), ym = YC + r * Math.cos(a);
-      o.b.position.set((xm + X0) / 2, (ym + yp) / 2, o.z); o.b.rotation.z = Math.atan2(X0 - xm, yp - ym);
-    });
-    // afișarea uleiului din trasee și a particulelor
-    trasee.forEach(t => {
-      t.g.setDrawRange(0, Math.floor(t.nIdx * clamp(t.plin, 0, 1) / 6) * 6);
-      const vit = clamp(st.Q / 25, 0, 1.5);
-      t.bile.forEach(o => {
-        o.u = (o.u + vit * dt * 0.8) % 1;
-        o.b.visible = st.n > 50 && o.u < t.plin;
-        if (o.b.visible) t.c.getPointAt(o.u, o.b.position);
-      });
-    });
-    const okLag = ramuri.every(r => r.plin >= 1) && st.p > 0.5;
-    cuz.forEach(m => { m.emissive.set(okLag ? 0x2a7a3a : (st.n > 50 ? 0x7a1a10 : 0x000000)); m.emissiveIntensity = 0.8; });
-    cuzCame.forEach(m => { m.emissive.set(trasee[trasee.length - 1].plin >= 1 && st.p > 0.5 ? 0x2a7a3a : (st.n > 50 ? 0x7a1a10 : 0x000000)); m.emissiveIntensity = 0.8; });
-    nivel.scale.y = 1 - 0.35 * trasee.reduce((a, t) => a + t.plin * t.V, 0) / Vtot;
-    nivel.position.y = 0.215 + 0.05 * nivel.scale.y;
-    mUlei.color.setHSL(0.1, 0.75, clamp(0.38 + st.T / 400, 0.3, 0.6));
+    // macheta: arborele cotit, distribuția, pompa, supapa, particulele (umplerea progresivă a traseelor la pornirea la rece)
+    const QM = VG * 3500, pl = trasee.map(t => clamp(t.plin, 0, 1));
+    mot.actualizeaza({ rpm: st.n, tps: 0, vent: st.motor && st.T > 95, tEv: st.motor ? 400 : 60, ulei: { Q: st.Qp / QM, Qm: st.Q / QM, Qr: Math.max(0, st.Qp - st.Q) / QM, desch: st.p >= P_SUP - 0.05 ? 1 : 0, p: st.p, senzor: true,
+      plin: [pl[0], Math.min(pl[1], pl[2]), pl[3], pl[4], pl[5], pl[6], pl[7], pl[8], pl[9], pl[10], pl[10], 1] } }, dt);
     st.v = 0; st.a = 0;
   }
   const f = (v, n = 1) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n).replace(".", ",");
@@ -883,8 +790,8 @@ function construiesteUngere({ THREE, caroserie, optiuni, ctxMotor }) {
       ${lampa ? '<div class="v3d-blocare">● lampa presiunii uleiului</div>' : ""}
       ${st.p >= P_SUP - 0.05 ? '<div class="v3d-abs">supapa de siguranță deschisă</div>' : ""}`;
   }
-  return { etichete: et, html, leaga, pas, hud, stare, camere: { motor: [[3.5, 1.5, 1.9], [X0, 0.6, 0]], lateral: [[X0, 0.7, 2.2], [X0, 0.6, 0]] },
-    camereButoane: [["motor", "motorul"], ["lateral", "motor – lateral"]], cameraInitiala: [[3.9, 1.7, 2.6], [X0 - 0.2, 0.6, 0]] };
+  return { motor: mot, etichete: et, html, leaga, pas, hud, stare, camere: { motor: [[3.1, 1.25, 1.2], [X0, 0.45, 0]], lateral: [[X0, 0.6, 1.6], [X0, 0.45, 0]] },
+    camereButoane: [["motor", "motorul (secționat)"], ["lateral", "motor – lateral"]], cameraInitiala: [[2.75, 1.05, 1.05], [X0, 0.45, 0]] };
 }
 
 /* ================================================================== senzorii motorului și ai autovehiculului în mers (DA – L2) */

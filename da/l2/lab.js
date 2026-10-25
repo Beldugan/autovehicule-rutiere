@@ -105,130 +105,22 @@ function x431(c) {
   return null;
 }
 
-/* ------------------------------------------------------------------ desenul motorului */
+/* ------------------------------------------------------------------ macheta 3D a motorului (singura reprezentare a motorului) */
 const SV = {};
-function construiesteSVG() {
-  const svg = $("#svg-motor"); svg.innerHTML = "";
-  const defs = mk("defs", {}, svg); defsComune(defs); filtre(defs);
-  grad(defs, "gCompart", [[0, "#2b3036"], [1, "#15181c"]]);
-  grad(defs, "gFonta", [[0, "#7c838b"], [0.5, "#5d646c"], [1, "#454b52"]]);
-  grad(defs, "gChiul", [[0, "#c9ced3"], [0.5, "#a7adb3"], [1, "#868d94"]]);
-  grad(defs, "gPlastic", [[0, "#3a3e44"], [0.5, "#1f2226"], [1, "#121417"]]);
-  grad(defs, "gRugina", [[0, "#a8673a"], [0.5, "#7b4423"], [1, "#4f2a14"]]);
-  grad(defs, "gCald", [[0, "#ff6a1a", 0.0], [1, "#ff6a1a", 0.0]]);
-  const g = mk("g", {}, svg); SV.g = g;
-  mk("rect", { x: 0, y: 0, width: 900, height: 420, fill: "url(#gCompart)" }, g);
-  // radiatorul și ventilatorul
-  mk("rect", { x: 846, y: 30, width: 46, height: 250, fill: "url(#pGrilaR)" }, g);
-  const pr2 = mk("pattern", { id: "pGrilaR", width: 6, height: 4, patternUnits: "userSpaceOnUse" }, defs); mk("rect", { width: 6, height: 4, fill: "#3a3f45" }, pr2); mk("rect", { y: 1, width: 6, height: 1.6, fill: "#16191c" }, pr2);
-  SV.vent = mk("g", { transform: "translate(868,150)" }, g);
-  for (let k = 0; k < 7; k++) mk("path", { d: "M0 0 C 10 -20, 30 -30, 16 -46 L 6 -44 C 10 -30, 0 -14, 0 0", fill: "#222", transform: `rotate(${k * 360 / 7})` }, SV.vent);
-  mk("circle", { cx: 0, cy: 0, r: 7, fill: "#444" }, SV.vent);
-  // bateria
-  mk("rect", { x: 26, y: 290, width: 120, height: 92, rx: 6, fill: "#1d1f22", stroke: "#000" }, g);
-  mk("rect", { x: 26, y: 290, width: 120, height: 16, rx: 4, fill: "#2c2f33" }, g);
-  mk("rect", { x: 44, y: 280, width: 16, height: 12, fill: "#c62828" }, g); mk("rect", { x: 112, y: 280, width: 16, height: 12, fill: "#222" }, g);
-  const tb = mk("text", { x: 86, y: 345, "text-anchor": "middle", "font-size": 12, fill: "#9aa3ad", "font-weight": 700 }, g); tb.textContent = "12 V · 60 Ah";
-  // calculatorul motorului
-  mk("rect", { x: 22, y: 186, width: 116, height: 70, rx: 4, fill: "url(#gAlu)", stroke: "#555" }, g);
-  mk("rect", { x: 30, y: 246, width: 100, height: 18, rx: 3, fill: "#111" }, g);
-  const te = mk("text", { x: 80, y: 224, "text-anchor": "middle", "font-size": 11, fill: "#333", "font-weight": 700 }, g); te.textContent = "ECU";
-  // filtrul de aer și tubulatura
-  mk("rect", { x: 22, y: 32, width: 150, height: 92, rx: 10, fill: "url(#gPlastic)", stroke: "#000" }, g);
-  mk("path", { d: "M172 64 C 190 64, 200 70, 214 86", fill: "none", stroke: "#202328", "stroke-width": 26, "stroke-linecap": "round" }, g);
-  // blocul motor, chiulasa, capacul
-  mk("rect", { x: 262, y: 200, width: 360, height: 180, rx: 6, fill: "url(#gFonta)", stroke: "#2c3035" }, g);
-  for (let k = 0; k < 9; k++) mk("line", { x1: 280 + k * 40, y1: 210, x2: 280 + k * 40, y2: 370, stroke: "#4c5259", "stroke-width": 2, opacity: 0.6 }, g);
-  mk("rect", { x: 252, y: 152, width: 380, height: 52, rx: 4, fill: "url(#gChiul)", stroke: "#5b6269" }, g);
-  SV.capac = mk("rect", { x: 270, y: 112, width: 344, height: 42, rx: 12, fill: "url(#gNegru)", stroke: "#000" }, g);
-  mk("circle", { cx: 588, cy: 124, r: 9, fill: "#c9a227" }, g);
-  // carterul volantului cu fereastra roții dințate 60−2
-  mk("path", { d: "M262 230 L 210 250 L 200 380 L 262 380 Z", fill: "url(#gFonta)", stroke: "#2c3035" }, g);
-  SV.roata = mk("g", { transform: "translate(232,330)" }, g);
-  mk("circle", { cx: 0, cy: 0, r: 34, fill: "#3b4046" }, SV.roata);
-  for (let k = 0; k < 60; k++) if (k < 58) { const a = k * 6 * Math.PI / 180; mk("rect", { x: -1.6, y: -40, width: 3.2, height: 7, fill: "#9aa2ab", transform: `rotate(${k * 6})` }, SV.roata); }
-  mk("circle", { cx: 0, cy: 0, r: 30, fill: "#2a2e33" }, SV.roata);
-  // colectorul de admisie (plastic) cu 4 canale și plenul
-  mk("rect", { x: 256, y: 60, width: 340, height: 40, rx: 16, fill: "url(#gPlastic)", stroke: "#000" }, g);
-  [336, 406, 476, 546].forEach(x => mk("path", { d: `M${x - 18} 96 C ${x - 18} 130, ${x - 14} 140, ${x - 12} 156 L ${x + 12} 156 C ${x + 14} 140, ${x + 18} 130, ${x + 18} 96 Z`, fill: "url(#gPlastic)", stroke: "#000" }, g));
-  // rampa de combustibil
-  mk("rect", { x: 300, y: 128, width: 280, height: 9, rx: 4, fill: "url(#gCrom)" }, g);
-  // conductele de evacuare și catalizatorul
-  SV.evac = mk("path", { d: "M600 230 C 640 240, 660 260, 690 280 L 760 300", fill: "none", stroke: "url(#gRugina)", "stroke-width": 26, "stroke-linecap": "round" }, g);
-  mk("rect", { x: 740, y: 282, width: 90, height: 46, rx: 18, fill: "url(#gInoxC)", stroke: "#444" }, g);
-  grad(defs, "gInoxC", [[0, "#d7dbe0"], [0.5, "#9aa1a8"], [1, "#6b727a"]]);
-  mk("path", { d: "M828 306 L 890 320", stroke: "url(#gRugina)", "stroke-width": 16, fill: "none" }, g);
-  // pompa de vid (pentru MAP), ascunsă implicit
-  SV.pompa = mk("g", { style: "display:none" }, g);
-  mk("rect", { x: 600, y: 14, width: 40, height: 64, rx: 8, fill: "#c62828", stroke: "#6d0f0f" }, SV.pompa);
-  mk("path", { d: "M600 40 C 585 40, 575 50, 566 60", fill: "none", stroke: "#111", "stroke-width": 4 }, SV.pompa);
-  SV.vacuum = manometru(SV.pompa, 670, 40, 24, { max: 110, unit: "kPa abs", pasMaj: 20, pasMin: 5, subtitlu: "absolut" });
-
-  // componentele selectabile
-  SV.comp = {};
-  const grup = (k, fn) => { const gg = mk("g", { class: "comp-da", "data-c": k, style: "cursor:pointer" }, g); fn(gg); gg.addEventListener("click", () => selecteaza(k)); SV.comp[k] = gg; return gg; };
-  const conector = (gg, x, y, w = 16, h = 10, c = "#5f6670") => mk("rect", { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 2, fill: c, stroke: "#222", class: "conector" }, gg);
-  grup("ckp", gg => { mk("rect", { x: 222, y: 360, width: 20, height: 26, rx: 3, fill: "#1a1a1a" }, gg); conector(gg, 232, 394, 18, 9); });
-  grup("ect", gg => { mk("rect", { x: 622, y: 158, width: 34, height: 30, rx: 4, fill: "url(#gAlu)" }, gg); mk("rect", { x: 646, y: 160, width: 14, height: 16, fill: "url(#gAlama)" }, gg); conector(gg, 666, 168, 12, 14, "#2b6f3a"); });
-  grup("iat", gg => { mk("circle", { cx: 196, cy: 70, r: 7, fill: "#3a3f45" }, gg); conector(gg, 196, 58, 12, 10, "#2b4f8a"); });
-  grup("map", gg => { mk("rect", { x: 546, y: 48, width: 28, height: 16, rx: 3, fill: "#2d3238", stroke: "#000" }, gg); conector(gg, 560, 42, 14, 8); });
-  grup("clap", gg => { mk("rect", { x: 212, y: 72, width: 48, height: 44, rx: 6, fill: "url(#gAlu)", stroke: "#555" }, gg); mk("circle", { cx: 236, cy: 94, r: 14, fill: "#2a2e33" }, gg); SV.clapeta = mk("line", { x1: 224, y1: 94, x2: 248, y2: 94, stroke: "#c0c6cc", "stroke-width": 3 }, gg); conector(gg, 236, 66, 16, 8); });
-  grup("tps", gg => { mk("rect", { x: 228, y: 114, width: 20, height: 14, rx: 3, fill: "#1d1f22" }, gg); conector(gg, 238, 134, 12, 8); });
-  grup("l1", gg => { mk("rect", { x: 670, y: 250, width: 12, height: 24, rx: 2, fill: "url(#gCrom)", transform: "rotate(-30 676 262)" }, gg); mk("path", { d: "M682 248 C 700 220, 720 210, 740 200", fill: "none", stroke: "#111", "stroke-width": 3 }, gg); conector(gg, 744, 198, 14, 9, "#7a3b8a"); });
-  grup("l2", gg => { mk("rect", { x: 832, y: 318, width: 12, height: 22, rx: 2, fill: "url(#gCrom)" }, gg); mk("path", { d: "M838 318 C 838 290, 830 270, 820 256", fill: "none", stroke: "#111", "stroke-width": 3 }, gg); conector(gg, 818, 252, 14, 9, "#7a3b8a"); });
-  ACT.slice(0, 4).forEach((k, i) => grup(k, gg => { const x = [336, 406, 476, 546][i]; mk("rect", { x: x - 7, y: 128, width: 14, height: 28, rx: 3, fill: "#2c7a3a", stroke: "#123" }, gg); conector(gg, x, 122, 16, 10, "#5f6670"); const t = mk("text", { x, y: 172, "text-anchor": "middle", "font-size": 9, fill: "#cfd6dd" }, gg); t.textContent = "cil. " + (i + 1); }));
-  grup("can", gg => { mk("rect", { x: 138, y: 166, width: 26, height: 24, rx: 4, fill: "#1b1d20", stroke: "#000" }, gg); mk("path", { d: "M164 176 C 190 176, 220 140, 260 98", fill: "none", stroke: "#111", "stroke-width": 4 }, gg); conector(gg, 150, 160, 12, 8); });
-  // cablul instrumentului către componenta selectată
-  SV.sonde = mk("g", {}, g);
-  SV.selRect = mk("rect", { fill: "none", stroke: "#ffcf4d", "stroke-width": 2, "stroke-dasharray": "5 3", rx: 6 }, g);
-  // etichete
-  SV.et = mk("g", { "font-size": 10.5, fill: "#e6ebf0" }, g);
-  Object.entries(COMP).forEach(([k, c]) => { const t = mk("text", { x: c.x + 10, y: c.y - 10, "font-weight": 600 }, SV.et); t.textContent = ({ ckp: "CKP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", clap: "clapetă", can: "canistră", cmp: "CMP", knock: "KS" })[k] || ""; });
-  prefixeazaId(svg, "d2-");
-  actualizeazaSVG(0);
-}
 function actualizeazaSVG(dt) {
-  if (!SV.g) return;
-  // selecția și sondele
-  const gsel = SV.comp[sim.sel]; if (gsel) { const b = gsel.getBBox(); Object.entries({ x: b.x - 6, y: b.y - 6, width: b.width + 12, height: b.height + 12 }).forEach(([k, v]) => SV.selRect.setAttribute(k, v)); }
-  SV.sonde.innerHTML = "";
-  if (sim.aparat !== "x431" || sim.pompaVid) {
-    const c = COMP[sim.sel], col = sim.aparat === "osc" ? "#ffd400" : "#d32f2f";
-    mk("path", { d: `M10 418 C 120 418, ${c.x - 60} ${c.y + 120}, ${c.x} ${c.y + 6}`, fill: "none", stroke: col, "stroke-width": 2.4 }, SV.sonde);
-    mk("path", { d: `M14 420 C 130 420, ${c.x - 40} ${c.y + 130}, ${c.x + 4} ${c.y + 8}`, fill: "none", stroke: "#111", "stroke-width": 2.4 }, SV.sonde);
-    mk("circle", { cx: c.x, cy: c.y + 6, r: 3.5, fill: col }, SV.sonde);
-  } else {
-    mk("path", { d: "M10 418 C 60 418, 60 300, 70 262", fill: "none", stroke: "#2a5bd7", "stroke-width": 4 }, SV.sonde); // cablul OBD spre priza de diagnoză
-  }
-  // conectori decuplați
-  Object.entries(SV.comp).forEach(([k, gg]) => { const c = gg.querySelector("[class$=conector]") || gg.querySelector(".conector"); if (c) c.setAttribute("transform", sim.decuplat[k] ? "translate(0,-7)" : ""); });
-  // animații
-  if (sim.merge) {
-    SV.unghiR = ((SV.unghiR || 0) + sim.rpm / 60 * 360 * dt / 50) % 360;
-    SV.roata.setAttribute("transform", `translate(232,330) rotate(${SV.unghiR})`);
-    SV.capac.setAttribute("transform", `translate(${(Math.random() - 0.5) * 0.6},${(Math.random() - 0.5) * 0.6})`);
-  }
-  if (sim.ventilator || sim.ect > 98) { SV.uv = ((SV.uv || 0) + 900 * dt) % 360; SV.vent.setAttribute("transform", `translate(868,150) rotate(${SV.uv})`); }
-  SV.clapeta.setAttribute("transform", `rotate(${-sim.tps * 0.85} 236 94)`);
-  const cald = clamp((sim.ect - 40) / 60, 0, 1) * (sim.merge ? 1 : 0.4);
-  SV.evac.setAttribute("filter", cald > 0.5 ? `url(#d2-fUmbra)` : "");
-  SV.pompa.style.display = sim.pompaVid ? "" : "none";
-  if (sim.pompaVid) SV.vacuum(sim.p);
-  SV.et.style.display = $("#ck-et") && !$("#ck-et").checked ? "none" : "";
   if (SV.m3d) {
     SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.tps, selectat: sim.sel, decuplat: sim.decuplat, vent: sim.ventilator || sim.ect > 98, tEv: sim.tEv, eticheteVizibile: !($("#ck-et") && !$("#ck-et").checked) });
     const cheieS = (sim.aparat !== "x431" || sim.pompaVid) ? sim.sel + "|" + sim.aparat : "";
     if (cheieS !== SV.sondaK) { SV.sondaK = cheieS; SV.m3d.sonda(cheieS ? sim.sel : null, sim.aparat); }
   }
 }
-/* motorul 3D realist pe stand (cu revenire la desenul 2D dacă WebGL lipsește) */
+/* motorul K7J pe stand – macheta 3D comună tuturor lucrărilor */
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=7").then(m => {
+  import(BAZA_COMUN + "motor3d.js?v=8").then(m => {
     const ET = { ckp: "CKP", cmp: "CMP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", clap: "clapetă", can: "canistră", knock: "detonație" };
     SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: k => { if (COMP[k]) selecteaza(k, false); } });
-    $("#svg-motor").style.display = "none";
-  }).catch(e => { el.remove(); console.warn("3D indisponibil:", e); });
+  }).catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu a putut fi încărcată (${esc(e.message)}): este necesar un browser cu WebGL.</p>`; });
 }
 function selecteaza(k, focus = true) {
   sim.sel = k; $("#sel-comp").value = k;
@@ -610,7 +502,6 @@ Cadru.porneste({
     <div class="card sim-scena scena">
       <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <div id="motor3d"></div>
-      <svg id="svg-motor" viewBox="0 0 900 420" role="img" aria-label="Compartimentul motor al standului K7J cu senzorii și actuatorii selectabili"></svg>
       <div class="afisaje">
         <div class="afisaj"><span>Turație</span><b id="af-n">0</b><small>rot/min</small></div>
         <div class="afisaj"><span>Temp. lichid (termometru)</span><b id="af-T">—</b><small>°C</small></div>
@@ -680,7 +571,7 @@ Cadru.porneste({
   </div>`,
     init(C) {
       sim.ect = sim.iat = P().Ta; sim.p = P().patm;
-      construiesteSVG(); legaOsc(); porneste3D();
+      legaOsc(); porneste3D();
       $("#osc-t").value = String(sim.osc.tdiv);
       $("#osc-t").addEventListener("change", e => { sim.osc.tdiv = +e.target.value; });
       $("#osc-mod").addEventListener("change", e => { sim.osc.benzi = e.target.value === "benzi"; deseneazaOsc(); });

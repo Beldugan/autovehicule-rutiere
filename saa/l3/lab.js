@@ -205,41 +205,21 @@ function schemaSVG(P = "cr") {
   s += `<g font-size="9.5" fill="currentColor" transform="translate(240 14)"><path d="M0,0 h22" stroke="#22262b" stroke-width="7" stroke-linecap="round"/><path d="M0,0 h22" stroke="#7fb3ff" stroke-width="1.6" stroke-dasharray="3 4"/><text x="28" y="3.5">furtun joasă presiune (4…6 bar)</text><path d="M200,0 h22" stroke="#bcd8ff" stroke-width="2" stroke-dasharray="3 4"/><text x="228" y="3.5">retur</text><path d="M276,0 h22" stroke="#a3abb3" stroke-width="5"/><text x="304" y="3.5">conductă de oțel – înaltă presiune</text><path d="M500,0 h22" stroke="#4a7fc0" stroke-width="5" opacity=".6"/><text x="528" y="3.5">culoarea din rampă = presiunea</text></g>`;
   return s;
 }
-function actualizeazaSchema(dt = 0) {
-  const sv = $("#svg-schema"); if (!sv) return;
-  const q = n => sv.querySelector("#cr-" + n);
-  if (!q("rampa-p")) { sv.innerHTML = schemaSVG("cr"); sim.thV = sim.thV || 0; }
-  const k = cl(sim.p / 1500, 0, 1), cul = `rgb(${Math.round(60 + 195 * k)},${Math.round(120 - 80 * k)},${Math.round(200 - 170 * k)})`;
-  q("rampa-p").setAttribute("fill", cul);
-  const misc = (sim.merge || sim.cr) && sim.n > 5;
-  sim.thV = ((sim.thV || 0) + (misc ? sim.n / 60 * 360 / MOT.LENT * dt : 0)) % 720;      // unghiul afișat (încetinit), ciclul de 720°
-  const th = sim.thV;
-  q("jp").setAttribute("stroke-dashoffset", String(-(th * 0.6) % 1000));
-  q("ret").setAttribute("stroke-dashoffset", String(-(th * 0.35) % 1000));
-  q("roataP").setAttribute("transform", `rotate(${(th / 2) % 360} 350 280)`);          // pompa: 1/2 din turația arborelui cotit (raportul curelei 1:2)
-  q("roataC").setAttribute("transform", `rotate(${th % 360} 520 366)`);
-  MOT.X.forEach((x, i) => {
-    const { phi, ypin, xm, ym } = pozaMec(i, th);
-    q("pist" + i).setAttribute("transform", `translate(0 ${(ypin - MOT.crown).toFixed(2)})`);
-    ["biela", "biela2"].forEach(n => { const e = q(n + i); e.setAttribute("x1", x); e.setAttribute("y1", ypin.toFixed(2)); e.setAttribute("x2", xm.toFixed(2)); e.setAttribute("y2", ym.toFixed(2)); });
-    q("mp" + i).setAttribute("cx", xm.toFixed(2)); q("mp" + i).setAttribute("cy", ym.toFixed(2));
-    q("arb" + i).setAttribute("transform", `rotate(${(phi % 360).toFixed(1)} ${x} ${MOT.yc})`);
-    // supapele: evacuarea deschisă ≈ 140…380°, admisia ≈ 340…580° (față de PMI la sfârșitul compresiei)
-    const ridic = (f, a0, a1) => f > a0 && f < a1 ? 7 * Math.sin(Math.PI * (f - a0) / (a1 - a0)) : 0;
-    q("supe" + i).setAttribute("transform", `translate(0 ${ridic(phi, 140, 380).toFixed(2)})`);
-    q("supa" + i).setAttribute("transform", `translate(0 ${ridic(phi, 340, 580).toFixed(2)})`);
-    // injecția (pilot + principală) în jurul PMI și arderea
-    const inj = sim.merge && (phi > 696 || phi < 10), ard = sim.merge && phi >= 2 && phi < 70;
-    q("jet" + i).setAttribute("opacity", inj ? "0.95" : "0");
-    const fl = q("flac" + i);
-    if (ard) { const top = MOT.deck - 4, bot = ypin - MOT.crown; fl.setAttribute("d", `M${x - 33},${bot} L${x - 33},${MOT.deck} Q${x},${top - 18} ${x + 33},${MOT.deck} L${x + 33},${bot}z`); fl.setAttribute("opacity", (1 - (phi - 2) / 68).toFixed(2)); }
-    else fl.setAttribute("opacity", "0");
-  });
-  q("obd-cab").setAttribute("opacity", sim.obd ? "1" : "0");
-  q("cleste").setAttribute("opacity", sim.cleste ? "1" : "0");
-  sv.querySelectorAll("[data-comp]").forEach(g => g.classList.toggle("ident", sim.ident.has(g.dataset.comp)));
+/* ------------------------------------------------------------------ macheta 3D: motorul de pe stand în varianta 1.5 dCi (common-rail Delphi) */
+const SV = { m3d: null };
+const ET3D = { rez: "rezervor", filtru: "filtru motorină", pjp: "pompa de transfer", pip: "pompa ÎP", imv: "IMV", rampa: "rampa", senz: "senzor presiune", inj: "injectoare", ecu: "ECU", obd: "priza OBD" };
+function alegeComp3D(k) { if (!COMP[k]) return; sim.ident.add(k); sim.sel3d = k; const t = `<b>${COMP[k][0]}.</b> ${COMP[k][1]}`; $("#comp-info") && ($("#comp-info").innerHTML = t); $("#comp-info2").innerHTML = t; actualizeazaPasi(); }
+function porneste3D() {
+  const el = $("#motor3d"); if (!el) return;
+  import(BAZA_COMUN + "motor3d.js?v=8").then(m => { SV.m3d = m.creeazaStand(el, { varianta: "dci", interior: true, mod: "transparent", etichete: ET3D, onSelect: alegeComp3D }); SV.m3d.vedere([1.0, 0.9, 1.25], [0.0, 0.25, 0.1]); })
+    .catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu a putut fi încărcată (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#motor3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp3D(b.dataset.c3))); });
 }
-
+function actualizeaza3D() {
+  if (!SV.m3d) return;
+  SV.m3d.seteaza({ rpm: sim.merge || sim.cr ? sim.n : 0, tps: 0, selectat: sim.sel3d || null, vent: false, tEv: sim.merge ? 300 : 80, eticheteVizibile: true,
+    cr: { p: sim.p, imv: sim.imv, n: sim.merge || sim.cr ? sim.n : 0, merge: sim.merge, contact: sim.contact || sim.merge },
+    furtune: [sim.obd ? { k: "obd", c: 0x1f5fd0, r: 0.004 } : null, sim.cleste ? { k: "inj", c: 0xffd400, r: 0.0035 } : null].filter(Boolean) });
+}
 /* ------------------------------------------------------------------ testerul OBD cu înregistrare și cursoare */
 const LG = { W: 760, H: 280, X0: 52, X1: 700, Y0: 22, Y1: 236 };
 function desenLog() {
@@ -332,12 +312,12 @@ function legaOsc() {
 const pe = (t, r, c) => Cadru.D.t[t][r][c] !== "";
 const PASI = [
   { t: "Pregătirea și identificarea", tab: "NSSM, Fig. 3.1", panou: "schema",
-    instr: ["Echipament de protecție; NU se slăbește niciun racord de înaltă presiune.", "Identificați pe schemă componentele sistemului (clic pe fiecare): cel puțin pompa, IMV, rampa, senzorul de presiune, injectoarele, ECU.", "Cu motorul oprit și contactul luat conectați testerul OBD și montați cleștele de curent pe cablul injectorului 1."],
+    instr: ["Echipament de protecție; NU se slăbește niciun racord de înaltă presiune.", "Identificați pe macheta 3D componentele sistemului (clic pe fiecare): cel puțin pompa, IMV, rampa, senzorul de presiune, injectoarele, ECU.", "Cu motorul oprit și contactul luat conectați testerul OBD și montați cleștele de curent pe cablul injectorului 1."],
     ver: () => [[sim.ochelari && sim.racorduri, "NSSM confirmate"], [sim.ident.size >= 6, `componente identificate: ${sim.ident.size}/6`], [sim.obd, "testerul OBD conectat"], [sim.cleste, "cleștele pe cablul injectorului 1"]],
     prog: () => (sim.ochelari && sim.racorduri ? 1 : 0) + (sim.ident.size >= 6 ? 1 : 0) + (sim.obd ? 1 : 0) + (sim.cleste ? 1 : 0), tot: 4,
     ctl: `<label class="bifa"><input type="checkbox" id="ck-och"> Ochelari și mănuși</label><label class="bifa"><input type="checkbox" id="ck-rac"> Nu se intervine pe racordurile de înaltă presiune</label>
       <div class="rand-butoane"><button type="button" id="b-obd">Conectează testerul OBD</button><button type="button" id="b-cl">Montează cleștele pe inj. 1</button></div>
-      <p class="nota" id="comp-info">Clic pe o componentă din schemă.</p>` },
+      <p class="nota" id="comp-info">Clic pe o componentă de pe macheta 3D.</p>` },
   { t: "Ralanti rece – profilul injecției", tab: "Tabelul 3.3 (ralanti rece)", panou: "osc",
     instr: ["Puneți contactul și porniți motorul rece (demarorul ≈ 2,5 s).", "Pe osciloscop numărați injecțiile pe ciclu (impulsurile injectorului 1).", "Cursorul A la începutul ultimei pre-injecții, B la începutul injecției principale → Δt; apoi A și B la începutul și sfârșitul principalei → durata.", "Alegeți numărul de injecții și înregistrați."],
     ver: () => [[sim.cleste, "cleștele montat"], [sim.merge && sim.reg === "ral", "motor la ralanti"], [sim.ect < 60, `motor rece (${fx(sim.ect, 0)} °C < 60 °C)`]],
@@ -432,7 +412,7 @@ function legaComenzi() {
   on("#b-logrun", () => { const L = sim.log; L.stop = !L.stop; if (!L.stop) { L.A = L.B = null; } desenLog(); });
   on("[data-osc]", b => { const o = sim.osc; if (b.dataset.osc === "run") o.run = !o.run; else { o.tdiv = TDIVS[(TDIVS.indexOf(o.tdiv) + 1) % TDIVS.length]; o.A = Math.min(o.A, o.tdiv * 10); o.B = Math.min(o.B, o.tdiv * 10); } desenOsc(); });
   $$("[data-ri]").forEach(b => b.addEventListener("click", e => { inregInj(e, b.dataset.ri, b.closest(".pas-ctl").querySelector("[data-nr]").value); actualizeazaPasi(); }));
-  $("#svg-schema").addEventListener("click", e => { const g = e.target.closest("[data-comp]"); if (!g) return; const k = g.dataset.comp; sim.ident.add(k); $("#comp-info").innerHTML = `<b>${COMP[k][0]}.</b> ${COMP[k][1]}`; $("#comp-info2").innerHTML = `<b>${COMP[k][0]}.</b> ${COMP[k][1]}`; actualizeazaPasi(); });
+  // identificarea componentelor: clic pe macheta 3D (alegeComp3D)
 }
 
 /* ------------------------------------------------------------------ înregistrările */
@@ -564,7 +544,7 @@ const TEST = [
 /* ------------------------------------------------------------------ definiția lucrării */
 const CSS = `<style>
 .saa3-scena .instr { margin-top:.4rem; } .instr h3 { margin:.2rem 0 .4rem; font-size:1rem; }
-#svg-schema { width:100%; height:auto; display:block; color:var(--text); }
+.saa3-3d .m3d { height:clamp(380px, 60vh, 600px); }
 .cr-comp { cursor:pointer; } .cr-comp:hover { filter:drop-shadow(0 0 4px #1477d1); } .cr-comp.ident { filter:drop-shadow(0 0 2px #2e9e44); }
 .saa3-afis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.4rem; margin:.5rem 0; }
 .saa3-afis div { background:var(--suprafata-2); border-radius:8px; padding:.35rem .5rem; } .saa3-afis span { display:block; font-size:.72rem; color:var(--text-sec); } .saa3-afis b { font-size:1.05rem; }
@@ -644,9 +624,9 @@ Cadru.porneste({
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena saa3-scena">
       <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
-      <h3 style="margin:2.2rem 0 .3rem">Schema sistemului common-rail – standul 1.5 dCi</h3>
-      <svg id="svg-schema" viewBox="0 0 1000 440" role="img" aria-label="Schema sistemului common-rail"></svg>
-      <p class="nota" id="comp-info2">Clic pe o componentă pentru descrierea ei.</p>
+      <h3 style="margin:2.2rem 0 .3rem">Standul 1.5 dCi – sistemul common-rail (macheta 3D a motorului)</h3>
+      <div id="motor3d" class="saa3-3d"></div>
+      <p class="nota" id="comp-info2">Clic pe o componentă a sistemului (pe macheta 3D) pentru descrierea ei; rotiți macheta pentru a o vedea din alte unghiuri.</p>
       <div class="saa3-afis"><div><span>Stare</span><b id="af-st">—</b></div><div><span>Turație [rot/min]</span><b id="af-n">0</b></div><div><span>Lichid [°C]</span><b id="af-T">—</b></div><div><span>p cerută [bar]</span><b id="af-pc">—</b></div><div><span>p reală [bar]</span><b id="af-p">—</b></div><div><span>IMV [%]</span><b id="af-imv">—</b></div></div>
       <div class="instr" data-panou="obd" hidden><canvas id="cv-log" height="280" aria-label="Înregistrarea testerului OBD"></canvas><p id="log-cit"></p></div>
       <div class="instr" data-panou="osc" hidden><canvas id="cv-osc" height="280" aria-label="Osciloscop – curentul injectorului 1"></canvas><p id="osc-cit"></p><p class="nota">Trageți cursoarele A și B pe ecran.</p></div>
@@ -659,7 +639,7 @@ Cadru.porneste({
     </aside>
   </div>`,
     init(C) {
-      actualizeazaSchema();
+      porneste3D();
       construiestePasi(); legaLog(); legaOsc();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       C.mesaj("Urmați pașii din panoul „Desfășurarea lucrării”.", "");
@@ -669,7 +649,7 @@ Cadru.porneste({
       const dt = Math.min(0.05, dt0 || 0.016); pas(dt);
       if (sim.osc.run && performance.now() - (this._to || 0) > 250) { this._to = performance.now(); achizitieOsc(); }
       if (!vizibil) return;
-      actualizeazaSchema(dt);
+      actualizeaza3D();
       const pn = PASI[pasActiv].panou;
       if (pn === "obd" && !sim.log.stop) desenLog();
       if (pn === "osc" && sim.osc.run && performance.now() - (this._tv || 0) > 250) { this._tv = performance.now(); desenOsc(); }

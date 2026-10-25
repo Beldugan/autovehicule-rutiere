@@ -86,21 +86,11 @@ function desenPres() {
     <linearGradient id="${Pf}-negru" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4f55"/><stop offset="1" stop-color="#121417"/></linearGradient>
     <linearGradient id="${Pf}-verde" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2e7d4f"/><stop offset=".5" stop-color="#5fbf86"/><stop offset="1" stop-color="#1f5e3a"/></linearGradient>
     <pattern id="${Pf}-imp" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#23272c"/><line x1="0" y1="0" x2="0" y2="6" stroke="#4b525a" stroke-width="2"/></pattern></defs>`;
-  // rampa de combustibil cu cele 4 injectoare și regulatorul (sistem cu retur)
-  s += `<g filter="url(#${Pf}-umbra)"><rect x="40" y="58" width="420" height="22" rx="11" fill="url(#${Pf}-tub)" stroke="#4d555d"/>`;
-  [90, 180, 270, 360].forEach((x, i) => { s += `<rect x="${x - 11}" y="80" width="22" height="46" rx="5" fill="url(#${Pf}-verde)" stroke="#14402a"/><rect x="${x - 6}" y="126" width="12" height="16" fill="#3b3f45"/><rect x="${x - 14}" y="38" width="28" height="20" rx="4" fill="#3b3f45" stroke="#111"/>${txt(x, 156, `I${i + 1}`, { fs: 10, w: 700 })}`; });
-  s += `<circle cx="468" cy="69" r="24" fill="url(#${Pf}-crom)" stroke="#5b6168"/><circle cx="468" cy="69" r="13" fill="#9aa1a8" stroke="#555"/></g>`;
-  s += txt(468, 112, "regulator", { fs: 10 });
-  // furtunul de vacuum al regulatorului (spre colector) – conectat sau deconectat și obturat
-  if (sim.regFurtun) s += `<path d="M484,52 C520,20 560,24 600,40" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/>${txt(600, 30, "furtun depresiune → colector", { fs: 9.5, a: "start" })}`;
-  else s += `<path d="M484,52 C500,40 510,36 520,36" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/><rect x="518" y="30" width="12" height="12" rx="3" fill="#d32f2f"/><path d="M560,40 C575,38 590,40 600,40" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/><rect x="552" y="34" width="10" height="12" rx="3" fill="#d32f2f"/>${txt(600, 30, "deconectat și obturat (dopuri)", { fs: 9.5, a: "start", f: "#d32f2f", w: 700 })}`;
-  // returul spre rezervor și turul de la pompă
-  s += `<path d="M468,93 C468,170 520,200 640,214" fill="none" stroke="#2f6f9e" stroke-width="6"/>${txt(650, 218, "retur → rezervor", { fs: 9.5, a: "start" })}`;
-  s += `<path d="M40,69 C10,69 10,240 60,250 H330" fill="none" stroke="url(#${Pf}-tub)" stroke-width="9"/>${txt(60, 270, "tur de la pompa electrică (filtru)", { fs: 9.5, a: "start" })}`;
-  // adaptorul în T (alamă) cu ventilul Schrader și furtunul trusei
-  s += `<rect x="330" y="240" width="50" height="22" rx="4" fill="url(#${Pf}-alama)" stroke="#6b5214"/><rect x="345" y="222" width="20" height="20" rx="3" fill="url(#${Pf}-alama)" stroke="#6b5214"/><path d="M380,251 C420,251 420,120 470,120" fill="none" stroke="url(#${Pf}-tub)" stroke-width="9" opacity="0"/>`;
-  if (M.montat) s += `<path d="M355,222 C355,180 560,250 612,226" fill="none" stroke="url(#${Pf}-imp)" stroke-width="9" stroke-linecap="round"/><rect x="604" y="214" width="20" height="18" rx="3" fill="url(#${Pf}-alama)" stroke="#6b5214"/>`;
-  else s += `<circle cx="355" cy="222" r="5" fill="#1b1b1b"/>${txt(355, 212, "ventil Schrader (capac)", { fs: 9 })}`;
+  // racordul trusei: furtunul vine de la adaptorul în T de pe turul de combustibil (rampa, regulatorul și adaptorul – pe macheta 3D)
+  s += txt(300, 40, "Trusa de presiune pe turul de combustibil", { fs: 12, w: 700 });
+  s += txt(300, 60, M.montat ? "adaptorul în T montat pe tur; furtunul trusei conectat la ventilul Schrader" : "trusa nemontată (adaptorul în T se vede pe macheta 3D)", { fs: 10 });
+  s += txt(300, 78, sim.regFurtun ? "furtunul de depresiune al regulatorului: conectat la colector" : "furtunul de depresiune al regulatorului: deconectat și obturat", { fs: 10 });
+  if (M.montat) s += `<path d="M150,250 C300,250 520,250 612,226" fill="none" stroke="url(#${Pf}-imp)" stroke-width="9" stroke-linecap="round"/><rect x="604" y="214" width="20" height="18" rx="3" fill="url(#${Pf}-alama)" stroke="#6b5214"/>${txt(150, 270, "← de la adaptorul în T (tur)", { fs: 9.5, a: "start" })}`;
   // manometrul trusei (0…6 bar, scală dublă psi), robinetul de golire
   s += `<g filter="url(#${Pf}-umbra)"><rect x="604" y="58" width="40" height="160" rx="8" fill="url(#${Pf}-negru)"/></g>`;
   s += svgGauge(Pf, 712, 140, 80, 6, p, { maj: 0.5, unit: "bar", marca: "GLYCERINE · CL 1,6", s2: { max: 80, maj: 20, unit: "psi", f: 6 / 87 * 80 / 6 } });
@@ -530,7 +520,7 @@ const TEST = [
 const SV = { m3d: null };
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=7").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", map: "MAP", l1: "sonda λ amonte", l2: "sonda λ aval" }, onSelect: () => {} }); })
+  import(BAZA_COMUN + "motor3d.js?v=8").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", map: "MAP", reg: "regulator", l1: "sonda λ amonte", l2: "sonda λ aval" }, onSelect: () => {} }); })
     .catch(e => { el.innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 const CSS = `<style>
@@ -673,7 +663,8 @@ Cadru.porneste({
       }
       if (sim.merge && provActiv() && sim.tProv > 120 && !this._av) { this._av = true; C.mesajTemporar("NSSM: defectul provocat durează de peste 2 minute – catalizatorul se supraîncălzește! Reveniți la normal.", "pericol"); }
       if (!provActiv()) this._av = false;
-      if (SV.m3d) SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.merge && sim.reg === "r2500" ? 9 : 0, selectat: null, decuplat: provActiv() === "rateu" ? { ["inj" + sim.cilR]: true } : {}, vent: false, tEv: sim.merge ? 420 : 160, eticheteVizibile: true });
+      if (SV.m3d) SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.merge && sim.reg === "r2500" ? 9 : 0, selectat: null, decuplat: provActiv() === "rateu" ? { ["inj" + sim.cilR]: true } : {}, vent: false, tEv: sim.merge ? 420 : 160, eticheteVizibile: true,
+        teTur: sim.man.montat, regFurtun: !!sim.regFurtun, furtune: [sim.man.montat ? { k: "teTur", c: 0x23272c } : null, sim.deb && sim.deb.retur ? { k: "retur", c: 0x2f6f9e, r: 0.005 } : null].filter(Boolean) });
       if (!vizibil) return;
       const now = performance.now();
       if (now - (this._td || 0) > 150) { this._td = now; deseneazaPanou(false); if (PASI[pasActiv].panou === "prep") desenAVL0(); }
