@@ -117,7 +117,7 @@ function actualizeazaSVG(dt) {
 /* motorul K7J pe stand – macheta 3D comună tuturor lucrărilor */
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=8").then(m => {
+  import(BAZA_COMUN + "motor3d.js?v=9").then(m => {
     const ET = { ckp: "CKP", cmp: "CMP", ect: "CTS", iat: "IAT", map: "MAP", tps: "TPS", l1: "λ1", l2: "λ2", inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", clap: "clapetă", can: "canistră", knock: "detonație" };
     SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: k => { if (COMP[k]) selecteaza(k, false); } });
   }).catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu a putut fi încărcată (${esc(e.message)}): este necesar un browser cu WebGL.</p>`; });

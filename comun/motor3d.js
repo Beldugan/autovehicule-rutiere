@@ -598,18 +598,40 @@ function sistemCR(g, M, XC, grupC, ancore, conectori) {
   const ip = [];
   ip.push(ajutoare(g).tub([[PX - 0.01, PY + 0.065, PZ - 0.02], [PX - 0.02, 0.43, PZ - 0.02], [0.19, RY, RZ + 0.01], [0.17, RY, RZ]], 0.0042, mIP));
   // injectoarele Delphi cu electrovalvă (verticale, pe partea admisiei a chiulasei)
-  const IZ = 0.112, inj = [];
-  const gJ = grupC("inj", "Injectoarele Delphi cu electrovalvă"); const ja = ajutoare(gJ);
+  // injectoarele Delphi cu electrovalvă: ușor înclinate, prin capacul chiulasei, cu duza (6 orificii) în centrul camerei de ardere
+  const inj = [], jeturi = [], IT = 0.256, IZT = 0.024, IZS = 0.062, ISUS = 0.49;
+  const gJ = grupC("inj", "Injectoarele Delphi cu electrovalvă");
+  const sus = V(0, ISUS - IT, IZS - IZT).normalize(), qJ = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), sus);
+  // geometria unui jet (con cu vârful în duză, orientat după −y) și cele 6 direcții ale orificiilor (unghiul conului de pulverizare 150°)
+  const gCon = new THREE.ConeGeometry(1, 1, 14, 1, true); gCon.translate(0, -0.5, 0);   // vârful în origine, corpul spre −y
+  // transparența jetului: lichid compact la ieșirea din orificiu, picături tot mai rare spre vârf (atomizare)
+  const cG = document.createElement("canvas"); cG.width = 4; cG.height = 64; { const x = cG.getContext("2d"), gr = x.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, "#fff"); gr.addColorStop(0.5, "#f0f0f0"); gr.addColorStop(1, "#a0a0a0"); x.fillStyle = gr; x.fillRect(0, 0, 4, 64); }
+  const texJ = new THREE.CanvasTexture(cG);
+  const DIR = Array.from({ length: 6 }, (_, k) => { const fi = k / 6 * Math.PI * 2 + 0.26, a = 70 * Math.PI / 180; return V(Math.sin(a) * Math.cos(fi), -Math.cos(a), Math.sin(a) * Math.sin(fi)); });
   XC.forEach((x, i) => {
-    ja.cyl(0.0095, 0.0085, 0.11, M.otel, x, 0.395, IZ, "y", gJ, 24); ja.cyl(0.013, 0.013, 0.03, M.crom, x, 0.455, IZ, "y", gJ, 6);
-    const sol = ja.cyl(0.012, 0.012, 0.022, M.plastic.clone(), x, 0.48, IZ, "y", gJ, 20); conectori["cr" + (i + 1)] = ja.rbox(0.02, 0.014, 0.02, 0.004, M.plasticGri, x, 0.497, IZ - 0.01);
-    ja.cyl(0.0042, 0.0042, 0.018, M.otel, x + 0.012, 0.47, IZ, "x", gJ, 10);                                                                       // racordul de înaltă presiune
-    ip.push(ajutoare(g).tub([[x, RY - 0.025, RZ - 0.004], [x + 0.01, RY - 0.04, RZ - 0.02], [x + 0.022, 0.47, IZ + 0.01], [x + 0.02, 0.47, IZ]], 0.0035, mIP));
+    const J = new THREE.Group(); J.position.set(x, IT, IZT); J.quaternion.copy(qJ); gJ.add(J); const ja = ajutoare(J);
+    ja.cyl(0.0035, 0.0045, 0.022, M.otel, 0, 0.011, 0, "y", J, 16);                                                                   // duza
+    ja.cyl(0.0085, 0.0085, 0.15, M.otel, 0, 0.097, 0, "y", J, 24);                                                                    // corpul (portinjectorul)
+    ja.cyl(0.013, 0.013, 0.028, M.crom, 0, 0.186, 0, "y", J, 6);                                                                      // piulița de prindere
+    const sol = ja.cyl(0.012, 0.012, 0.024, M.plastic.clone(), 0, 0.212, 0, "y", J, 20);                                              // electrovalva
+    conectori["cr" + (i + 1)] = ja.rbox(0.02, 0.014, 0.02, 0.004, M.plasticGri, 0, 0.23, -0.012);
+    ja.cyl(0.0042, 0.0042, 0.02, M.otel, 0.012, 0.18, 0, "x", J, 10);                                                                 // racordul de înaltă presiune
+    J.updateMatrixWorld(true); const intr = J.localToWorld(V(0.022, 0.18, 0));
+    ip.push(ajutoare(g).tub([[x, RY - 0.025, RZ - 0.004], [x + 0.012, RY - 0.045, RZ - 0.03], [intr.x + 0.004, intr.y + 0.004, intr.z + 0.02], [intr.x, intr.y, intr.z]], 0.0035, mIP));
     inj.push(sol);
+    // jetul de combustibil pulverizat (6 conuri), în camera de ardere, sub vârful duzei
+    const P = new THREE.Group(); P.position.set(x, IT - 0.003, IZT); I_ADD(P);
+    const mJ = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: texJ, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const mJ2 = new THREE.MeshBasicMaterial({ color: 0x9fd0ff, alphaMap: texJ, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const mN = new THREE.MeshBasicMaterial({ color: 0xbfd8ee, transparent: true, opacity: 0, depthWrite: false });
+    const conuri = DIR.map(d => { const m = new THREE.Mesh(gCon, mJ); m.quaternion.setFromUnitVectors(V(0, -1, 0), d); P.add(m); const e = new THREE.Mesh(gCon, mJ2); e.scale.set(2.3, 1.08, 2.3); m.add(e); return m; });
+    const nor = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mN); nor.scale.set(0, 0, 0); P.add(nor);                          // norul de vapori după injecție
+    jeturi.push({ P, conuri, mJ, mJ2, mN, nor });
   });
-  ancore.inj = V(XC[0], 0.51, IZ);
-  // returul injectoarelor (furtune înlănțuite) și al pompei, spre rezervor; turul de joasă presiune: rezervor → filtru → pompa de transfer
-  const ret = ajutoare(g).tub([[XC[0] - 0.012, 0.47, IZ], ...XC.map(x => [x + 0.008, 0.49, IZ - 0.012]), [0.2, 0.47, 0.1], [0.32, 0.3, 0.2], [0.4, 0.0, 0.35], [-0.2, -0.4, 0.42], [-0.5, -0.52, 0.4]], 0.0032, mRet);
+  function I_ADD(o) { g.add(o); }
+  ancore.inj = V(XC[0], 0.51, IZS);
+  // returul injectoarelor (furtune înlănțuite pe electrovalve) și al pompei, spre rezervor; turul de joasă presiune: rezervor → filtru → pompa de transfer
+  const ret = ajutoare(g).tub([[XC[0] - 0.016, ISUS - 0.03, IZS - 0.004], ...XC.map(x => [x + 0.01, ISUS - 0.012, IZS - 0.016]), [0.2, 0.47, 0.1], [0.32, 0.3, 0.2], [0.4, 0.0, 0.35], [-0.2, -0.4, 0.42], [-0.5, -0.52, 0.4]], 0.0032, mRet);
   const tur1 = ajutoare(g).tub([[-0.6, -0.52, 0.36], [-0.3, -0.45, 0.45], [0.3, -0.2, 0.42], [0.46, 0.0, 0.36], [0.46, 0.05, 0.34]], 0.0045, mJP);
   const tur2 = ajutoare(g).tub([[0.46, 0.2, 0.32], [0.38, 0.32, 0.28], [0.25, 0.31, 0.24], [PX - 0.064, PY, PZ]], 0.0045, mJP);
   // bujiile incandescente (pe partea evacuării) cu bara de alimentare
@@ -620,12 +642,12 @@ function sistemCR(g, M, XC, grupC, ancore, conectori) {
     { q: "jp", n: 18, curba: new THREE.CatmullRomCurve3([V(-0.6, -0.52, 0.36), V(-0.3, -0.45, 0.45), V(0.3, -0.2, 0.42), V(0.46, 0.0, 0.36), V(0.46, 0.05, 0.34), V(0.46, 0.2, 0.32), V(0.38, 0.32, 0.28), V(0.25, 0.31, 0.24), V(PX - 0.064, PY, PZ)]) },
     { q: "ip", n: 8, curba: new THREE.CatmullRomCurve3([V(PX - 0.01, PY + 0.065, PZ - 0.02), V(PX - 0.02, 0.43, PZ - 0.02), V(0.19, RY, RZ + 0.01), V(0.17, RY, RZ)]) },
     { q: "ip", n: 18, curba: new THREE.CatmullRomCurve3([V(0.17, RY, RZ), V(-0.19, RY, RZ)]) },
-    { q: "ret", n: 22, curba: new THREE.CatmullRomCurve3([V(XC[0] - 0.012, 0.47, IZ), ...XC.map(x => V(x + 0.008, 0.49, IZ - 0.012)), V(0.2, 0.47, 0.1), V(0.32, 0.3, 0.2), V(0.4, 0.0, 0.35), V(-0.2, -0.4, 0.42), V(-0.5, -0.52, 0.4)]) }
+    { q: "ret", n: 22, curba: new THREE.CatmullRomCurve3([V(XC[0] - 0.016, ISUS - 0.03, IZS - 0.004), ...XC.map(x => V(x + 0.01, ISUS - 0.012, IZS - 0.016)), V(0.2, 0.47, 0.1), V(0.32, 0.3, 0.2), V(0.4, 0.0, 0.35), V(-0.2, -0.4, 0.42), V(-0.5, -0.52, 0.4)]) }
   ];
   let NP = 0; TR.forEach(t => { t.L = t.curba.getLength(); t.s = Array.from({ length: t.n }, (_, k) => k / t.n); NP += t.n; });
   const part = new THREE.InstancedMesh(new THREE.SphereGeometry(0.0034, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), NP); g.add(part);
   // piesele sistemului rămân opace în modurile „transparent” / „secționat” ale machetei
-  [gR, gF, gP, gT, gI, gRa, gS, gJ, ...ip, ret, tur1, tur2, part].forEach(o => o.traverse(m => { if (m.isMesh) m.userData.interior = true; }));
+  [gR, gF, gP, gT, gI, gRa, gS, gJ, ...ip, ret, tur1, tur2, part, ...jeturi.map(j => j.P)].forEach(o => o.traverse(m => { if (m.isMesh) m.userData.interior = true; }));
   const cul = { jp: new THREE.Color(0x9fd2ff), ip: new THREE.Color(0xff6a3d), ret: new THREE.Color(0xcfe6ff) };
   let j0 = 0; TR.forEach(t => { for (let k = 0; k < t.n; k++) part.setColorAt(j0++, cul[t.q]); });
   const mat4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), s1 = new THREE.Vector3(1, 1, 1), s0 = new THREE.Vector3(0, 0, 0);
@@ -634,7 +656,21 @@ function sistemCR(g, M, XC, grupC, ancore, conectori) {
   return function (u, dt, vis) {
     th += vis; const thD = th * 180 / Math.PI, p = u.p || 0, merge = !!u.merge;
     mIP.emissiveIntensity = Math.min(0.55, p / 2800); mIP.emissive.setHSL(0.03, 1, 0.45);
-    inj.forEach((m, i) => { const phi = ((thD - OF_CIL[i]) % 720 + 720) % 720, act = merge && (phi > 700 || phi < 12); m.material.emissive = m.material.emissive || new THREE.Color(0); m.material.emissive.setHex(act ? 0x33ff66 : 0); m.material.emissiveIntensity = act ? 0.9 : 0; });
+    // injecțiile ciclului: u.prof = [[start (°RAC față de PMI), durată (°RAC)], …] (pilot, principală, post); implicit pilot + principală
+    const prof = u.prof && u.prof.length ? u.prof : [[-7, 1.5], [-2, 5]], inject = merge || !!u.antrenare;
+    const Lmax = Math.min(0.036, 0.034 * Math.sqrt(Math.max(p, 50) / 1000)), FADE = 26;
+    inj.forEach((m, i) => {
+      const phi = ((thD - OF_CIL[i]) % 720 + 720) % 720; let act = false, L = 0, op = 0, nor = 0;
+      if (inject) prof.forEach(([a0, d0]) => {
+        const d = (((phi - (720 + a0)) % 720) + 720) % 720, dur = Math.max(1.2, d0), k = Math.min(1, Math.sqrt(dur / 5));
+        if (d < dur) { act = true; L = Math.max(L, Lmax * k * Math.min(1, (d + 0.6) / Math.max(1.5, dur * 0.6))); op = Math.max(op, 0.95); }
+        else if (d < dur + FADE) { const f = (d - dur) / FADE; L = Math.max(L, Lmax * k * (1 + 0.25 * f)); op = Math.max(op, 0.95 * (1 - f) * (1 - f)); nor = Math.max(nor, Math.sin(Math.PI * f) * k); }
+      });
+      m.material.emissive = m.material.emissive || new THREE.Color(0); m.material.emissive.setHex(act ? 0x33ff66 : 0); m.material.emissiveIntensity = act ? 0.9 : 0;
+      const j = jeturi[i], w = Math.max(0.0001, L * (act ? 0.13 : 0.18));
+      j.conuri.forEach(c => { c.visible = L > 0.0005; c.scale.set(w, Math.max(0.0001, L), w); }); j.mJ.opacity = op; j.mJ2.opacity = op * 0.55;
+      j.mN.opacity = 0.35 * nor; j.nor.scale.setScalar(nor > 0.01 ? 0.012 + 0.02 * nor : 0.0001); j.nor.position.y = -0.008;
+    });
     const v = { jp: 0.05 + 0.25 * (u.n || 0) / 4000, ip: 0.03 + 0.12 * (u.n || 0) / 4000 * (u.imv || 50) / 50, ret: 0.04 + 0.08 * (u.n || 0) / 4000 };
     let j = 0; TR.forEach(t => { const on = (u.n || 0) > 20 && (u.contact !== false); t.s.forEach((s0_, k) => { const s = (s0_ + v[t.q] * dt / t.L) % 1; t.s[k] = s; mat4.compose(t.curba.getPointAt(s), q0, on ? s1 : s0); part.setMatrixAt(j++, mat4); }); });
     part.instanceMatrix.needsUpdate = true;

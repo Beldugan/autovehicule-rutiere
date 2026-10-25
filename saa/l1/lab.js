@@ -441,7 +441,7 @@ const TEST = [
 /* ------------------------------------------------------------------ 3D: motorul pe stand */
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=8").then(m => {
+  import(BAZA_COMUN + "motor3d.js?v=9").then(m => {
     const ET = { inj1: "injector 1", inj2: "injector 2", inj3: "injector 3", inj4: "injector 4", map: "MAP", ect: "CTS", ckp: "CKP", tps: "clapetă / TPS", clap: "corp clapetă", iat: "IAT", l1: "λ amonte", can: "canistră" };
     SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: () => { } });
     SV.m3d.selecteaza("inj1", false);

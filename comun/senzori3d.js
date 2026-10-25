@@ -4,7 +4,7 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
-import { MAT } from "./motor3d.js?v=8";
+import { MAT } from "./motor3d.js?v=9";
 import { SENZORI } from "./senzori-date.js?v=1";
 
 const CAT = () => globalThis.CATALOG_SENZORI;

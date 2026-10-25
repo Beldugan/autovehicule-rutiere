@@ -211,13 +211,14 @@ const ET3D = { rez: "rezervor", filtru: "filtru motorină", pjp: "pompa de trans
 function alegeComp3D(k) { if (!COMP[k]) return; sim.ident.add(k); sim.sel3d = k; const t = `<b>${COMP[k][0]}.</b> ${COMP[k][1]}`; $("#comp-info") && ($("#comp-info").innerHTML = t); $("#comp-info2").innerHTML = t; actualizeazaPasi(); }
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=8").then(m => { SV.m3d = m.creeazaStand(el, { varianta: "dci", interior: true, mod: "transparent", etichete: ET3D, onSelect: alegeComp3D }); SV.m3d.vedere([1.0, 0.9, 1.25], [0.0, 0.25, 0.1]); })
+  import(BAZA_COMUN + "motor3d.js?v=9").then(m => { SV.m3d = m.creeazaStand(el, { varianta: "dci", interior: true, mod: "transparent", etichete: ET3D, onSelect: alegeComp3D }); SV.m3d.vedere([1.0, 0.9, 1.25], [0.0, 0.25, 0.1]); })
     .catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu a putut fi încărcată (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#motor3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp3D(b.dataset.c3))); });
 }
 function actualizeaza3D() {
   if (!SV.m3d) return;
   SV.m3d.seteaza({ rpm: sim.merge || sim.cr ? sim.n : 0, tps: 0, selectat: sim.sel3d || null, vent: false, tEv: sim.merge ? 300 : 80, eticheteVizibile: true,
-    cr: { p: sim.p, imv: sim.imv, n: sim.merge || sim.cr ? sim.n : 0, merge: sim.merge, contact: sim.contact || sim.merge },
+    cr: { p: sim.p, imv: sim.imv, n: sim.merge || sim.cr ? sim.n : 0, merge: sim.merge, antrenare: sim.cr && sim.n > 100, contact: sim.contact || sim.merge,
+      prof: (sim.merge || sim.cr) && sim.n > 50 ? profil(regInj()).map(([t, d]) => [-2 + t * sim.n * 6, d * sim.n * 6]) : [] },
     furtune: [sim.obd ? { k: "obd", c: 0x1f5fd0, r: 0.004 } : null, sim.cleste ? { k: "inj", c: 0xffd400, r: 0.0035 } : null].filter(Boolean) });
 }
 /* ------------------------------------------------------------------ testerul OBD cu înregistrare și cursoare */
