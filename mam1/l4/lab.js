@@ -22,6 +22,42 @@ function initTermic() { const p = P(); sim.Ts = { ntc: p.Ta + 2.3, lm: p.Ta + 2.
 const medTip = () => sim.poz === "aer" ? "aer" : "apa";
 const Tm = () => MD.mediu(P(), sim.poz, sim.tS);
 const POZ = { aer: [300, 470], pahar: [172, 712], apa: [400, 712] };
+let SV3 = null;                                   // standul 3D (aparate3d.js)
+const VEDERI = { tot: [[0.0, 0.56, 1.05], [-0.05, 0.14, 0]], senzori: [[-0.24, 0.3, 0.46], [-0.19, 0.12, 0.02]], placa: [[0.13, 0.2, 0.28], [0.11, 0.01, 0.04]], dmm: [[0.26, 0.27, 0.42], [0.17, 0.03, 0.05]] };
+function vedere3d(v) { if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
+function linieOled() {
+  const v = sim.pr && sim.pr.last, f = (x, d) => Number.isFinite(x) ? x.toFixed(d).padStart(7, " ") : "     —";
+  return { titlu: sim.fw ? `TEMP[C] B=${sim.fw.B}${sim.rec ? " REC " + (sim.rec.k * 0.5).toFixed(0) + "s" : ""}` : "", linii: v ? [`NTC ${f(v.ntc, 2)}`, `LM35${f(v.lm, 2)}`, `DS  ${f(v.ds, 3)}`, `TK  ${f(v.tc, 2)}`] : ["pornire..."] };
+}
+function sincron3d(rapid) {
+  if (!SV3) return;
+  const mm = t => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  SV3.seteaza({ poz: sim.poz, rapid, et: etalon().toFixed(1), oled: linieOled(), run: sim.run, rec: !!sim.rec, dec: sim.dec, manusi: sim.manusi, tx: sim.run && performance.now() - sim.tx < 80,
+    dmm: { mod: sim.dmm.mod, txt: sim.dmm.mod === "OFF" ? "" : ($("#dmm-v").textContent || ""), u: $("#dmm-u").textContent || "", r: sim.dmm.s.dmmR, b: sim.dmm.s.dmmB },
+    ceas: mm(sim.tS), ceasP: `${{ aer: "în aer", pahar: "în pahar", apa: "în apa caldă" }[sim.poz]} ${mm(sim.tPoz)}${sim.viteza > 1 ? " · ×" + sim.viteza : ""}`, Tw: MD.mediu(P(), "apa", sim.tS) });
+}
+function laClic3d(k) {
+  if (k === "pahar") return mutaPoz("pahar");
+  if (k === "termos") return mutaPoz("apa");
+  if (k === "aer" || (k === "senzori" && sim.poz !== "aer")) return mutaPoz("aer");
+  if (k === "x2") { sim.dec = !sim.dec; desenStativ(); citesteDMM(); actualizeazaPasi(); return sincron3d(); }
+  if (k === "manusi") { sim.manusi = !sim.manusi; instrumenteAfis(); actualizeazaPasi(); return sincron3d(); }
+  if (k === "rst") return resetMega();
+  if (k === "dmmKnob") { sim.dmm.mod = { OFF: "V", V: "R", R: "OFF" }[sim.dmm.mod]; citesteDMM(); dmmCtl(); actualizeazaPasi(); return sincron3d(); }
+  if (PIN[k]) { const id = ["tGND", "n2"].includes(k) ? "dmmB" : "dmmR"; sim.dmm.s[id] = k; desenSonde(); citesteDMM(); dmmCtl(); actualizeazaPasi(); return sincron3d(); }
+  inspector({ dmm: "dmm", senzori: "senzori" }[k] || k);
+}
+/* comenzile multimetrului (sub planșă) */
+const TP_OPT = [["nc", "liberă"], ["tUs", "TP Us (A0)"], ["t5V", "TP 5V"], ["tLM", "TP LM35 (A1)"], ["tGND", "TP GND"], ["n1", "NTC 1"], ["n2", "NTC 2"]];
+function dmmCtl() {
+  const el = $("#tk-dmm"); if (!el) return;
+  el.innerHTML = `<b>Multimetru</b>${[["OFF", "OFF"], ["V", "V⎓"], ["R", "Ω"]].map(([m, t]) => `<button type="button" data-dm="${m}" class="${sim.dmm.mod === m ? "activ" : ""}">${t}</button>`).join("")}
+    <label>sonda <span style="color:#d32f2f;font-weight:800">+</span> <select data-ds="dmmR">${TP_OPT.map(([k, t]) => `<option value="${k}"${sim.dmm.s.dmmR === k ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+    <label>sonda <b>−</b> <select data-ds="dmmB">${TP_OPT.map(([k, t]) => `<option value="${k}"${sim.dmm.s.dmmB === k ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+    <span class="tk-dmm-v">${sim.dmm.mod === "OFF" ? "" : sim.dmm.txt}</span>`;
+  $$("[data-dm]", el).forEach(b => b.addEventListener("click", () => { sim.dmm.mod = b.dataset.dm; citesteDMM(); dmmCtl(); actualizeazaPasi(); sincron3d(); }));
+  $$("[data-ds]", el).forEach(s => s.addEventListener("change", () => { sim.dmm.s[s.dataset.ds] = s.value; desenSonde(); citesteDMM(); dmmCtl(); actualizeazaPasi(); sincron3d(); }));
+}
 const NUME_POZ = { aer: "în aer (deasupra recipientelor)", pahar: "în paharul cu apă la temperatura camerei", apa: "în apa caldă din recipientul izolat" };
 /** abaterea maximă a senzorilor (și a etalonului) față de mediu */
 const abatere = () => Math.max(...["ntc", "lm", "ds", "tc", "et"].map(k => Math.abs(sim.Ts[k] - Tm())));
@@ -296,7 +332,7 @@ function mutaPoz(poz, instant) {
   const [x1, y1] = POZ[poz], x0 = sim.bx, y0 = sim.by;
   sim.poz = poz; sim.tPoz = 0;
   if (instant) { sim.anim = { t: 0, d: 0.35, x0, y0, x1, y1 }; } else sim.anim = { t: 0, d: 1.1, x0, y0, x1, y1 };
-  actualizeazaPasi();
+  sincron3d(instant); actualizeazaPasi();
 }
 function animaStativ(h) {
   const a = sim.anim; if (!a) return;
@@ -569,28 +605,28 @@ const ctlPoz = () => `<div class="rand-mic">${[["aer", "↑ Aer"], ["pahar", "Pa
   <div class="rand-mic"><span class="nota" style="align-self:center">Timp:</span>${[1, 10, 30, 60].map(v => `<button type="button" data-vit="${v}" class="${sim.viteza === v ? "activ" : ""}">×${v}</button>`).join("")}</div>`;
 const SIT = s => s === "aer" ? "aer" : "apa";
 const PASI = [
-  { t: "Stabilizarea în aer", tab: "Tabelul 4.1 – aer", zona: [0, 0, 1300, 800], pini: [],
+  { t: "Stabilizarea în aer", tab: "Tabelul 4.1 – aer", v3: "tot", zona: [0, 0, 1300, 800], pini: [],
     banda: "Pasul 1 · Senzorii au fost ținuți în mână la montare (sunt mai calzi). Lăsați-i în aer cel puțin 5 minute (accelerați timpul) și înregistrați indicațiile de pe OLED și ale etalonului.",
     instr: ["Porniți simularea (programul afișează cele patru temperaturi pe OLED și pe monitorul serial).", "Stativul ridicat: senzorii în aer. Accelerați timpul (×10…×60) și urmăriți plotterul până când curbele devin orizontale.", "După cel puțin 5 minute: „● citiri → Tabelul 4.1”."],
     ctl: ctlPoz,
     ver: () => [[sim.run, "programul rulează"], [!sim.dec, "X2 cuplat"], [sim.poz === "aer", "senzorii în aer"], [sim.poz === "aer" && sim.tPoz >= 300, `≥ 5 min în aer (${fx(sim.tPoz / 60, 1)} min)`], [sim.poz === "aer" && abatere() < 0.3, "indicațiile stabilizate"]],
     prog: () => ["et", ...SZ].filter(c => pe("t41", "aer", c)).length, tot: 5,
     butoane: [["● citiri (OLED + etalon) → Tabelul 4.1", inregSt, "primar"]] },
-  { t: "Divizorul NTC în aer", tab: "Tabelul 4.3 – aer", zona: [540, 20, 560, 720], pini: ["tUs", "t5V", "tGND", "n1", "n2"],
+  { t: "Divizorul NTC în aer", tab: "Tabelul 4.3 – aer", v3: "dmm", zona: [540, 20, 560, 720], pini: ["tUs", "t5V", "tGND", "n1", "n2"],
     banda: "Pasul 2 · Multimetrul V⎓: sonda − pe TP GND, + pe TP Us (Us), apoi pe TP 5V (Uref). Apoi decuplați X2, Ω pe NTC 1 – NTC 2 (rezistența măsurată).",
     instr: ["Multimetrul pe <b>V⎓</b>, sonda − pe TP GND, sonda + pe TP Us → „● Us”.", "Sonda + pe TP 5V → „● Uref” (alimentarea divizorului).", "Decuplați X2 (clic pe conector), multimetrul pe <b>Ω</b>, sondele pe NTC 1 și NTC 2 → „● R”. Observați pe OLED ce afișează programul cu NTC-ul deconectat.", "Cuplați X2 la loc."],
     ctl: () => "",
     ver: () => [[sim.run, "programul rulează"], [stabil("aer"), "senzorii stabilizați în aer"], [sim.dmm.mod !== "OFF", "multimetrul pornit"], [peMasa(sim.dmm.s.dmmB) || [sim.dmm.s.dmmR, sim.dmm.s.dmmB].sort().join() === "n1,n2", "sonda − pe masă / sondele pe NTC"]],
     prog: () => ["us", "uref", "rm"].filter(c => pe("t43", "aer", c)).length, tot: 3,
     butoane: [["● Us → Tabelul 4.3", inregUs, "primar"], ["● Uref → Tabelul 4.3", inregUref, "secundar"], ["● R NTC → Tabelul 4.3", inregR, "secundar"]] },
-  { t: "Apă caldă, după stabilizare", tab: "Tabelele 4.1 și 4.3 – apă", zona: [0, 300, 900, 500], pini: ["tUs", "t5V", "tGND", "n1", "n2"],
+  { t: "Apă caldă, după stabilizare", tab: "Tabelele 4.1 și 4.3 – apă", v3: "senzori", zona: [0, 300, 900, 500], pini: ["tUs", "t5V", "tGND", "n1", "n2"],
     banda: "Pasul 3 · Mănușile, apoi senzorii în recipientul cu apă caldă. După stabilizare: citirile (Tabelul 4.1) și măsurătorile divizorului (Tabelul 4.3).",
     instr: ["Puneți mănușile termoizolante (clic pe ele sau butonul de mai jos).", "„Apă caldă”: stativul coboară senzorii în recipient (conexiunile rămân deasupra apei).", "Așteptați stabilizarea (≥ 1 min, indicațiile constante) și înregistrați: citirile → Tabelul 4.1; Us, Uref, R → Tabelul 4.3."],
     ctl: ctlPoz,
     ver: () => [[sim.manusi, "mănușile puse"], [sim.poz === "apa", "senzorii în apa caldă"], [stabil("apa"), "indicațiile stabilizate"]],
     prog: () => ["et", ...SZ].filter(c => pe("t41", "apa", c)).length + ["us", "uref", "rm"].filter(c => pe("t43", "apa", c)).length, tot: 8,
     butoane: [["● citiri (OLED + etalon) → Tabelul 4.1", inregSt, "primar"], ["● Us → Tabelul 4.3", inregUs, "secundar"], ["● Uref → Tabelul 4.3", inregUref, "secundar"], ["● R NTC → Tabelul 4.3", inregR, "secundar"]] },
-  { t: "Treapta de temperatură", tab: "Tabelul 4.2", zona: [0, 150, 900, 650], pini: [],
+  { t: "Treapta de temperatură", tab: "Tabelul 4.2", v3: "senzori", zona: [0, 150, 900, 650], pini: [],
     banda: "Pasul 4 · Senzorii, stabilizați în aer, se introduc simultan în apa caldă; programul înregistrează 121 de eșantioane (60 s). Pe înregistrare: ϑ0, ϑ∞, ϑ(τ) = ϑ0 + 0,632(ϑ∞ − ϑ0) și τ.",
     instr: ["Răciți senzorii: ≈ 1 min în pahar, apoi în aer până se stabilizează (≥ 3…5 min, accelerați timpul).", "Timp ×1, mănușile puse: „▶ Treaptă” (trimite „r” și coboară senzorii la t = 0).", "După 60 s: alegeți senzorul, mutați cursorul pe primul eșantion care atinge ϑ(τ) și înregistrați (repetați pentru toți cei patru).", "Comparați: termocuplul cel mai rapid, NTC-ul auto cel mai lent; DS18B20 are în plus întârzierea conversiei."],
     ctl: () => `${ctlPoz()}<div class="rand-mic"><button type="button" data-trp="1" class="primar">▶ Treaptă (r + introducere)</button></div>
@@ -601,7 +637,7 @@ const PASI = [
     ver: () => [[sim.run, "programul rulează"], [sim.manusi, "mănușile puse"], [!!sim.inreg || !!sim.rec, sim.rec ? `înregistrare: ${fx(sim.rec.k * 0.5, 1)} / 60 s` : "treapta înregistrată"], [!!(sim.inreg && sim.inreg.ok), "pornită din aer, cu senzorii stabilizați"]],
     prog: () => SZ.filter(k => pe("t42", k, "tau")).length, tot: 4,
     butoane: [["● ϑ0, ϑ∞, τ (cursor) → Tabelul 4.2", inregTau, "primar"]] },
-  { t: "Liniarizarea NTC", tab: "Tabelul 4.3 – calcul", zona: [540, 20, 560, 720], pini: [],
+  { t: "Liniarizarea NTC", tab: "Tabelul 4.3 – calcul", v3: "placa", zona: [540, 20, 560, 720], pini: [],
     banda: "Pasul 5 · Din Us și Uref: R = Rp·Us/(Uref − Us) (4.1), apoi ϑ cu modelul B (4.2) și din tabelul constructorului; comparați cu etalonul și cu rezistența măsurată.",
     instr: ["Calculele apar în coloanele Tabelului 4.3 (fila Determinări) și în rezultate.", "Comparați ϑ model B și ϑ din tabel cu etalonul; eroarea vine din toleranța R25 și B a exemplarului, din Rp (1 %) și din forma reală a caracteristicii.", "Opțional: opriți simularea, schimbați B în program (de ex. 3977) și observați eroarea pe OLED."],
     ctl: () => `<div class="tabel-scroll"><table class="tabel mic"><thead><tr><th>ϑ [°C]</th>${MD.TABEL.filter(r => r[0] >= 0 && r[0] <= 100).map(r => `<th>${r[0]}</th>`).join("")}</tr></thead><tbody><tr><td>R [Ω]</td>${MD.TABEL.filter(r => r[0] >= 0 && r[0] <= 100).map(r => `<td>${r[1]}</td>`).join("")}</tr></tbody></table></div><p class="nota">Tabelul constructorului (NTC 2,5 kΩ la 25 °C).</p>`,
@@ -631,7 +667,7 @@ function alegePas(i, zoom) {
   $$("#pasi .pas").forEach(el => el.classList.toggle("activ", +el.dataset.pas === i));
   $$("#tk-svg .tk-pin").forEach(r => r.classList.toggle("tinta", p.pini.includes(r.dataset.pin)));
   $("#tk-pas-banda").innerHTML = p.banda;
-  if (zoom) seteazaVB(p.zona.slice());
+  if (zoom) { seteazaVB(p.zona.slice()); vedere3d(p.v3); }
   if (i === 3 && sim.inreg) { sim.vedere = "rec"; comutaVedere(); }
   actualizeazaPasi();
 }
@@ -765,6 +801,12 @@ const CSS = `<style>
 #tk-svg { width:100%; height:auto; aspect-ratio:1300/800; display:block; touch-action:none; user-select:none; font-family:system-ui,sans-serif; }
 .tk-pin { fill:transparent; stroke:transparent; cursor:crosshair; } .tk-pin:hover, .tk-pin.aproape { fill:rgba(20,119,209,.35); stroke:#1477d1; stroke-width:1.2; }
 .tk-comp { cursor:pointer; }
+.m4-3d .m3d { height:clamp(400px, 58vh, 640px); }
+.tk-plansa.cu3d #tk-svg { display:none; }
+.a3d-tip { position:absolute; background:rgba(20,24,30,.88); color:#fff; font:12px system-ui,sans-serif; padding:.2rem .45rem; border-radius:4px; pointer-events:none; white-space:nowrap; z-index:3; }
+.tk-dmm, .tk-vederi { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; padding:.35rem .6rem; font:12.5px system-ui,sans-serif; color:#333; border-bottom:1px solid #eee; }
+.tk-dmm button, .tk-vederi button { border:1px solid #cfd4da; background:#fff; color:#333; border-radius:4px; padding:.2rem .55rem; font:600 12px system-ui; cursor:pointer; } .tk-dmm button.activ { background:#f2b705; border-color:#c99700; }
+.tk-dmm select { font:12px system-ui; } .tk-dmm-v { margin-left:auto; font:700 14px ui-monospace,monospace; background:#bfd0b0; color:#1d2414; padding:.1rem .5rem; border-radius:3px; min-width:7ch; text-align:right; }
 .abur { opacity:.0; animation:abur 3.2s ease-in-out infinite; } .abur1 { animation-delay:1.05s; } .abur2 { animation-delay:2.1s; }
 @keyframes abur { 0% { opacity:0; transform:translateY(8px); } 35% { opacity:.55; } 100% { opacity:0; transform:translateY(-26px); } }
 .tk-ajutor { margin:.3rem .6rem 0; font:11px system-ui,sans-serif; color:#888; pointer-events:none; }
@@ -809,6 +851,7 @@ pre.cod { background:#1e1e1e; color:#d4d4d4; padding:.7rem .9rem; border-radius:
 table.mic { font-size:.72rem; } table.mic th, table.mic td { padding:.15rem .3rem; }
 .sim-grila:fullscreen .sim-scena.tk, .sim-grila.ecran-plin .sim-scena.tk { display:block; }
 .sim-grila:fullscreen #tk-svg, .sim-grila.ecran-plin #tk-svg { height:calc(100vh - 25rem); min-height:320px; aspect-ratio:auto; }
+.sim-grila:fullscreen .m4-3d .m3d, .sim-grila.ecran-plin .m4-3d .m3d { height:calc(100vh - 27rem); min-height:320px; }
 @media (max-width:900px){ .tk-jos { grid-template-columns:1fr; } .tk-ser { border-left:0; border-top:1px solid #e3e3e3; } .tk-pas-banda { position:static; max-width:none; border-radius:0; } }
 </style>`;
 Cadru.porneste({
@@ -874,9 +917,12 @@ Cadru.porneste({
         <button type="button" id="tk-codb" class="activ">{ } Cod</button>
         <button type="button" id="tk-start" class="tk-start">▶ Pornește simularea</button>
       </div>
-      <div class="tk-plansa">${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div>
+      <div class="tk-plansa"><div id="st3d" class="m4-3d"></div>${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div>
         <div class="tk-pas-banda" id="tk-pas-banda"></div></div>
-      <p class="tk-ajutor">Rotița = zoom · tragere pe fundal = deplasare · clic pe componente = detalii (dublu clic pe pahar / recipient = introduce senzorii) · trageți sondele multimetrului pe punctele de test · clic pe comutatorul rotativ, pe X2, pe mănuși și pe RESET</p>
+      <div class="tk-dmm" id="tk-dmm"></div>
+      <div class="tk-vederi" id="tk-vederi" hidden><span>Vedere:</span>${[["tot", "Ansamblu"], ["senzori", "Senzori și recipiente"], ["placa", "Placa de test"], ["dmm", "Multimetru"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>
+      <p class="tk-ajutor" id="aj-3d" hidden>Trageți = rotire · dreapta-trageți = deplasare · rotița = zoom · clic pe pahar / vasul Dewar / stativ = mută senzorii · clic pe un punct de test = sonda multimetrului (+, sau − pe GND / NTC 2) · clic pe comutatorul rotativ, pe X2, pe mănuși, pe RESET · celelalte obiecte = detalii</p>
+      <p class="tk-ajutor" id="aj-svg">Rotița = zoom · tragere pe fundal = deplasare · clic pe componente = detalii (dublu clic pe pahar / recipient = introduce senzorii) · trageți sondele multimetrului pe punctele de test · clic pe comutatorul rotativ, pe X2, pe mănuși și pe RESET</p>
       <div class="tk-jos">
         <div class="tk-cod" id="tk-codp">
           <div class="tk-cod-sus"><b>Cod – Arduino Mega 2560</b><span style="margin-left:auto">${PROG.titlu}.ino</span></div>
@@ -902,12 +948,15 @@ Cadru.porneste({
       legaPlansa(); desenSonde(); desenStativ(); afiseazaCod(); actualizeazaFw(); instrumenteAfis(); oledAfis(); citesteDMM();
       $("#tk-start").addEventListener("click", pornesteSim);
       $("#tk-codb").addEventListener("click", () => { const p = $("#tk-codp"); p.hidden = !p.hidden; $("#tk-codb").classList.toggle("activ", !p.hidden); });
-      $("#tk-fit").addEventListener("click", () => seteazaVB(VB0.slice()));
+      $("#tk-fit").addEventListener("click", () => { seteazaVB(VB0.slice()); vedere3d("tot"); });
       const tx = () => { const i = $("#ser-in"); if (i.value.trim()) trimiteSerial(i.value); i.value = ""; };
       $("#ser-tx").addEventListener("click", tx); $("#ser-in").addEventListener("keydown", e => { if (e.key === "Enter") tx(); });
       $$("[data-ved]").forEach(b => b.addEventListener("click", () => { if (b.dataset.ved === "rec" && !sim.inreg) return Cadru.mesajTemporar("Nu există încă o treaptă înregistrată.", "atentie"); sim.vedere = b.dataset.ved; comutaVedere(); }));
-      construiestePasi();
+      construiestePasi(); dmmCtl();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
+      $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
+      import(BAZA_COMUN + "aparate3d.js?v=2").then(m => { SV3 = m.creeazaStandTemp($("#st3d"), { laClic: laClic3d }); $(".tk-plansa").classList.add("cu3d"); $("#tk-vederi").hidden = false; $("#aj-3d").hidden = false; $("#aj-svg").hidden = true; sincron3d(true); })
+        .catch(e => { console.warn("Standul 3D nu s-a încărcat:", e); $("#st3d").remove(); });
       C.mesaj("Pasul 1: porniți simularea și lăsați senzorii să se stabilizeze în aer (cel puțin 5 minute – accelerați timpul).", "");
     },
     reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.serial = []; sim.ist = []; sim.inreg = null; sim.tS = 0; if (Cadru.P) initTermic(); },
@@ -920,8 +969,8 @@ Cadru.porneste({
         const T = Tm(), m = medTip(); ["ntc", "lm", "ds", "tc", "et"].forEach(k => { sim.Ts[k] += (T - sim.Ts[k]) * (1 - Math.exp(-d / MD.tau(p, k, m))); });
         if (sim.run) pasProgram(); }
       if (!vizibil) return;
-      if (acum - sim.dmm.tA > 300) { sim.dmm.tA = acum; citesteDMM(); }
-      if (acum - (this._to || 0) > 120) { this._to = acum; oledAfis(); instrumenteAfis(); plotter(); }
+      if (acum - sim.dmm.tA > 300) { sim.dmm.tA = acum; citesteDMM(); const v = $(".tk-dmm-v"); if (v) v.textContent = sim.dmm.mod === "OFF" ? "" : sim.dmm.txt; }
+      if (acum - (this._to || 0) > 120) { this._to = acum; oledAfis(); instrumenteAfis(); plotter(); sincron3d(); }
       $("#ledTX").setAttribute("fill", sim.run && acum - sim.tx < 60 ? "#ffd04a" : "#5a4a1a");
       if (acum - (this._ts || 0) > 300) {
         this._ts = acum; avertizari(); actualizeazaPasi(); if (pasActiv === 3) cursorAfis();
