@@ -441,10 +441,10 @@ const TEST = [
 /* ------------------------------------------------------------------ 3D: motorul pe stand */
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=10").then(m => {
+  import(BAZA_COMUN + "motor3d.js?v=12").then(m => {
     const ET = { inj1: "injector 1", inj2: "injector 2", inj3: "injector 3", inj4: "injector 4", map: "MAP", ect: "CTS", ckp: "CKP", tps: "clapetă / TPS", clap: "corp clapetă", iat: "IAT", l1: "λ amonte", can: "canistră" };
-    SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: () => { } });
-    SV.m3d.selecteaza("inj1", false);
+    SV.m3d = m.creeazaStand(el, { etichete: ET, onSelect: () => { }, mod: "transparent" });
+    SV.m3d.vedere([0.55, 0.62, 0.95], [-0.02, 0.27, 0.06]);
   }).catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu poate fi afișată în acest browser.</p>`; console.warn(e); });
 }
 const SV = {};
@@ -605,7 +605,8 @@ Cadru.porneste({
       pas(dt);
       if (sim.osc.ruleaza && (vizibil || sim.aparat === "osc")) achizitie();
       if (!vizibil) return;
-      if (SV.m3d) SV.m3d.seteaza({ rpm: sim.n, tps: sim.tps, selectat: "inj1", decuplat: {}, vent: sim.cons, tEv: sim.motor ? 200 + sim.T * 2 + sim.n * 0.05 : 25, eticheteVizibile: !($("#ck-et") && !$("#ck-et").checked) });
+      if (SV.m3d) SV.m3d.seteaza({ rpm: sim.n, tps: sim.tps, selectat: null, decuplat: {}, vent: sim.cons, tEv: sim.motor ? 200 + sim.T * 2 + sim.n * 0.05 : 25, eticheteVizibile: !($("#ck-et") && !$("#ck-et").checked),
+        mpi: { ti: sim.ti, n: sim.n, activ: sim.motor && sim.ti > 0 }, racire: { Tm: sim.T, Tr: Math.max(20, sim.T - 25), x: Math.max(0, Math.min(1, (sim.T - 89) / 13)), Q: sim.n / 4000 } });
       if (SV.m3d && SV.sonda !== sim.aparat) { SV.sonda = sim.aparat; SV.m3d.sonda(sim.aparat === "osc" ? "inj1" : null, "osc"); }
       if (acum - (this._ta || 0) > 120) {
         this._ta = acum;

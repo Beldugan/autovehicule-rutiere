@@ -588,7 +588,7 @@ function alegeCil3D(k) {
 }
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=10").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { cil1: "cil. 1", cil2: "cil. 2", cil3: "cil. 3", cil4: "cil. 4", map: "MAP" }, onSelect: alegeCil3D }); })
+  import(BAZA_COMUN + "motor3d.js?v=12").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { cil1: "cil. 1", cil2: "cil. 2", cil3: "cil. 3", cil4: "cil. 4", map: "MAP" }, onSelect: alegeCil3D }); })
     .catch(e => { el.innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 const CSS = `<style>
@@ -732,7 +732,7 @@ Cadru.porneste({
       if (sim.merge && reg === "accel" && M.tReg > 0.6) M.min = Math.min(M.min, M.p);
       if (sim.contact || sim.merge) { M.buf.push([sim.t, M.p]); while (M.buf.length && M.buf[0][0] < sim.t - 41) M.buf.shift(); }
       if (SV.m3d) { const pc = PASI[pasActiv].panou, cil = pc === "leak" ? sim.leak.c : sim.comp.c;
-        SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.merge && reg === "r2500" ? 7 : sim.clapeta ? 100 : 0, selectat: pc === "comp" || pc === "leak" ? "cil" + cil : null, decuplat: {}, vent: false, tEv: sim.merge ? 380 : 120, eticheteVizibile: true, bujiiScoase: sim.bujii,
+        SV.m3d.seteaza({ rpm: sim.rpm, ect: sim.ect, mpi: { ti: 2.6, n: sim.rpm, activ: sim.inj && sim.rpm > 50 && !sim.cr }, tps: sim.merge && reg === "r2500" ? 7 : sim.clapeta ? 100 : 0, selectat: pc === "comp" || pc === "leak" ? "cil" + cil : null, decuplat: {}, vent: false, tEv: sim.merge ? 380 : 120, eticheteVizibile: true, bujiiScoase: sim.bujii,
           furtune: [sim.comp.montat ? { k: "cil" + sim.comp.c, c: 0x151515 } : null, sim.leak.conectat ? { k: "cil" + sim.leak.c, c: 0x1f4fa0 } : null].filter(Boolean) }); }
       if (!vizibil) return;
       if (PASI[pasActiv].panou === "avl" && (sim.cr || !this._avlOk)) { desenAVL(); this._avlOk = !sim.cr; }

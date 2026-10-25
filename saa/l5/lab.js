@@ -69,7 +69,9 @@ function svgGauge(P, cx, cy, r, max, val, o = {}) {
 /* ------------------------------------------------------------------ vasul cu apă, plita, termostatul demontat, termometrul, șublerul */
 const PLITA = ["oprită", "încălzire lentă (≈ 0,4 °C/min)", "încălzire rapidă"];
 function desenBaie() {
-  const el = $("#svg-baie"); if (!el) return;
+  const cit = $("#baie-cit"); if (cit) cit.textContent = `Termometru: ${fx(sim.baie.Tw, 1)} °C · comparator: cursa ${fx(Math.round(sim.baie.s * 100) / 100, 2)} mm · plita: ${PLITA[sim.baie.plita]} · ${Math.abs(sim.baie.s - MD.cursa(P(), sim.baie.Tw)) < 0.05 ? "cursa stabilizată" : "elementul de ceară se dilată…"}`;
+  if (SV.baie) { SV.baie.seteaza({ Tw: sim.baie.Tw, s: sim.baie.s, plita: sim.baie.plita }); return; }
+  const el = $("#svg-baie"); if (!el) return; el.style.display = "";
   const Pf = "bv", B = sim.baie, pr = P(), k = 3.6, sp = B.s * k, pin = 22;   // scara: 3,6 px/mm
   let s = defsInstr(Pf);
   // stativul cu tija și sârma de suspendare
@@ -353,16 +355,26 @@ function inregP(e, k) {
 /* ------------------------------------------------------------------ macheta 3D */
 const SV = { m3d: null };
 function porneste3D() {
+  const eb = $("#baie3d");
+  if (eb) import(BAZA_COMUN + "aparate3d.js?v=1").then(m => { SV.baie = m.creeazaBaie(eb); $("#svg-baie").style.display = "none"; }).catch(() => { eb.remove(); });
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=10").then(m => { SV.m3d = m.creeazaStand(el, { racire: true, mod: "transparent", etichete: ET3D, onSelect: k => alegeComp(k, false) }); })
+  import(BAZA_COMUN + "motor3d.js?v=12").then(m => { SV.m3d = m.creeazaStand(el, { racire: true, mod: "transparent", vedere: "racire", aparate: ["obd", "ir", "crono", "presiune"], etichete: ET3D, onSelect: k => alegeComp(k, false) }); $(".saa5-scena").classList.add("cu3d"); })
     .catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu a putut fi încărcată (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#motor3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp(b.dataset.c3))); });
 }
 function actualizeaza3D() {
+  const m = MS(), ca = $("#cit-ap");
+  if (ca) ca.innerHTML = [sim.obd ? `<b>OBD:</b> ${sim.contact || sim.merge ? `${Math.round(m.Tm)} °C · ${Math.round(m.rpm)} rot/min · GMV ${m.fan ? "ACTIV" : "inactiv"}` : "contact luat"}` : "", sim.ir && (sim.merge || sim.stop) ? `<b>IR furtun inferior:</b> ${fx(irCitire(m.Tr), 1)} °C` : "", sim.merge ? `<b>Cronometru:</b> ${mmss(sim.ts)}` : "",
+    pasActiv === 4 && (sim.pres.montat || sim.pres.bus) ? `<b>Tester presiune:</b> ${fx(sim.pres.p, 2)} bar${sim.pres.bus ? ` (max ${fx(sim.pres.pMax, 2)} bar${sim.pres.busDesch ? ", bușonul s-a deschis" : ""})` : sim.pres.tP != null ? ` · menținere ${mmss(sim.t - sim.pres.tP)}` : ""}` : ""].filter(Boolean).join(" &nbsp;·&nbsp; ");
   if (!SV.m3d) return;
-  const m = MS();
   SV.m3d.seteaza({ rpm: m.rpm, tps: 0, selectat: sim.selectat, vent: !!m.fan, tEv: sim.merge ? 200 + m.Tm * 2 : 40, eticheteVizibile: true,
     racire: { Tm: m.Tm, Tr: m.Tr, x: m.x, Q: m.rpm / 4000, capVas: !sim.pres.montat && !sim.pres.bus },
-    furtune: [sim.ir && (sim.merge || sim.stop) ? { k: "ir", laser: true, spre: [0.75, -0.05, 0.25] } : null, sim.pres.montat ? { k: "vas", c: 0x1d1d1d, r: 0.007 } : null, sim.obd ? { k: "obd", c: 0x1f5fd0, r: 0.004 } : null].filter(Boolean) });
+    furtune: [sim.obd ? { k: "obd", c: 0x1f5fd0, r: 0.004, spre: [0.66, 0.0, 0.64] } : null].filter(Boolean),
+    aparate: {
+      obd: { titlu: "K7J · Date curente" + (sim.obd ? "" : " (deconectat)"), linii: sim.obd && (sim.contact || sim.merge) ? [["Temp. lichid", `${Math.round(m.Tm)} °C`], ["Turație", `${Math.round(m.rpm)} rot/min`], ["Releu GMV", m.fan ? "ACTIV" : "INACTIV", m.fan], ...sim.ev.slice(-2).reverse().map(e => [`GMV ${e.ev === "on" ? "cuplat" : "decuplat"}`, `${e.T} °C ${mmss(e.ts)}`])] : null },
+      ir: { on: sim.ir && (sim.merge || !!sim.stop), T: irCitire(m.Tr) },
+      crono: { t: sim.merge ? sim.ts : sim.stop ? sim.stop.ts : 0 },
+      presiune: { vizibil: pasActiv === 4, montat: sim.pres.montat, p: sim.pres.p, max: sim.pres.bus ? sim.pres.pMax : null }
+    } });
 }
 
 /* ------------------------------------------------------------------ calculele determinărilor */
@@ -449,6 +461,8 @@ const TEST = [
 ];
 const CSS = `<style>
 .saa5-3d .m3d { height:clamp(380px, 60vh, 600px); }
+.saa5-baie .m3d { height:clamp(320px, 48vh, 460px); }
+.cu3d .instr[data-panou="ap"], .cu3d .instr[data-panou="pres"] { display:none !important; }
 .saa5-afis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.4rem; margin:.5rem 0; }
 .saa5-afis div { background:var(--suprafata-2); border-radius:8px; padding:.35rem .5rem; } .saa5-afis span { display:block; font-size:.72rem; color:var(--text-sec); } .saa5-afis b { font-size:1.05rem; }
 .instr { margin-top:.4rem; } .instr h3 { margin:.2rem 0 .4rem; font-size:1rem; }
@@ -531,9 +545,11 @@ Cadru.porneste({
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena saa5-scena">
       <div id="motor3d" class="saa5-3d"></div>
+      <p class="nota" id="cit-ap" aria-live="polite"></p>
       <p class="nota" id="comp-desc">Clic pe o componentă a circuitului de răcire (pe macheta 3D). Particulele arată curgerea lichidului: albastru – rece, roșu – fierbinte.</p>
       <div class="saa5-afis"><div><span>Stare</span><b id="af-st">—</b></div><div><span>T motor [°C]</span><b id="af-T">—</b></div><div><span>T ieșire radiator [°C]</span><b id="af-Tr">—</b></div><div><span>Cursa termostatului [mm]</span><b id="af-x">—</b></div><div><span>Ventilator</span><b id="af-v">—</b></div><div><span>Timp</span><b id="af-t">—</b></div></div>
-      <div class="instr" data-panou="baie" hidden><h3>Termostatul în vasul cu apă</h3><svg id="svg-baie" viewBox="0 0 880 350" role="img" aria-label="Vasul cu apă pe plită, termostatul suspendat, termometrul și șublerul"></svg></div>
+      <div class="instr" data-panou="baie" hidden><h3>Termostatul în vasul cu apă</h3><div id="baie3d" class="saa5-baie"></div><svg id="svg-baie" viewBox="0 0 880 350" role="img" aria-label="Vasul cu apă pe plită, termostatul suspendat, termometrul și șublerul"></svg>
+        <p class="nota" id="baie-cit"></p></div>
       <div class="instr" data-panou="ap"><h3>Aparatele pe stand</h3><svg id="svg-ap" viewBox="0 0 990 240" role="img" aria-label="Testerul OBD, termometrul cu infraroșu, cronometrul și panoul standului"></svg></div>
       <div class="instr" data-panou="termo" hidden><h3>Camera termografică – radiatorul</h3><canvas id="cv-termo" width="360" height="250" aria-label="Termograma radiatorului"></canvas></div>
       <div class="instr" data-panou="pres" hidden><h3>Testerul de presiune al circuitului de răcire</h3><svg id="svg-pres" viewBox="0 0 800 300" role="img" aria-label="Pompa de mână cu manometru pe vasul de expansiune sau pe bușon"></svg></div>

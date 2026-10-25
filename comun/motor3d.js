@@ -694,7 +694,6 @@ function interiorRacire(g, M, rac, grupC, ancore, rot, carcT) {
   const mGeam = new THREE.MeshStandardMaterial({ color: 0xc3c8cd, roughness: 0.4, metalness: 0.7, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
   const mCam = new THREE.MeshStandardMaterial({ color: 0x5fa8e0, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false });
   // termostatul (în carcasa transparentă): talerul supapei, capsula cu ceară, arcul, rama, supapa de aerisire
-  carcT.material = mGeam; carcT.userData.fixMat = true;
   const gT = grupC("termostat", "Termostatul cu element de ceară"); const ta = ajutoare(gT);
   ta.cyl(0.024, 0.024, 0.003, M.otel, -0.3, 0.31, 0.04, "x", gT, 32);                                                        // flanșa (scaunul)
   const taler = ta.cyl(0.019, 0.019, 0.003, M.alama, -0.298, 0.31, 0.04, "x", gT, 32);                                      // talerul supapei
@@ -708,7 +707,6 @@ function interiorRacire(g, M, rac, grupC, ancore, rot, carcT) {
   const gP = grupC("pompaApa", "Pompa de apă"); const rotor = new THREE.Group(); rotor.position.set(0.262, 0.215, -0.075); gP.add(rotor);
   ajutoare(rotor).cyl(0.03, 0.03, 0.003, M.otel, 0, 0, 0, "x", rotor, 32);
   for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2; const p = ajutoare(rotor).box(0.01, 0.024, 0.003, M.otel, -0.006, Math.cos(a) * 0.016, Math.sin(a) * 0.016); p.rotation.x = -a + 0.5; }
-  ajutoare(gP).cyl(0.041, 0.041, 0.03, mGeam, 0.262, 0.215, -0.075, "x", gP, 32);
   ancore.pompaApa = V(0.27, 0.27, -0.075);
   // cămașa de apă (canale în bloc și chiulasă) și circuitul mic (bypass) spre aspirația pompei
   const cam = [[0.25, 0.2, -0.1], [0.2, 0.13, -0.085], [0.0, 0.15, -0.085], [-0.2, 0.16, -0.08], [-0.225, 0.2, 0.0], [-0.2, 0.22, 0.08], [0.0, 0.19, 0.085], [0.19, 0.2, 0.08], [0.2, 0.275, 0.06], [0.0, 0.3, 0.07], [-0.2, 0.31, 0.06], [-0.255, 0.31, 0.045]];
@@ -755,6 +753,126 @@ function interiorRacire(g, M, rac, grupC, ancore, rot, carcT) {
   };
 }
 
+/* ======================================================================= injecția multipunct secvențială: jeturile de benzină în poarta de admisie
+   (2 jeturi înguste pe injector, îndreptate spre talerul supapei de admisie), exact în fereastra de injecție a fiecărui cilindru:
+   injecția se termină înainte de deschiderea supapei de admisie (≈ 330 °RAC în ciclu), durata = t_i·n·6 [°RAC]. */
+function pulverizareMPI(g, mpi) {
+  const cG = document.createElement("canvas"); cG.width = 4; cG.height = 64; { const x = cG.getContext("2d"), gr = x.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, "#fff"); gr.addColorStop(0.5, "#eaeaea"); gr.addColorStop(1, "#7a7a7a"); x.fillStyle = gr; x.fillRect(0, 0, 4, 64); }
+  const tex = new THREE.CanvasTexture(cG), gCon = new THREE.ConeGeometry(1, 1, 14, 1, true); gCon.translate(0, -0.5, 0);
+  const jet = mpi.map(({ tip, ax }) => {
+    const G = new THREE.Group(); G.position.copy(tip); g.add(G);
+    const m = new THREE.MeshBasicMaterial({ color: 0xd2ecff, alphaMap: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const m2 = new THREE.MeshBasicMaterial({ color: 0x6fb2e6, alphaMap: tex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const per = new THREE.Vector3(1, 0, 0).cross(ax).normalize();
+    const conuri = [-1, 1].map(s2 => { const d = ax.clone().applyAxisAngle(per, s2 * 0.1); const c = new THREE.Mesh(gCon, m); c.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), d); G.add(c); const e = new THREE.Mesh(gCon, m2); e.scale.set(2.4, 1.05, 2.4); c.add(e); return c; });
+    const pel = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 8), new THREE.MeshBasicMaterial({ color: 0xe8c860, transparent: true, opacity: 0, depthWrite: false })); G.add(pel);   // pelicula de benzină pe taler
+    G.traverse(o => { if (o.isMesh) o.userData.interior = true; });
+    return { G, conuri, m, m2, pel };
+  });
+  let th = 0;
+  /** u = { ti [ms], n [rot/min], activ } */
+  return function (u, dt, vis) {
+    th += vis; const thD = th * 180 / Math.PI, n = u.n || 0, ti = u.activ ? (u.ti || 0) : 0, dur = Math.max(1.5, ti * n * 6 / 1000), FADE = 28, Lm = 0.085;
+    jet.forEach((j, i) => {
+      const phi = ((thD - OF_CIL[i]) % 720 + 720) % 720, d = (((phi - (330 - dur)) % 720) + 720) % 720;
+      let L = 0, op = 0, pl = 0;
+      if (ti > 0 && n > 50 && !(u.oprite && u.oprite[i + 1])) { if (d < dur) { L = Lm * Math.min(1, (d + 0.8) / 4); op = 1; } else if (d < dur + FADE) { const f = (d - dur) / FADE; L = Lm * (1 + 0.1 * f); op = (1 - f) * (1 - f); pl = Math.sin(Math.PI * Math.min(1, f * 1.2)); } }
+      const w = Math.max(0.0001, L * 0.14);
+      j.conuri.forEach(c => { c.visible = L > 0.0005; c.scale.set(w, Math.max(0.0001, L), w); }); j.m.opacity = op; j.m2.opacity = op * 0.6;
+      j.pel.position.copy(mpi[i].ax).multiplyScalar(Lm); j.pel.scale.setScalar(pl > 0.01 ? 0.008 + 0.006 * pl : 0.0001); j.pel.material.opacity = 0.5 * pl;
+    });
+  };
+}
+/* ======================================================================= turbosuflanta cu geometrie variabilă (VGT) a motorului 1.5 dCi
+   carcasa turbinei (fontă, parțial transparentă) cu paletele directoare mobile pe inelul de comandă, roata turbinei, carcasa centrală
+   cu lagărele și conductele de ulei (tur din galeria blocului, retur liber în baie), roata și carcasa compresorului, actuatorul
+   pneumatic (capsula cu membrană, tija, pârghia) comandat de electrovalva EVRV prin furtunul de depresiune; colectorul de evacuare
+   racordat la turbină, țeava de evacuare (downpipe) spre catalizator; aerul: filtrul → compresorul → intercoolerul → corpul clapetei. */
+function turbosuflanta(g, M, grupC, ancore) {
+  const V = (x, y, z) => new THREE.Vector3(x, y, z), { add, box, rbox, cyl, tub } = ajutoare(g);
+  const TX = -0.02, TY = 0.15, TZ = -0.37, CX = 0.105;                  // axa turbinei (paralelă cu arborele cotit)
+  const mFonta = new THREE.MeshStandardMaterial({ color: 0x6e4429, roughness: 0.85, metalness: 0.35, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide, emissive: 0xff3a00, emissiveIntensity: 0 });
+  const mAluT = new THREE.MeshStandardMaterial({ color: 0xc3c8cd, roughness: 0.4, metalness: 0.85, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide });
+  const mUlei = new THREE.MeshStandardMaterial({ color: 0xe0a238, emissive: 0x7a4300, emissiveIntensity: 0.3, roughness: 0.25 });
+  fixEnv({ mFonta, mAluT, mUlei });
+  const gT = grupC("turbo", "Turbosuflanta cu geometrie variabilă");
+  const ta = ajutoare(gT);
+  const melc = (x, R, r, m) => { const o = add(new THREE.Mesh(new THREE.TorusGeometry(R, r, 16, 48, Math.PI * 1.85), m), gT); o.position.set(x, TY, TZ); o.rotation.y = Math.PI / 2; return o; };
+  // turbina: carcasa în spirală, paletele directoare (VGT), roata
+  melc(TX, 0.058, 0.026, mFonta); ta.cyl(0.042, 0.042, 0.03, mFonta, TX - 0.006, TY, TZ, "x", gT, 40);
+  ta.cyl(0.03, 0.026, 0.05, M.ruginaCald, TX - 0.05, TY, TZ, "x", gT, 32);                                                  // ieșirea axială
+  const rotT = new THREE.Group(); rotT.position.set(TX, TY, TZ); gT.add(rotT);
+  ajutoare(rotT).cyl(0.009, 0.006, 0.026, M.otel, 0, 0, 0, "x", rotT, 16);
+  for (let k = 0; k < 11; k++) { const a = k / 11 * Math.PI * 2; const p = ajutoare(rotT).box(0.022, 0.024, 0.0018, M.crom, 0, Math.cos(a) * 0.017, Math.sin(a) * 0.017); p.rotation.x = a + Math.PI / 2; p.rotation.y = 0.35; }
+  const palete = [];
+  for (let k = 0; k < 11; k++) { const a = k / 11 * Math.PI * 2, P0 = new THREE.Group(); P0.position.set(TX + 0.004, TY + Math.cos(a) * 0.036, TZ + Math.sin(a) * 0.036); gT.add(P0);
+    const pa = ajutoare(P0).box(0.014, 0.0022, 0.016, M.otel, 0, 0, 0.004); P0.userData.a = a; palete.push(P0); ajutoare(P0).cyl(0.0022, 0.0022, 0.03, M.otel, -0.012, 0, 0, "x", P0, 8); }
+  const inel = add(new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.0025, 6, 48), M.otel), gT); inel.rotation.y = Math.PI / 2; inel.position.set(TX + 0.022, TY, TZ);
+  // carcasa centrală cu lagărele (cuzineți flotanți) și arborele
+  ta.cyl(0.028, 0.028, 0.06, M.aluMat, 0.045, TY, TZ, "x", gT, 32); ta.cyl(0.005, 0.005, CX - TX, M.crom, (CX + TX) / 2, TY, TZ, "x", gT, 12);
+  // compresorul: carcasa în spirală (aluminiu, transparentă), roata, intrarea axială, ieșirea tangențială
+  melc(CX, 0.052, 0.024, mAluT); ta.cyl(0.04, 0.04, 0.03, mAluT, CX + 0.008, TY, TZ, "x", gT, 40); ta.cyl(0.03, 0.032, 0.05, M.alu, CX + 0.05, TY, TZ, "x", gT, 32);
+  const rotC = new THREE.Group(); rotC.position.set(CX, TY, TZ); gT.add(rotC);
+  ajutoare(rotC).cyl(0.004, 0.012, 0.028, M.crom, 0.004, 0, 0, "x", rotC, 16);
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; const p = ajutoare(rotC).box(0.024, 0.02, 0.0015, M.alu, 0.004, Math.cos(a) * 0.016, Math.sin(a) * 0.016); p.rotation.x = a + Math.PI / 2; p.rotation.y = -0.3; }
+  ancore.turbo = V(0.045, TY + 0.06, TZ - 0.02);
+  // actuatorul VGT: capsula cu membrană pe suport, tija, pârghia pe axul inelului de comandă; furtunul de depresiune spre EVRV
+  const gA = grupC("vgt", "Actuatorul geometriei variabile (VGT)"); const aa = ajutoare(gA);
+  aa.cyl(0.034, 0.034, 0.026, M.otel, 0.07, TY - 0.075, TZ - 0.035, "z", gA, 32); aa.cyl(0.026, 0.034, 0.012, M.otel, 0.07, TY - 0.075, TZ - 0.054, "z", gA, 32);
+  aa.box(0.03, 0.05, 0.006, M.otel, 0.07, TY - 0.045, TZ - 0.02);                                                          // suportul pe carcasa centrală
+  const tija = aa.cyl(0.0025, 0.0025, 0.09, M.crom, 0.02, TY - 0.075, TZ - 0.035, "x", gA, 8);
+  const parg = new THREE.Group(); parg.position.set(TX + 0.03, TY - 0.05, TZ - 0.035); gA.add(parg); ajutoare(parg).box(0.008, 0.032, 0.006, M.otel, 0, -0.014, 0);
+  aa.tub([[0.07, TY - 0.075, TZ - 0.062], [0.08, TY - 0.06, TZ - 0.1], [0.2, 0.3, -0.3], [0.3, 0.42, -0.2]], 0.0035, M.cauciuc);
+  aa.rbox(0.03, 0.026, 0.024, 0.004, M.plastic, 0.3, 0.44, -0.2); ancore.vgt = V(0.07, TY - 0.04, TZ - 0.07);
+  // ungerea: tur din galeria blocului (conductă metalică) spre partea de sus a carcasei centrale, retur liber în baie
+  const gU = grupC("ungTurbo", "Ungerea turbosuflantei"); const ua = ajutoare(gU);
+  const tur = [[0.06, -0.01, -0.136], [0.08, 0.05, -0.2], [0.06, 0.2, -0.3], [0.045, TY + 0.04, TZ + 0.005], [0.045, TY + 0.028, TZ]];
+  const ret = [[0.045, TY - 0.028, TZ], [0.045, TY - 0.06, TZ + 0.01], [0.05, -0.03, -0.25], [0.05, -0.13, -0.16], [0.05, -0.15, -0.14]];
+  ua.tub(tur, 0.0032, M.otel); ua.tub(ret, 0.007, M.cauciuc); ua.cyl(0.006, 0.006, 0.012, M.alama, 0.045, TY + 0.034, TZ, "y", gU, 6);
+  ancore.ungTurbo = V(0.06, 0.22, -0.3);
+  // colectorul → intrarea turbinei; ieșirea turbinei → downpipe (racordat la linia de evacuare a standului)
+  tub([[0.0, 0.12, -0.25], [0.0, 0.11, -0.3], [TX + 0.01, TY - 0.06, TZ + 0.035]], 0.024, M.ruginaCald);
+  const down = [[TX - 0.075, TY, TZ], [-0.13, 0.12, -0.38], [-0.14, 0.0, -0.38], [-0.12, -0.15, -0.37], [-0.15, -0.3, -0.36]];
+  tub(down, 0.025, M.ruginaCald);
+  // traseul aerului: filtrul → compresorul; compresorul → intercooler (în fața standului) → corpul clapetei
+  const aerIn = [[-0.52, 0.47, 0.22], [-0.42, 0.56, 0.05], [-0.1, 0.55, -0.2], [0.2, 0.32, -0.37], [CX + 0.075, TY, TZ]];
+  tub(aerIn, 0.03, M.cauciuc, g, 120);
+  const iesC = [[CX, TY + 0.075, TZ - 0.02], [CX + 0.05, TY + 0.12, TZ - 0.08], [0.32, 0.12, -0.48], [0.42, -0.1, -0.5]];
+  tub(iesC, 0.024, M.cauciuc, g, 80);
+  const gI = grupC("intercooler", "Intercoolerul (răcitorul aerului de supraalimentare)"); const ia = ajutoare(gI);
+  ia.rbox(0.07, 0.24, 0.3, 0.01, M.aluMat, 0.45, -0.25, -0.35); for (let k = 0; k < 14; k++) ia.box(0.072, 0.004, 0.27, M.alu, 0.45, -0.355 + k * 0.016, -0.35);
+  ancore.intercooler = V(0.45, -0.1, -0.35);
+  const iesI = [[0.42, -0.38, -0.2], [0.35, -0.42, 0.05], [0.0, -0.1, 0.42], [-0.3, 0.26, 0.34], [-0.36, 0.34, 0.28], [-0.29, 0.33, 0.28]];
+  tub(iesI, 0.028, M.cauciuc, g, 120);
+  [gT, gA, gU, gI].forEach(o => o.traverse(m => { if (m.isMesh) m.userData.interior = true; }));
+  // particulele: gazele de evacuare (portocaliu), aerul (albastru deschis), uleiul (chihlimbar)
+  const C3 = pts => new THREE.CatmullRomCurve3(pts.map(p => V(...p)));
+  const spir = (x, R, n) => Array.from({ length: n }, (_, k) => { const a = -Math.PI / 2 + k / (n - 1) * Math.PI * 1.7; return [x, TY + Math.cos(a) * R, TZ + Math.sin(a) * R]; });
+  const TR = [
+    { k: "g", n: 30, c: C3([[0.0, 0.14, -0.25], [0.0, 0.11, -0.3], ...spir(TX, 0.05, 8), [TX, TY, TZ], ...down]) , col: 0xff6a1a },
+    { k: "a", n: 30, c: C3([...aerIn, [CX, TY, TZ], ...spir(CX, 0.048, 6).reverse(), ...iesC, [0.45, -0.25, -0.35], ...iesI]), col: 0x9fdcff },
+    { k: "u", n: 10, c: C3(tur), col: 0xffc04a }, { k: "u", n: 8, c: C3(ret), col: 0xffc04a }
+  ];
+  let NP = 0; TR.forEach(t => { t.L = t.c.getLength(); t.s = Array.from({ length: t.n }, (_, k) => k / t.n); NP += t.n; });
+  const part = new THREE.InstancedMesh(new THREE.SphereGeometry(0.0045, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), NP); part.userData.interior = true; g.add(part);
+  let j0 = 0; const cc = new THREE.Color(); TR.forEach(t => { for (let k = 0; k < t.n; k++) part.setColorAt(j0++, cc.setHex(t.col)); });
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), s1 = V(1, 1, 1), s0 = V(0, 0, 0);
+  let thT = 0, vgtF = 0.8;
+  /** u = { n (rot/min motor), boost [bar rel], vgt (0 deschis … 1 închis), sarcina (0…1) } */
+  return function (u, dt) {
+    const n = u.n || 0, nt = n > 50 ? 25000 + 60000 * Math.min(1, (u.boost || 0) / 1.2) + 8 * n : 0;     // turația reală a turbinei [rot/min]
+    thT += nt / 60 * 2 * Math.PI * dt / 2000;                                                                       // afișată mult încetinit
+    rotT.rotation.x = -thT; rotC.rotation.x = -thT;
+    vgtF += ((u.vgt ?? 0.8) - vgtF) * Math.min(1, dt / 0.3);
+    palete.forEach(p => { p.rotation.x = p.userData.a + Math.PI / 2 + (0.25 + 0.75 * (1 - vgtF)) * 0.9; });              // închis: palete aproape tangențiale (secțiune mică)
+    inel.rotation.x = vgtF * 0.25; tija.position.x = 0.02 - 0.012 * vgtF; parg.rotation.z = -0.5 + 0.9 * vgtF;
+    mFonta.emissiveIntensity = Math.min(0.5, n / 9000 + (u.sarcina || 0) * 0.3);
+    const fl = { g: n / 3500 * (0.4 + 0.6 * (u.sarcina || 0)), a: n / 3500 * (1 + (u.boost || 0)), u: n > 50 ? 0.4 + n / 5000 : 0 };
+    let j = 0; TR.forEach(t => { const v = 0.35 * fl[t.k]; t.s.forEach((s, k) => { const sN = (s + v * dt / t.L) % 1; t.s[k] = sN; m4.compose(t.c.getPointAt(sN), q0, fl[t.k] > 0.01 ? s1 : s0); part.setMatrixAt(j++, m4); }); });
+    part.instanceMatrix.needsUpdate = true;
+  };
+}
+
 /** construiește motorul; întoarce grupul, componentele selectabile și ancorele etichetelor/sondelor */
 export { sistemRacire };
 export function construiesteMotor(opt = {}) {
@@ -776,7 +894,7 @@ export function construiesteMotor(opt = {}) {
   cyl(0.026, 0.026, 0.025, M.galben, 0.09, 0.455, 0.05);                         // bușonul de umplere cu ulei
   for (let k = nC0; k < g.children.length; k++) g.children[k].userData.carcasa = true;
   const DCI = opt.varianta === "dci";
-  let fise = [], gT = null, vacReg = null, vacDop = null, dop = null;
+  let fise = [], gT = null, vacReg = null, vacDop = null, dop = null, actMPI = null, actTurbo = null;
   if (!DCI) {
   // bobina de inducție (DIS) și fișele de înaltă tensiune către bujii
   rbox(0.11, 0.05, 0.08, 0.008, M.plastic, -0.04, 0.47, -0.02);
@@ -850,8 +968,8 @@ export function construiesteMotor(opt = {}) {
     conectori.clap = rbox(0.03, 0.02, 0.02, 0.004, M.plasticGri, -0.25, 0.37, 0.355, c); ancore.clap = new THREE.Vector3(-0.25, 0.38, 0.355); }
   { const c = grupC("tps", "Potențiometrul clapetei TPS"); rbox(0.016, 0.05, 0.045, 0.006, M.plastic, -0.215, 0.33, 0.23, c); conectori.tps = rbox(0.02, 0.02, 0.026, 0.004, M.plasticGri, -0.215, 0.365, 0.225, c); ancore.tps = new THREE.Vector3(-0.215, 0.37, 0.225); }
   { const c = grupC("map", "Senzorul MAP"); rbox(0.05, 0.022, 0.04, 0.005, M.plastic, 0.08, 0.392, 0.28, c); conectori.map = rbox(0.024, 0.018, 0.02, 0.004, M.plasticGri, 0.08, 0.41, 0.3, c); ancore.map = new THREE.Vector3(0.08, 0.42, 0.3); }
-  const conducta = tub([[-0.29, 0.33, 0.28], [-0.36, 0.34, 0.28], [-0.44, 0.4, 0.28], [-0.52, 0.47, 0.25]], 0.045, M.cauciuc);
-  for (let i = 0; i < 7; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.046, 0.004, 6, 20), M.cauciuc); r.position.set(-0.36 - i * 0.022, 0.345 + i * 0.012, 0.28); r.rotation.y = Math.PI / 2; g.add(r); }
+  if (!DCI) { tub([[-0.29, 0.33, 0.28], [-0.36, 0.34, 0.28], [-0.44, 0.4, 0.28], [-0.52, 0.47, 0.25]], 0.045, M.cauciuc);
+  for (let i = 0; i < 7; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.046, 0.004, 6, 20), M.cauciuc); r.position.set(-0.36 - i * 0.022, 0.345 + i * 0.012, 0.28); r.rotation.y = Math.PI / 2; g.add(r); } }
   { const c = grupC("iat", "Senzorul IAT"); cyl(0.01, 0.01, 0.03, M.plastic, -0.42, 0.44, 0.28, "y", c); conectori.iat = rbox(0.02, 0.016, 0.02, 0.004, M.albastru, -0.42, 0.46, 0.28, c); ancore.iat = new THREE.Vector3(-0.42, 0.47, 0.28); }
   if (opt.filtruAer !== false) { rbox(0.28, 0.12, 0.22, 0.03, M.plastic, -0.6, 0.5, 0.24); }
   const actCR = DCI ? sistemCR(g, M, XC, grupC, ancore, conectori) : null;
@@ -870,9 +988,17 @@ export function construiesteMotor(opt = {}) {
   gT = new THREE.Group(); g.add(gT); const gta = ajutoare(gT);
   gta.rbox(0.03, 0.016, 0.016, 0.003, M.alama, 0.24, 0.32, 0.21); gta.cyl(0.006, 0.006, 0.02, M.alama, 0.24, 0.335, 0.21, "y", gT, 12); gta.cyl(0.0055, 0.0055, 0.008, M.plastic, 0.24, 0.348, 0.21, "y", gT, 12);
   gT.visible = false; ancore.teTur = new THREE.Vector3(0.24, 0.35, 0.21);
+  // injectoarele (injecție secvențială în poarta de admisie): corpul din cupa rampei spre supapa de admisie, duza cu 2 orificii
+  const mpi = [];
   XC.forEach((x, i) => { const k = "inj" + (i + 1), c = grupC(k, `Injectorul cilindrului ${i + 1}`);
-    cyl(0.011, 0.009, 0.06, M.verde, x, 0.25, 0.155, "y", c);
-    conectori[k] = rbox(0.026, 0.016, 0.02, 0.004, M.plasticGri, x, 0.305, 0.185, c); ancore[k] = new THREE.Vector3(x, 0.315, 0.19); });
+    const tip = new THREE.Vector3(x, 0.285, 0.11), tinta = new THREE.Vector3(x - 0.017, 0.266, 0.02), ax = tinta.clone().sub(tip).normalize();
+    const J = new THREE.Group(); J.position.copy(tip); J.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), ax); c.add(J); const ja = ajutoare(J);
+    ja.cyl(0.0035, 0.0045, 0.01, M.otel, 0, 0.005, 0, "y", J, 12); ja.cyl(0.0085, 0.0085, 0.048, M.verde, 0, 0.034, 0, "y", J, 20);
+    const or = add(new THREE.Mesh(new THREE.TorusGeometry(0.0085, 0.0016, 6, 18), M.cauciuc), J); or.rotation.x = Math.PI / 2; or.position.y = 0.012;
+    J.updateMatrixWorld(true); const top = J.localToWorld(new THREE.Vector3(0, 0.066, 0.004));
+    conectori[k] = rbox(0.022, 0.016, 0.02, 0.004, M.plasticGri, top.x, top.y + 0.006, top.z, c); ancore[k] = top.clone().add(new THREE.Vector3(0, 0.02, 0));
+    c.traverse(o => { if (o.isMesh) o.userData.interior = true; }); mpi.push({ tip, ax }); });
+  actMPI = opt.interior ? pulverizareMPI(g, mpi) : null;
   // supapa canistrei
   { const c = grupC("can", "Supapa de purjare a canistrei"); cyl(0.022, 0.022, 0.05, M.plastic, 0.18, 0.4, 0.36, "z", c); conectori.can = rbox(0.022, 0.016, 0.02, 0.004, M.plasticGri, 0.18, 0.43, 0.36, c); tub([[0.18, 0.4, 0.33], [0.12, 0.38, 0.32], [0.05, 0.35, 0.33]], 0.006, M.cauciuc); ancore.can = new THREE.Vector3(0.18, 0.44, 0.36); }
   }
@@ -885,8 +1011,9 @@ export function construiesteMotor(opt = {}) {
   { const c = grupC("l1", "Sonda λ amonte"); const s = cyl(0.009, 0.009, 0.05, M.crom, 0.05, 0.13, -0.29, "y", c); s.rotation.x = -0.6; cyl(0.012, 0.012, 0.012, M.otel, 0.05, 0.11, -0.28, "y", c);
     tub([[0.05, 0.16, -0.31], [0.08, 0.3, -0.33], [0.1, 0.42, -0.3]], 0.0035, M.cauciuc, c); conectori.l1 = rbox(0.03, 0.018, 0.02, 0.004, M.violet, 0.1, 0.43, -0.3, c); ancore.l1 = new THREE.Vector3(0.05, 0.16, -0.31); }
   if (opt.stand !== false) {
-    const linieEv = [[0.0, 0.1, -0.25], [0.02, 0.0, -0.3], [0.0, -0.15, -0.34], [-0.15, -0.3, -0.36], [-0.45, -0.34, -0.36]];
-    tub(linieEv, 0.024, M.ruginaCald);
+    const linieEv = DCI ? [[-0.12, -0.15, -0.37], [-0.13, -0.2, -0.365], [-0.14, -0.26, -0.362], [-0.15, -0.3, -0.36], [-0.45, -0.34, -0.36]] : [[0.0, 0.1, -0.25], [0.02, 0.0, -0.3], [0.0, -0.15, -0.34], [-0.15, -0.3, -0.36], [-0.45, -0.34, -0.36]];
+    tub(DCI ? linieEv.slice(2) : linieEv, 0.024, M.ruginaCald);
+    if (DCI) actTurbo = turbosuflanta(g, M, grupC, ancore);
     const cat = linieEv[3];
     rbox(0.22, 0.11, 0.13, 0.04, M.scut, cat[0] - 0.08, cat[1], cat[2]);
     { const c = grupC("l2", "Sonda λ aval"); const p = linieEv[3]; cyl(0.009, 0.009, 0.05, M.crom, p[0] - 0.24, p[1] + 0.015, p[2], "y", c);
@@ -984,9 +1111,13 @@ export function construiesteMotor(opt = {}) {
       fise.forEach(f => f.forEach(m => { m.visible = !st.bujiiScoase; }));
       if (gT) { gT.visible = !!st.teTur; vacReg.visible = st.regFurtun !== false; vacDop.visible = dop.visible = st.regFurtun === false; }
       if (modCurent === "sectionat") { g.updateMatrixWorld(); planSect.copy(planLocal).applyMatrix4(g.matrixWorld); }
-      if (actRacire) actRacire(st.racire || {}, dt);
+      // valori implicite (lucrările care nu modelează ungerea, răcirea sau injecția): după turație și sarcină
+      const rpm = st.rpm || 0, Tl = st.ect ?? 88;
+      if (actRacire) actRacire(st.racire || { Tm: Tl, Tr: Math.max(20, Tl - 22), x: Math.max(0, Math.min(1, (Tl - 89) / 13)), Q: rpm / 4000 }, dt);
+      if (actMPI) actMPI(st.mpi || { ti: 2.4 + (st.tps || 0) * 0.07, n: rpm, activ: rpm > 50, oprite: Object.fromEntries(Object.keys(st.decuplat || {}).filter(k => st.decuplat[k] && /^inj\d$/.test(k)).map(k => [k.slice(3), true])) }, dt, vis);
       if (actCR) st.crStare = actCR(st.cr || {}, dt, vis);
-      if (actInterior) st.uleiStare = actInterior(st.ulei || {}, dt, vis, (st.rpm || 0) > 50);
+      if (actTurbo) actTurbo(st.turbo || { n: rpm, boost: rpm > 50 ? 0.03 + rpm / 4000 * 0.15 : 0, vgt: 0.8, sarcina: (st.tps || 0) / 100 }, dt);
+      if (actInterior) st.uleiStare = actInterior(st.ulei || (rpm > 50 ? { Q: rpm / 3500, Qm: rpm / 3500, Qr: 0, desch: 0, p: 1 + rpm / 1000 } : {}), dt, vis, rpm > 50);
     }
   };
 }
@@ -1015,7 +1146,7 @@ export function creeazaStand(gazda, optiuni = {}) {
   pod.rotation.x = -Math.PI / 2; pod.position.y = -0.82; pod.receiveShadow = true; scene.add(pod);
   const linii = new THREE.Mesh(new THREE.PlaneGeometry(14, 0.06), new THREE.MeshStandardMaterial({ color: 0xe8c234, roughness: 0.6 })); linii.rotation.x = -Math.PI / 2; linii.position.set(0, -0.818, -1.1); scene.add(linii);
   // motorul
-  const mot = construiesteMotor({ stand: true, interior: !!optiuni.interior, varianta: optiuni.varianta, racire: !!optiuni.racire }); scene.add(mot.grup);
+  const mot = construiesteMotor({ stand: true, interior: optiuni.interior !== false, varianta: optiuni.varianta, racire: optiuni.racire !== false }); scene.add(mot.grup);
   const M = mot.M;
   // aparatele sistemului de ungere (numai cu interiorul): manometrul de control pe furtun și termometrul cu sonda în tubul jojei
   const ap = {};
@@ -1084,6 +1215,72 @@ export function creeazaStand(gazda, optiuni = {}) {
   // fascicul ECU → motor
   { const c = new THREE.CatmullRomCurve3([new THREE.Vector3(0.66, -0.15, 0.45), new THREE.Vector3(0.45, 0.1, 0.4), new THREE.Vector3(0.2, 0.4, 0.38), new THREE.Vector3(0.0, 0.42, 0.3)]); const m = new THREE.Mesh(new THREE.TubeGeometry(c, 40, 0.008, 10), M.cauciuc); m.castShadow = true; scene.add(m); }
 
+  // aparatele de atelier 3D (opțional): testerul OBD, termometrul cu infraroșu (cu raza laser), cronometrul, testerul de presiune al circuitului de răcire
+  const AP = {};
+  if (optiuni.aparate) {
+    const ecr = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return { c, x: c.getContext("2d"), t }; };
+    const mA = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 0.6; return m; };
+    const plan = (G, e, w, h, x, y, z) => { const o = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: e.t })); o.position.set(x, y, z); G.add(o); return o; };
+    const rb = (G, w, h, d, r, m, x, y, z) => { const o = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), m); o.position.set(x, y, z); o.castShadow = true; G.add(o); return o; };
+    if (optiuni.aparate.includes("obd")) {   // tester OBD în husă de cauciuc, pe suportul panoului
+      const G = new THREE.Group(); G.position.set(0.66, 0.06, 0.66); G.rotation.set(-0.35, 0.72, 0); scene.add(G);
+      rb(G, 0.13, 0.21, 0.035, 0.012, mA({ color: 0x1f6fd0, roughness: 0.7 }), 0, 0, 0); rb(G, 0.115, 0.19, 0.03, 0.008, mA({ color: 0x1c1f23, roughness: 0.4 }), 0, 0, 0.004);
+      const e = ecr(320, 240); plan(G, e, 0.1, 0.075, 0, 0.042, 0.0195);
+      [[-0.03, -0.035], [0, -0.035], [0.03, -0.035], [0, -0.065]].forEach(([x, y]) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.005, 20), mA({ color: 0x3a4048, roughness: 0.5 })); b.rotation.x = Math.PI / 2; b.position.set(x, y, 0.02); G.add(b); });
+      AP.obd = { G, e, k: "" };
+    }
+    if (optiuni.aparate.includes("ir")) {   // termometrul IR (pistol): corpul, mânerul, trăgaciul, ecranul spre operator, emițătorul laser
+      const G = new THREE.Group(); G.position.set(0.72, 0.02, 0.22); scene.add(G);
+      const mo = mA({ color: 0xe0561a, roughness: 0.5 }), mn = mA({ color: 0x22262b, roughness: 0.6 });
+      rb(G, 0.05, 0.05, 0.15, 0.012, mo, 0, 0, 0); rb(G, 0.035, 0.11, 0.045, 0.01, mn, 0, -0.07, -0.05).rotation.x = -0.25; rb(G, 0.012, 0.03, 0.012, 0.004, mn, 0, -0.032, -0.012);
+      const e = ecr(220, 100); const sc = plan(G, e, 0.042, 0.019, 0, 0.004, -0.0755); sc.rotation.y = Math.PI;
+      const nas = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, 0.012, 24), mn); nas.rotation.x = Math.PI / 2; nas.position.z = 0.078; G.add(nas);
+      const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.0012, 0.0012, 1, 8), new THREE.MeshBasicMaterial({ color: 0xff2020 })); scene.add(laser);
+      const punct = new THREE.Mesh(new THREE.SphereGeometry(0.006, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff3030 })); scene.add(punct);
+      AP.ir = { G, e, laser, punct, k: "" };
+    }
+    if (optiuni.aparate.includes("crono")) {   // cronometrul digital, pe panoul standului
+      const G = new THREE.Group(); G.position.set(0.6, -0.06, 0.38); G.rotation.set(-0.2, 0.8, 0); scene.add(G);
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.016, 48), M.crom); c.rotation.x = Math.PI / 2; G.add(c);
+      const e = ecr(220, 100); plan(G, e, 0.05, 0.023, 0, 0.004, 0.0085); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.012, 16), M.otel); b.position.y = 0.045; G.add(b);
+      AP.crono = { G, e, k: "" };
+    }
+    if (optiuni.aparate.includes("presiune") && mot.ancore.vas) {   // testerul de presiune: pompa de mână cu manometru, furtunul și adaptorul pe gâtul vasului
+      const G = new THREE.Group(); G.position.set(0.42, 0.42, -0.62); G.rotation.y = -0.6; scene.add(G);
+      const mr = mA({ color: 0xc62828, roughness: 0.45 });
+      const corp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 32), mr); corp.position.y = -0.04; G.add(corp);
+      const pist = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.12, 12), M.crom); pist.position.y = 0.1; G.add(pist);
+      const man = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.016, 0.02), M.plastic); man.position.y = 0.16; G.add(man);
+      const cad = new THREE.Group(); cad.position.set(0, 0.02, 0.05); G.add(cad);
+      const rama = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.022, 48), M.crom); rama.rotation.x = Math.PI / 2; cad.add(rama);
+      const e = ecr(256, 256); plan(cad, e, 0.068, 0.068, 0, 0, 0.0115);
+      G.updateMatrixWorld(true); const A = G.localToWorld(new THREE.Vector3(0, -0.14, 0)), B = mot.ancore.vas.clone();
+      const furt = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([A, A.clone().add(new THREE.Vector3(0, -0.08, 0)), new THREE.Vector3((A.x + B.x) / 2, Math.min(A.y, B.y) - 0.05, (A.z + B.z) / 2), B.clone().add(new THREE.Vector3(0, 0.05, 0)), B]), 60, 0.005, 10), M.cauciuc); scene.add(furt);
+      const adapt = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 24), M.alama); adapt.position.copy(B).add(new THREE.Vector3(0, -0.005, 0)); scene.add(adapt);
+      AP.presiune = { G, e, furt, adapt, pist, k: "" };
+    }
+  }
+  function actualizeazaAparate(t) {
+    const a = stare.aparate || {};
+    if (AP.obd) { const o = a.obd || {}; AP.obd.G.visible = o.vizibil !== false; const k = JSON.stringify(o); if (k !== AP.obd.k) { AP.obd.k = k; const { x, c } = AP.obd.e;
+      x.fillStyle = "#06121d"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1f6fd0"; x.fillRect(0, 0, c.width, 30); x.fillStyle = "#fff"; x.font = "bold 16px system-ui"; x.textAlign = "left"; x.fillText(o.titlu || "Date curente", 10, 21);
+      (o.linii || []).forEach(([e, v, alerta], i) => { x.fillStyle = "#9fb3c6"; x.font = "15px system-ui"; x.fillText(e, 10, 60 + i * 34); x.fillStyle = alerta ? "#ffb02e" : "#6dff8e"; x.font = "bold 20px 'Courier New',monospace"; x.textAlign = "right"; x.fillText(v, c.width - 10, 60 + i * 34); x.textAlign = "left"; });
+      if (!o.linii) { x.fillStyle = "#567"; x.font = "15px system-ui"; x.fillText("deconectat", 10, 70); } AP.obd.e.t.needsUpdate = true; } }
+    if (AP.ir) { const o = a.ir || {}, I = AP.ir; I.G.visible = o.vizibil !== false; const tgt = mot.ancore.ir;
+      if (tgt) { I.G.lookAt(tgt); } const on = !!o.on && I.G.visible; I.laser.visible = I.punct.visible = on;
+      if (on && tgt) { const n = I.G.localToWorld(new THREE.Vector3(0, 0, 0.085)), d = tgt.clone().sub(n), L = d.length(); I.laser.position.copy(n).addScaledVector(d, 0.5); I.laser.scale.y = L; I.laser.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); I.punct.position.copy(tgt); }
+      const txt = on ? (o.T ?? 0).toFixed(1) : "--.-"; if (txt !== I.k) { I.k = txt; const { x, c } = I.e; x.fillStyle = "#1d2228"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#9fe6c0"; x.font = "bold 58px 'Courier New',monospace"; x.textAlign = "right"; x.textBaseline = "middle"; x.fillText(txt, c.width - 12, 56); x.font = "14px system-ui"; x.textAlign = "left"; x.fillText("°C  ε 0,95", 8, 16); I.e.t.needsUpdate = true; } }
+    if (AP.crono) { const o = a.crono || {}; AP.crono.G.visible = o.vizibil !== false; const tt = o.t || 0, txt = `${String(Math.floor(tt / 60)).padStart(2, "0")}:${String(Math.floor(tt % 60)).padStart(2, "0")}`;
+      if (txt !== AP.crono.k) { AP.crono.k = txt; const { x, c } = AP.crono.e; x.fillStyle = "#aab79c"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1b2416"; x.font = "bold 62px 'Courier New',monospace"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(txt, c.width / 2, 54); AP.crono.e.t.needsUpdate = true; } }
+    if (AP.presiune) { const o = a.presiune || {}, Pr = AP.presiune, viz = !!o.vizibil; Pr.G.visible = viz; Pr.furt.visible = Pr.adapt.visible = viz && !!o.montat; Pr.pist.position.y = 0.1 - 0.05 * Math.max(0, Math.sin(t * 6)) * (o.pompeaza ? 1 : 0);
+      const k = `${(o.p || 0).toFixed(3)}|${(o.max ?? -1).toFixed(3)}`; if (viz && k !== Pr.k) { Pr.k = k; const { x, c } = Pr.e, R = c.width / 2, ang = v => (-225 + 270 * Math.max(0, Math.min(1, v / 2.5))) * Math.PI / 180;
+        x.fillStyle = "#fbfbf7"; x.beginPath(); x.arc(R, R, R, 0, Math.PI * 2); x.fill(); x.strokeStyle = "#d32f2f"; x.lineWidth = 12; x.beginPath(); x.arc(R, R, R - 16, ang(1.4), ang(2.5)); x.stroke();
+        for (let i = 0; i <= 25; i++) { const a2 = ang(i / 10), M5 = i % 5 === 0; x.strokeStyle = "#111"; x.lineWidth = M5 ? 4 : 2; x.beginPath(); x.moveTo(R + Math.cos(a2) * (R - 8), R + Math.sin(a2) * (R - 8)); x.lineTo(R + Math.cos(a2) * (R - (M5 ? 30 : 20)), R + Math.sin(a2) * (R - (M5 ? 30 : 20))); x.stroke();
+          if (M5) { x.fillStyle = "#111"; x.font = "bold 22px system-ui"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText((i / 10).toFixed(1).replace(".", ","), R + Math.cos(a2) * (R - 52), R + Math.sin(a2) * (R - 52)); } }
+        x.fillStyle = "#222"; x.font = "bold 24px system-ui"; x.fillText("bar", R, R + 50); x.font = "13px system-ui"; x.fillText("COOLING SYSTEM", R, R - 46);
+        if (o.max != null && o.max > 0) { const am = ang(o.max); x.strokeStyle = "#1d4ed8"; x.lineWidth = 3; x.beginPath(); x.moveTo(R, R); x.lineTo(R + Math.cos(am) * (R - 22), R + Math.sin(am) * (R - 22)); x.stroke(); }
+        const ap = ang(o.p || 0); x.strokeStyle = "#c62828"; x.lineWidth = 6; x.beginPath(); x.moveTo(R - Math.cos(ap) * 22, R - Math.sin(ap) * 22); x.lineTo(R + Math.cos(ap) * (R - 20), R + Math.sin(ap) * (R - 20)); x.stroke(); x.fillStyle = "#111"; x.beginPath(); x.arc(R, R, 12, 0, Math.PI * 2); x.fill(); Pr.e.t.needsUpdate = true; } }
+  }
   // sondele instrumentului (cablu roșu / negru sau cablul OBD)
   const sonde = new THREE.Group(); scene.add(sonde);
   const matR = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.5 }), matN = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 }), matG = new THREE.MeshStandardMaterial({ color: 0xffd400, roughness: 0.5 });
@@ -1129,7 +1326,7 @@ export function creeazaStand(gazda, optiuni = {}) {
   if (mot.interior || mot.racire) {
     cv.insertAdjacentHTML("beforeend", `<span class="m3d-sep"></span>${[["sectionat", "secționat"], ["transparent", "transparent"], ["opac", "carcasă opacă"]].map(([k, t]) => `<button type="button" data-mod="${k}">${t}</button>`).join("")}`);
     cv.querySelectorAll("[data-mod]").forEach(b => b.addEventListener("click", () => setMod(b.dataset.mod)));
-    setMod(optiuni.mod || "sectionat"); zboara(...(VEDERI.ungere || VEDERI.racire)); zbor.k = 0.999;
+    setMod(optiuni.mod || "opac"); if (optiuni.mod) { zboara(...(VEDERI[optiuni.vedere] || (optiuni.mod === "sectionat" ? VEDERI.ungere : VEDERI.gen))); zbor.k = 0.999; }
   }
   // selectare prin clic (raycasting)
   const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let jos = null;
@@ -1164,8 +1361,8 @@ export function creeazaStand(gazda, optiuni = {}) {
     const dt = Math.min(0.1, Math.max(0, (t - tP) / 1000)); tP = t;
     if (!cont.getClientRects().length) return;
     stare.timp += dt;
-    mot.actualizeaza(stare, dt); furtune(stare.furtune);
-    if (ap.man) { const u = stare.ulei || {}, us = stare.uleiStare || {}; const vm = !!u.man && (us.ad || 0) > 0.97; ap.man.visible = ap.furtun.visible = ap.sup.visible = vm; ap.term.visible = ap.cablu.visible = u.term !== false;
+    mot.actualizeaza(stare, dt); furtune(stare.furtune); if (optiuni.aparate) actualizeazaAparate(stare.timp);
+    if (ap.man) { const u = stare.ulei || {}, us = stare.uleiStare || {}; const vm = !!u.man && (us.ad || 0) > 0.97; ap.man.visible = ap.furtun.visible = ap.sup.visible = vm; ap.term.visible = ap.cablu.visible = u.term === true;
       const pm = vm ? (u.pAfis ?? u.p ?? 0) : 0, T = u.Tafis; if (Math.abs(pm - ap.ult[0]) > 0.004 || T !== ap.ult[1]) { ap.deseneaza(pm, T); ap.ult = [pm, T]; } }
     if (stare.rpm > 50) mot.grup.position.set((Math.random() - 0.5) * 0.0008, (Math.random() - 0.5) * 0.0008, 0); else mot.grup.position.set(0, 0, 0);
     if (zbor) { zbor.k = Math.min(1, zbor.k + dt / 0.8); const e = zbor.k * zbor.k * (3 - 2 * zbor.k); camera.position.lerpVectors(zbor.p0, zbor.p1, e); ctl.target.lerpVectors(zbor.t0, zbor.t1, e); if (zbor.k >= 1) zbor = null; }

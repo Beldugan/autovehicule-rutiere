@@ -79,6 +79,10 @@ const COMP = {
   senz: ["Senzorul de presiune din rampă", "Membrană metalică cu mărci tensometrice; semnal ≈ 0,5…4,5 V spre ECU (bucla închisă de presiune)."],
   inj: ["Injectoarele Delphi cu electrovalvă", "Comandate de ECU în curent (vârf de atragere ≈ 18…20 A, palier de menținere ≈ 10…12 A), de 2…4 ori pe ciclu; returul de comandă merge la rezervor."],
   ecu: ["Calculatorul motorului (ECU Delphi DCM)", "Citește turația (CKP), sarcina (pedala, MAF), temperaturile și presiunea din rampă; comandă IMV, injectoarele, EGR și turbosuflanta."],
+  turbo: ["Turbosuflanta cu geometrie variabilă (VGT)", "Turbina antrenată de gazele de evacuare rotește compresorul (până la ≈ 200 000 rot/min). Paletele directoare mobile din jurul roții turbinei închid secțiunea la debite mici (presiune de supraalimentare la turații joase) și o deschid la debite mari."],
+  vgt: ["Actuatorul geometriei variabile", "Capsulă cu membrană comandată prin depresiune de electrovalva EVRV (ECU, semnal PWM): tija rotește inelul de comandă al paletelor; la motoarele noi – actuator electric cu senzor de poziție."],
+  ungTurbo: ["Ungerea turbosuflantei", "Conductă metalică din galeria de ulei a blocului spre lagărele flotante ale carcasei centrale; returul liber, prin furtun gros, în baia de ulei. Fără ulei lagărele se distrug în câteva secunde."],
+  intercooler: ["Intercoolerul", "Răcește aerul comprimat (încălzit în compresor): densitatea crește, scade temperatura de ardere și emisia de NOx."],
   obd: ["Priza de diagnoză OBD", "Testerul citește presiunea cerută / reală, comanda IMV, turația și temperatura combustibilului; înregistrează datele."]
 };
 const MOT = { X: [600, 690, 780, 870], yc: 352, r: 15, L: 62, crown: 22, deck: 246, OFF: [0, 540, 180, 360], LENT: 25 };   // OFF: decalajul ciclului (°) – ordinea 1-3-4-2
@@ -207,16 +211,24 @@ function schemaSVG(P = "cr") {
 }
 /* ------------------------------------------------------------------ macheta 3D: motorul de pe stand în varianta 1.5 dCi (common-rail Delphi) */
 const SV = { m3d: null };
-const ET3D = { rez: "rezervor", filtru: "filtru motorină", pjp: "pompa de transfer", pip: "pompa ÎP", imv: "IMV", rampa: "rampa", senz: "senzor presiune", inj: "injectoare", ecu: "ECU", obd: "priza OBD" };
+const ET3D = { turbo: "turbosuflanta VGT", vgt: "actuator VGT", ungTurbo: "ungere turbo", intercooler: "intercooler", rez: "rezervor", filtru: "filtru motorină", pjp: "pompa de transfer", pip: "pompa ÎP", imv: "IMV", rampa: "rampa", senz: "senzor presiune", inj: "injectoare", ecu: "ECU", obd: "priza OBD" };
 function alegeComp3D(k) { if (!COMP[k]) return; sim.ident.add(k); sim.sel3d = k; const t = `<b>${COMP[k][0]}.</b> ${COMP[k][1]}`; $("#comp-info") && ($("#comp-info").innerHTML = t); $("#comp-info2").innerHTML = t; actualizeazaPasi(); }
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=10").then(m => { SV.m3d = m.creeazaStand(el, { varianta: "dci", interior: true, mod: "transparent", etichete: ET3D, onSelect: alegeComp3D }); SV.m3d.vedere([1.0, 0.9, 1.25], [0.0, 0.25, 0.1]); })
+  import(BAZA_COMUN + "motor3d.js?v=12").then(m => { SV.m3d = m.creeazaStand(el, { varianta: "dci", interior: true, mod: "transparent", etichete: ET3D, onSelect: alegeComp3D }); SV.m3d.vedere([1.0, 0.9, 1.25], [0.0, 0.25, 0.1]); })
     .catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu a putut fi încărcată (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#motor3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp3D(b.dataset.c3))); });
+}
+/** presiunea de supraalimentare și poziția geometriei variabile (stand fără sarcină: presiuni mici; la accelerare VGT se închide) */
+function turboStare() {
+  const run = sim.merge || sim.cr, tinta = run && sim.merge ? ({ ral: 0.03, n1500: 0.07, n2000: 0.12, n2500: 0.18, n3000: 0.25, acc: 0.65 }[sim.reg] ?? 0.05) : 0;
+  sim.boost = (sim.boost || 0) + (tinta - (sim.boost || 0)) * 0.04;
+  const vgt = !run ? 0.2 : sim.reg === "acc" ? (sim.boost < 0.5 ? 1 : 0.55) : Math.max(0.3, 0.9 - sim.n / 5500);
+  return { n: run ? sim.n : 0, boost: sim.boost, vgt, sarcina: sim.reg === "acc" ? 0.8 : 0.1 };
 }
 function actualizeaza3D() {
   if (!SV.m3d) return;
   SV.m3d.seteaza({ rpm: sim.merge || sim.cr ? sim.n : 0, tps: 0, selectat: sim.sel3d || null, vent: false, tEv: sim.merge ? 300 : 80, eticheteVizibile: true,
+    turbo: turboStare(),
     cr: { p: sim.p, imv: sim.imv, n: sim.merge || sim.cr ? sim.n : 0, merge: sim.merge, antrenare: sim.cr && sim.n > 100, contact: sim.contact || sim.merge,
       prof: (sim.merge || sim.cr) && sim.n > 50 ? profil(regInj()).map(([t, d]) => [-2 + t * sim.n * 6, d * sim.n * 6]) : [] },
     furtune: [sim.obd ? { k: "obd", c: 0x1f5fd0, r: 0.004 } : null, sim.cleste ? { k: "inj", c: 0xffd400, r: 0.0035 } : null].filter(Boolean) });

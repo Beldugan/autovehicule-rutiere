@@ -520,7 +520,7 @@ const TEST = [
 const SV = { m3d: null };
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=10").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", map: "MAP", reg: "regulator", l1: "sonda λ amonte", l2: "sonda λ aval" }, onSelect: () => {} }); })
+  import(BAZA_COMUN + "motor3d.js?v=12").then(m => { SV.m3d = m.creeazaStand(el, { etichete: { inj1: "inj. 1", inj2: "inj. 2", inj3: "inj. 3", inj4: "inj. 4", map: "MAP", reg: "regulator", l1: "sonda λ amonte", l2: "sonda λ aval" }, onSelect: () => {} }); })
     .catch(e => { el.innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 const CSS = `<style>
@@ -663,7 +663,7 @@ Cadru.porneste({
       }
       if (sim.merge && provActiv() && sim.tProv > 120 && !this._av) { this._av = true; C.mesajTemporar("NSSM: defectul provocat durează de peste 2 minute – catalizatorul se supraîncălzește! Reveniți la normal.", "pericol"); }
       if (!provActiv()) this._av = false;
-      if (SV.m3d) SV.m3d.seteaza({ rpm: sim.rpm, tps: sim.merge && sim.reg === "r2500" ? 9 : 0, selectat: null, decuplat: provActiv() === "rateu" ? { ["inj" + sim.cilR]: true } : {}, vent: false, tEv: sim.merge ? 420 : 160, eticheteVizibile: true,
+      if (SV.m3d) SV.m3d.seteaza({ rpm: sim.rpm, ect: sim.ect, tps: sim.merge && sim.reg === "r2500" ? 9 : 0, selectat: null, decuplat: provActiv() === "rateu" ? { ["inj" + sim.cilR]: true } : {}, vent: false, tEv: sim.merge ? 420 : 160, eticheteVizibile: true,
         teTur: sim.man.montat, regFurtun: !!sim.regFurtun, furtune: [sim.man.montat ? { k: "teTur", c: 0x23272c } : null, sim.deb && sim.deb.retur ? { k: "retur", c: 0x2f6f9e, r: 0.005 } : null].filter(Boolean) });
       if (!vizibil) return;
       const now = performance.now();
