@@ -82,5 +82,5 @@ const PORTAL = {
     }
   },
   /** lucrările deja realizate în portal: cod → cale */
-  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "mf-l4": "mf/l4/", "da-l1": "da/l1/", "da-l2": "da/l2/", "da-l3": "da/l3/", "da-l4": "da/l4/", "saa-l1": "saa/l1/", "saa-l2": "saa/l2/", "saa-l3": "saa/l3/", "saa-l4": "saa/l4/", "saa-l5": "saa/l5/", "mam1-l1": "mam1/l1/", "mam1-l2": "mam1/l2/", "mam1-l3": "mam1/l3/" }
+  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "mf-l4": "mf/l4/", "da-l1": "da/l1/", "da-l2": "da/l2/", "da-l3": "da/l3/", "da-l4": "da/l4/", "saa-l1": "saa/l1/", "saa-l2": "saa/l2/", "saa-l3": "saa/l3/", "saa-l4": "saa/l4/", "saa-l5": "saa/l5/", "mam1-l1": "mam1/l1/", "mam1-l2": "mam1/l2/", "mam1-l3": "mam1/l3/", "mam1-l4": "mam1/l4/" }
 };
