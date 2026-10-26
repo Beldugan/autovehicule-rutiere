@@ -3355,7 +3355,7 @@ function apiColocviuTrimite_(d) {
 }
 function cheieOk_(k) { return String(k || "").toUpperCase().trim() === cheieProf_(); }
 function apiColocviuLista_(p) {
-  if (!cheieOk_(p.key)) return { ok: false, eroare: "Cheia cadrului didactic nu este corectă (meniul Laborator → Cheia cadrului didactic)." };
+  if (!cheieOk_(p.key)) return { ok: false, eroare: "Cheia cadrului didactic nu este corectă (în foaia de calcul: meniul Laborator → Colocviu: cheia cadrului didactic)." };
   const C = colConf_();
   return { ok: true, itemi: C.itemi, lucrari: C.lucrari, pondere: C.pondere, max: testMax_(), minim: C.notaMinimaPromovare, foaie: SpreadsheetApp.getActive().getUrl(), studenti: citesteRanduri_().map(s => { delete s.row; return s; }) };
 }
