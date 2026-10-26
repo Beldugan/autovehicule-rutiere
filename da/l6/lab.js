@@ -188,7 +188,7 @@ const PASI = [
     buton: ["● Diagnosticul → Tabelul 6.6", e => inregDiag(e)] }
 ];
 let pasActiv = 0;
-const VEDERI = { tot: [[1.6, 2.3, 3.6], [0.7, 0.85, 0]], modul: [[0.55, 1.35, 0.35], [0.15, 0.85, -0.38]], roata: [[1.25, 1.25, 1.15], [0.72, 0.98, 0.4]], volan: [[1.75, 1.45, -1.1], [1.05, 1.15, -0.55]],
+const VEDERI = { tot: [[1.6, 2.3, 3.6], [0.7, 0.85, 0]], modul: [[0.55, 1.35, 0.35], [0.15, 0.85, -0.38]], roata: [[1.25, 1.25, 1.15], [0.72, 0.98, 0.4]], volan: [[2.1, 1.55, 0.75], [1.1, 1.1, 0.2]],
   spate: [[-1.2, 1.3, 1.1], [-0.62, 0.98, 0.4]], adas: [[-0.4, 1.35, 1.3], [1.4, 1.1, 0]] };
 const VR = [[[1.25, 1.25, 1.15], [0.72, 0.98, 0.4]], [[1.25, 1.25, -1.15], [0.72, 0.98, -0.4]], [[-1.15, 1.25, 1.15], [-0.62, 0.98, 0.4]], [[-1.15, 1.25, -1.15], [-0.62, 0.98, -0.4]]];
 function vedere3d(v) { if (!SV.s3) return; if (v === "roata") return SV.s3.vedere(...VR[sim.sel]); if (VEDERI[v]) SV.s3.vedere(...VEDERI[v]); }
@@ -439,7 +439,7 @@ const TEST = [
 const SV = { s3: null };
 function porneste3D() {
   const el = $("#st3d"); if (!el) return;
-  import(BAZA_COMUN + "aparate3d.js?v=6").then(m => { SV.s3 = m.creeazaStandABS(el, { laClic: laClic3d }); vedere3d(PASI[pasActiv].vedere); })
+  import(BAZA_COMUN + "aparate3d.js?v=7").then(m => { SV.s3 = m.creeazaStandABS(el, { laClic: laClic3d }); vedere3d(PASI[pasActiv].vedere); })
     .catch(e => { el.innerHTML = `<p class="nota">Standul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 function laClic3d(k) {

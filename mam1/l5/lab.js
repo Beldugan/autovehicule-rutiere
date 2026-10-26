@@ -640,7 +640,7 @@ Cadru.porneste({
       $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
       construiestePasi();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
-      import(BAZA_COMUN + "aparate3d.js?v=6").then(m => { SV3 = m.creeazaStandMAP($("#st3d"), { laClic: laClic3d }); sincron3d(); })
+      import(BAZA_COMUN + "aparate3d.js?v=7").then(m => { SV3 = m.creeazaStandMAP($("#st3d"), { laClic: laClic3d }); sincron3d(); })
         .catch(e => { console.warn("Standul 3D nu s-a încărcat:", e); $("#st3d").innerHTML = `<p class="nota" style="padding:1rem">Standul 3D nu poate fi afișat pe acest dispozitiv (WebGL). Lucrați cu comenzile și afișajele de mai jos.</p>`; });
       C.mesaj("Pasul 1: ochelarii, colierele strânse, apoi porniți simularea și citiți presiunea atmosferică.", "");
     },

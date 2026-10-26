@@ -1014,10 +1014,15 @@ export function creeazaStandABS(gazda, opt = {}) {
   const XC = XF + 0.13;
   cyl(sc, 0.022, 0.022, 0.55, mat({ color: 0x6b7178, roughness: 0.4, metalness: 0.7 }), XC, YH - 0.03, 0, 24).rotation.x = Math.PI / 2;
   const biel = [ZH, -ZH].map(z => { const b = cyl(sc, 0.008, 0.008, 0.16, otel, XC - 0.05, YH - 0.03, z * 0.8, 10); b.rotation.x = Math.PI / 2; return b; });
-  const COL = new THREE.Group(); COL.position.set(XC + 0.02, YH - 0.03, -0.32); sc.add(COL);
-  const pts = [V3(0, 0, 0), V3(0.1, 0.12, -0.2), V3(0.25, 0.42, -0.42)];
-  sc.add(Object.assign(tubM(pts.map(p => p.clone().add(COL.position)), 0.016, otel, 20)));
-  const VOL = new THREE.Group(); VOL.position.copy(COL.position.clone().add(V3(0.27, 0.46, -0.45))); VOL.lookAt(VOL.position.clone().add(V3(0.35, 0.45, -0.8))); sc.add(VOL);
+  // coloana de direcție: pinionul pe cremalieră → cardan → coloana înclinată, cu suportul ei; volanul la capătul din față al standului, spre operator
+  const ZV = 0.25, PIN = V3(XC + 0.03, YH - 0.03, ZV), CARD = V3(XC + 0.1, YH + 0.06, ZV), VPOS = V3(XL + 0.08, YD + 0.5, ZV), dirV = VPOS.clone().sub(CARD).normalize();
+  cyl(sc, 0.02, 0.02, 0.05, fonta, PIN.x, PIN.y, PIN.z, 16);
+  sc.add(tubM([PIN, PIN.clone().lerp(CARD, 0.5), CARD], 0.011, otel, 8));
+  add(sc, new THREE.Mesh(new THREE.SphereGeometry(0.018, 14, 10), fonta)).position.copy(CARD);
+  const capC = VPOS.clone().addScaledVector(dirV, -0.11), axC = add(sc, new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.026, CARD.distanceTo(capC), 18), mat({ color: 0x2a2c30, roughness: 0.6 })));
+  axC.position.copy(CARD).lerp(capC, 0.5); axC.quaternion.setFromUnitVectors(V3(0, 1, 0), dirV);
+  const sup = add(sc, new THREE.Mesh(RB(0.05, VPOS.y - 0.16 - YD, 0.06), albastru)); sup.position.set(VPOS.x - 0.12, (VPOS.y - 0.16 + YD) / 2, ZV);
+  const VOL = new THREE.Group(); VOL.position.copy(VPOS); VOL.lookAt(VPOS.clone().add(dirV)); sc.add(VOL);
   const volan = new THREE.Group(); VOL.add(volan);
   k_(add(volan, new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.017, 14, 48), mat({ color: 0x1e1f22, roughness: 0.7 }))), "volan", "Volanul (clic = rotire ±; butonul din pași îl centrează)");
   [0, 1, 2].forEach(k => { const s = add(volan, new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.012), mat({ color: 0x2a2c30, roughness: 0.6 }))); s.position.set(Math.cos(k * 2.1 - 1.57) * 0.08, Math.sin(k * 2.1 - 1.57) * 0.08, 0); s.rotation.z = k * 2.1 - 1.57; });

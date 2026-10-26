@@ -412,7 +412,7 @@ Cadru.porneste({
     init(C) {
       construiestePasi(); ecranComplet($(".sim-grila"), $("#btn-ecran")); afisaje();
       $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
-      import(BAZA_COMUN + "aparate3d.js?v=6").then(m => { SV3 = m.creeazaPierderi($("#st3d"), { laClic: laClic3d }); sincron3d(); })
+      import(BAZA_COMUN + "aparate3d.js?v=7").then(m => { SV3 = m.creeazaPierderi($("#st3d"), { laClic: laClic3d }); sincron3d(); })
         .catch(e => { console.warn(e); $("#st3d").innerHTML = `<p class="nota">Standul 3D nu poate fi afișat (WebGL). Folosiți afișajele și citirile de mai jos.</p>`; });
       C.mesaj("Pasul 1: porniți pompa cu robinetul parțial deschis, aerisiți prizele, citiți temperatura.", "");
     },
