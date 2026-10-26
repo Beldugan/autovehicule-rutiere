@@ -1,4 +1,4 @@
-/* GENERAT AUTOMAT – nu editați aici: modificați comun/config.js, modelele lucrărilor sau server/nucleu.gs și rulați tools/build_server.py */
+/* GENERAT AUTOMAT – nu editați aici: modificați comun/config.js, modelele lucrărilor, băncile de întrebări (date.js ale lucrărilor) sau fișierele .gs din server și rulați tools/build_server.py */
 
 /* Configurarea portalului: disciplinele, lucrările și adresele registrelor de prezență (câte o foaie Google pe disciplină) */
 "use strict";
@@ -26,7 +26,13 @@ const PORTAL = {
         "Regimuri de curgere. Experiența lui Reynolds",
         "Pierderi de sarcină longitudinale și locale într-un circuit de răcire",
         "Definitivarea și susținerea referatelor"
-      ]
+      ],
+      /** colocviul de laborator (ultima ședință): portofoliul bifat de cadrul didactic + testul recapitulativ notat pe server */
+      colocviu: {
+        lab: 7, lucrari: 6, durataMin: 30, grilaPeLucrare: 2, punctePeProblema: 2,
+        itemi: ["Referat complet (tabele, calcule, grafice)", "Exemplul rezolvat recalculat cu valorile proprii", "Răspunsuri la întrebările de verificare", "Referat predat în Classroom"],
+        pondere: { portofoliu: 0.5, test: 0.5 }, notaMinimaPromovare: 5
+      }
     },
     DA: {
       nume: "Diagnosticarea autovehiculelor", an: "anul IV", sem: 1, cod: "MR4103", tip: "Laborator", dosar: "da",
@@ -84,7 +90,7 @@ const PORTAL = {
     }
   },
   /** descrierea din lista lucrărilor, pentru lucrările fără simulator */
-  descrieri: { "mf-l7": "recapitulare · pregătirea susținerii · întrebări și test de antrenament · anexe" },
+  descrieri: { "mf-l7": "colocviu · portofoliul lucrărilor + test recapitulativ notat automat · test de antrenament · anexe" },
   /** lucrările deja realizate în portal: cod → cale */
   realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "mf-l4": "mf/l4/", "mf-l5": "mf/l5/", "mf-l6": "mf/l6/", "mf-l7": "mf/l7/", "da-l1": "da/l1/", "da-l2": "da/l2/", "da-l3": "da/l3/", "da-l4": "da/l4/", "da-l5": "da/l5/", "saa-l1": "saa/l1/", "saa-l2": "saa/l2/", "saa-l3": "saa/l3/", "saa-l4": "saa/l4/", "saa-l5": "saa/l5/", "mam1-l1": "mam1/l1/", "mam1-l2": "mam1/l2/", "mam1-l3": "mam1/l3/", "mam1-l4": "mam1/l4/", "mam1-l5": "mam1/l5/" }
 };
@@ -2586,6 +2592,789 @@ MODELE["saa-l5"] = (function () {
   return { TAPA: TAPA, TMIN: TMIN, parametri: parametri, cursa: cursa, incalzire: incalzire, stare: stare, prelucreaza: prelucreaza, asteptate: asteptate, verifica: verifica };
 })();
 
+
+/* ---- mf/l7/date.js ---- */
+/* GENERAT din mf/l1…l6/lab.js (întrebările de verificare și testele) – tools/extrage_recap_mf.js */
+const LUCRARI_MF = [
+ {
+  "nr": 1,
+  "titlu": "Vâscozitatea uleiurilor de motor în funcție de temperatură",
+  "scop": "Determinarea vâscozității dinamice și cinematice a uleiurilor de motor la 40, 60 și 80 °C cu vâscozimetrul Höppler, trasarea dreptei Walther și încadrarea în clasificarea SAE J300.",
+  "relatii": "η = K·(ρ<sub>b</sub> − ρ<sub>l</sub>)·t; &nbsp; ν = η/ρ; &nbsp; ρ(t) = ρ<sub>15</sub>·[1 − α(t − 15)]; &nbsp; lg lg(ν + 0,7) = A − B·lg T.",
+  "intrebari": [
+   [
+    "Care este diferența dintre vâscozitatea dinamică și cea cinematică? Dați unitățile SI și pe cele uzuale.",
+    "η leagă efortul tangențial de gradientul de viteză (Pa·s; uzual mPa·s = cP); ν = η/ρ (m²/s; uzual mm²/s = cSt). Clasificarea SAE folosește ν la 100 °C și η (HTHS) la 150 °C."
+   ],
+   [
+    "De ce nu se poate folosi direct legea lui Stokes în vâscozimetrul Höppler?",
+    "Stokes presupune lichid nelimitat și Re &lt; 0,5; în tub jocul bilă–perete este foarte mic, rezistența este dominată de curgerea în fanta dintre bilă și tub, deci se folosește constanta de etalonare K a fiecărei bile."
+   ],
+   [
+    "Ce reprezintă cele două numere din marcajul 5W-30?",
+    "5W – clasa de iarnă, stabilită prin încercări la rece (CCS – pornire, MRV – pompare); 30 – clasa de vară, după ν la 100 °C (9,3…12,5 mm²/s) și HTHS la 150 °C (min. 2,9 mPa·s)."
+   ],
+   [
+    "De ce se măsoară și vâscozitatea HTHS la 150 °C?",
+    "În lagăre gradienții de viteză sunt foarte mari (10⁶ s⁻¹) și temperatura ridicată; polimerii aditivi se aliniază și vâscozitatea scade temporar. HTHS garantează grosimea minimă a filmului de ulei în aceste condiții."
+   ],
+   [
+    "Cum influențează diluarea uleiului cu motorină (la regenerarea filtrului de particule) vâscozitatea și ungerea?",
+    "Motorina (ν ≈ 2–4 mm²/s) scade vâscozitatea uleiului; filmul din lagăre se subțiază, crește uzura, iar uleiul poate ieși din clasa SAE. Se verifică nivelul (crește!) și se scurtează intervalul de schimb."
+   ]
+  ],
+  "test": [
+   {
+    "q": "Unitatea uzuală a vâscozității cinematice în fișele tehnice ale uleiurilor este:",
+    "o": [
+     "mPa·s",
+     "mm²/s (cSt)",
+     "Pa",
+     "kg/m³"
+    ],
+    "c": 1,
+    "e": "ν = η/ρ, uzual în mm²/s (1 cSt)."
+   },
+   {
+    "q": "În vâscozimetrul Höppler, la viteză constantă, η este proporțională cu:",
+    "o": [
+     "pătratul timpului de cădere",
+     "timpul de cădere",
+     "inversul timpului",
+     "temperatura"
+    ],
+    "c": 1,
+    "e": "η = K(ρ<sub>b</sub> − ρ<sub>l</sub>)·t – relație liniară cu t."
+   },
+   {
+    "q": "De ce timpul de cădere trebuie să fie peste 10 s?",
+    "o": [
+     "ca bila să nu se oprească",
+     "pentru ca eroarea relativă de cronometrare să fie mică",
+     "din cauza Archimede",
+     "pentru încălzirea uleiului"
+    ],
+    "c": 1,
+    "e": "Timpul de reacție (0,1–0,2 s) raportat la un timp scurt dă erori de câteva procente."
+   },
+   {
+    "q": "În diagrama Walther dreptele sunt obținute pentru:",
+    "o": [
+     "lg ν funcție de t",
+     "lg lg(ν + 0,7) funcție de lg T",
+     "ν funcție de 1/T",
+     "η funcție de p"
+    ],
+    "c": 1,
+    "e": "ASTM D341: lg lg(ν + 0,7) = A − B·lg T."
+   },
+   {
+    "q": "Un ulei cu panta Walther B mai mică:",
+    "o": [
+     "își schimbă mai puțin vâscozitatea cu temperatura (VI mare)",
+     "este mai vâscos la 100 °C",
+     "este întotdeauna mineral",
+     "nu poate fi multigrad"
+    ],
+    "c": 0,
+    "e": "B mic → variație mică cu temperatura → indice de vâscozitate mare."
+   },
+   {
+    "q": "Numărul „30” din 5W-30 se stabilește după:",
+    "o": [
+     "vâscozitatea la −30 °C",
+     "ν la 100 °C și HTHS la 150 °C",
+     "densitate",
+     "punctul de inflamabilitate"
+    ],
+    "c": 1,
+    "e": "Clasa de vară – Tabelul 1.1."
+   },
+   {
+    "q": "O eroare de 1 °C la 40 °C modifică vâscozitatea cu aproximativ:",
+    "o": [
+     "0,1 %",
+     "3 %",
+     "30 %",
+     "nu o modifică"
+    ],
+    "c": 1,
+    "e": "≈ 3 % – de aceea stabilizarea termică este esențială."
+   }
+  ]
+ },
+ {
+  "nr": 2,
+  "titlu": "Compresibilitatea lichidului de frână și efectul aerului din circuit",
+  "scop": "Determinarea modulului de elasticitate al unui lichid de frână cu piezometrul cu piston filetat și evidențierea efectului aerului asupra volumului absorbit (cursa pedalei).",
+  "relatii": "ΔV = n·πd²/4·s; &nbsp; K<sub>m</sub> = V₀·Δp/ΔV; &nbsp; 1/K = 1/K<sub>m</sub> − D/(E·e); &nbsp; β = 1/K; &nbsp; V<sub>a0</sub> = n<sub>b</sub>·πd<sub>b</sub>³/6; &nbsp; ΔV<sub>a</sub> = V<sub>a0</sub>(1 − p₀/p); &nbsp; a = √(K/ρ).",
+  "intrebari": [
+   [
+    "Definiți compresibilitatea și modulul de elasticitate al unui lichid; care sunt unitățile lor?",
+    "Compresibilitatea β = −(1/V<sub>0</sub>)·ΔV/Δp este micșorarea relativă a volumului la creșterea presiunii cu o unitate, în 1/Pa. Modulul de elasticitate K = 1/β = −V<sub>0</sub>·Δp/ΔV, în Pa (practic GPa). Pentru lichidul de frână K ≈ 1,5…2,0 GPa, β ≈ 5…6,7·10<sup>−10</sup> 1/Pa."
+   ],
+   [
+    "De ce aerul din circuitul de frânare produce „pedala moale”?",
+    "Aerul are K = p ≈ 0,1 MPa la presiunea atmosferică, de ~15 000 de ori mai mic decât al lichidului. Bula se comprimă izoterm și absoarbe aproape tot volumul ei la presiuni mici (jumătate până la 1 bar), deci pedala coboară fără ca presiunea să crească; abia după comprimarea bulei presiunea urcă. Efectul este același cu bulele de vapori la fierberea lichidului."
+   ],
+   [
+    "De ce lichidul de frână se schimbă periodic, chiar dacă nivelul lui este corect?",
+    "Lichidul pe bază de glicoli este higroscopic: absoarbe apă din aer prin furtunuri și prin capacul rezervorului. Apa scade punctul de fierbere (DOT 4: 230 °C uscat → 155 °C umed), iar la frânări repetate apar bule de vapori (pedală moale, „fading”); apa produce și coroziune. De aceea lichidul se înlocuiește la 2 ani sau când conținutul de apă depășește ≈ 3 %."
+   ],
+   [
+    "Calculați viteza de propagare a undei de presiune în lichidul de frână (K = 1,7 GPa, ρ = 1050 kg/m³).",
+    "a = √(K/ρ) = √(1,7·10<sup>9</sup>/1050) ≈ <b>1272 m/s</b>."
+   ],
+   [
+    "Cum influențează elasticitatea furtunurilor de frână valoarea măsurată a modulului de elasticitate?",
+    "Peretele de cauciuc se dilată sub presiune și absoarbe volum, ca un termen D/(E·e) foarte mare în relația (2.4) (E al cauciucului este de mii de ori mai mic decât al oțelului). Modulul „echivalent” măsurat scade mult sub cel al lichidului – de câteva ori, după lungimea furtunului – deci cursa pedalei crește. În simulator: situația „furtun flexibil racordat”."
+   ]
+  ],
+  "test": [
+   {
+    "q": "Ce mărime se citește direct pe piezometru pentru a obține ΔV?",
+    "o": [
+     "presiunea",
+     "numărul de rotații ale roții de manevră",
+     "temperatura",
+     "diametrul cilindrului"
+    ],
+    "c": 1,
+    "e": "ΔV = n·πd²/4·s: se citește numărul de rotații n; d și s sunt constante ale standului."
+   },
+   {
+    "q": "Un student obține K = 0,9 GPa pentru DOT 4. Cea mai probabilă cauză este:",
+    "o": [
+     "cilindrul se dilată",
+     "a rămas aer în piezometru",
+     "temperatura e prea mică",
+     "manometrul are clasa 1"
+    ],
+    "c": 1,
+    "e": "Corecția cilindrului este de doar ≈ 3 %. O valoare mult sub 1,5 GPa indică aer rămas (aerisire incompletă)."
+   },
+   {
+    "q": "Corecția pentru deformarea cilindrului face ca modulul real K să fie:",
+    "o": [
+     "mai mic decât K_m",
+     "mai mare decât K_m",
+     "egal cu K_m",
+     "nul"
+    ],
+    "c": 1,
+    "e": "Cilindrul se dilată și „ajută” la absorbția de volum, deci K_m < K: 1/K = 1/K_m − D/(E·e)."
+   },
+   {
+    "q": "O bulă de 0,5 cm³ (la 1 bar abs.) absoarbe până la 1 bar suprapresiune:",
+    "o": [
+     "0,05 cm³",
+     "0,25 cm³",
+     "0,48 cm³",
+     "0,5 cm³"
+    ],
+    "c": 1,
+    "e": "ΔV_a = 0,5·(1 − 1/2) = 0,25 cm³ – jumătate din volumul bulei la doar 1 bar."
+   },
+   {
+    "q": "Curbele de încărcare și descărcare nu se suprapun, descărcarea ajunge la 0 bar mai devreme. Diagnosticul:",
+    "o": [
+     "aer în lichid",
+     "scurgere la etanșarea pistonului",
+     "manometru defect",
+     "lichid prea vâscos"
+    ],
+    "c": 1,
+    "e": "Lichidul pierdut pe lângă piston face ca presiunea să scadă la zero înainte de revenirea roții (§2.7)."
+   },
+   {
+    "q": "La 100 bar, lichidul de frână cu K = 1,7 GPa își micșorează volumul cu aproximativ:",
+    "o": [
+     "0,06 %",
+     "0,6 %",
+     "6 %",
+     "10 %"
+    ],
+    "c": 1,
+    "e": "ΔV/V = p/K = 10⁷/1,7·10⁹ ≈ 0,59 %."
+   },
+   {
+    "q": "Celeritatea undelor de presiune în motorină (K = 1,5 GPa, ρ = 830 kg/m³) este:",
+    "o": [
+     "≈ 340 m/s",
+     "≈ 1340 m/s",
+     "≈ 4500 m/s",
+     "≈ 13 400 m/s"
+    ],
+    "c": 1,
+    "e": "a = √(1,5·10⁹/830) ≈ 1344 m/s."
+   },
+   {
+    "q": "Lichidul DOT 5 (siliconic) față de DOT 4:",
+    "o": [
+     "este higroscopic",
+     "are modul de elasticitate mai mic (mai compresibil)",
+     "se amestecă fără restricții cu DOT 4",
+     "are punct de fierbere mai mic"
+    ],
+    "c": 1,
+    "e": "Lichidele siliconice sunt nehigroscopice, dar mai compresibile (K ≈ 1 GPa) și nu se amestecă cu cele pe bază de glicoli."
+   }
+  ]
+ },
+ {
+  "nr": 3,
+  "titlu": "Legea lui Pascal: transmiterea hidraulică a forței în sistemul de frânare",
+  "scop": "Verificarea legii lui Pascal pe un circuit real de frânare: presiunea creată de pompa centrală, forța la etrier, randamentele transmisiei și factorul de amplificare al servofrânei.",
+  "relatii": "F<sub>t</sub> = F<sub>p</sub>·i<sub>p</sub>·η<sub>p</sub>; &nbsp; p = F<sub>t</sub>/A<sub>m</sub>; &nbsp; F<sub>c</sub> = p·A<sub>c</sub>·η<sub>c</sub>; &nbsp; s<sub>c</sub>A<sub>c</sub> = s<sub>m</sub>A<sub>m</sub>; &nbsp; F<sub>f</sub> = 2μF<sub>c</sub>; &nbsp; F<sub>r</sub> = F<sub>f</sub>·r<sub>ef</sub>/r<sub>d</sub>.",
+  "intrebari": [
+   [
+    "Enunțați legea fundamentală a hidrostaticii și legea lui Pascal.",
+    "p = p₀ + ρgh: presiunea crește liniar cu adâncimea. Pascal: o variație de presiune produsă într-un punct al unui lichid în repaus se transmite integral în toate punctele lui."
+   ],
+   [
+    "De ce diferența de nivel dintre pompa centrală și etrier nu influențează practic presiunea în circuit?",
+    "ρgh pentru h &lt; 1 m este sub 0,1 bar, neglijabil față de 20…150 bar de lucru."
+   ],
+   [
+    "Cum se modifică forța la etrier dacă diametrul pistonului etrierului crește de la 54 la 57 mm?",
+    "Crește cu raportul ariilor (57/54)² = 1,114, adică cu ≈ 11 %, la aceeași presiune; crește însă și volumul de lichid necesar (cursa pedalei)."
+   ],
+   [
+    "Ce se întâmplă cu presiunea în circuit dacă servofrâna își pierde vacuumul?",
+    "Asistarea dispare: la aceeași forță pe pedală presiunea scade de ≈ 4…7 ori; frâna funcționează, dar cere o forță foarte mare."
+   ],
+   [
+    "De ce sistemul de frânare are două circuite independente (pompa tandem)?",
+    "Pentru siguranță: la o scurgere într-un circuit, celălalt (de regulă în diagonală) asigură încă cel puțin jumătate din forța de frânare (cerință legală)."
+   ]
+  ],
+  "test": [
+   {
+    "q": "Într-un lichid în repaus, presiunea într-un punct:",
+    "o": [
+     "depinde de direcție",
+     "este aceeași pe toate direcțiile",
+     "este zero",
+     "depinde doar de volum"
+    ],
+    "c": 1,
+    "e": "Proprietatea presiunii hidrostatice; de aici legea lui Pascal."
+   },
+   {
+    "q": "Raportul F<sub>c</sub>/F<sub>t</sub> între etrier și pompa centrală este (ideal):",
+    "o": [
+     "d<sub>c</sub>/d<sub>m</sub>",
+     "A<sub>c</sub>/A<sub>m</sub>",
+     "A<sub>m</sub>/A<sub>c</sub>",
+     "1"
+    ],
+    "c": 1,
+    "e": "La aceeași presiune forțele sunt proporționale cu ariile (3.7)."
+   },
+   {
+    "q": "Dacă forța se multiplică de 6 ori între pompă și etrier, cursa pistonului etrierului:",
+    "o": [
+     "crește de 6 ori",
+     "rămâne aceeași",
+     "scade de 6 ori",
+     "scade de 36 de ori"
+    ],
+    "c": 2,
+    "e": "Conservarea volumului s<sub>c</sub>A<sub>c</sub> = s<sub>m</sub>A<sub>m</sub> – lucrul mecanic se conservă."
+   },
+   {
+    "q": "Termenul ρgh pentru o diferență de nivel de 0,8 m de lichid de frână este aproximativ:",
+    "o": [
+     "0,08 bar",
+     "8 bar",
+     "80 bar",
+     "0,8 bar"
+    ],
+    "c": 0,
+    "e": "1050·9,81·0,8 ≈ 8 240 Pa ≈ 0,08 bar."
+   },
+   {
+    "q": "După punctul de saturație al servofrânei, presiunea:",
+    "o": [
+     "nu mai crește deloc",
+     "crește doar cu forța șoferului (panta mică)",
+     "scade",
+     "crește exponențial"
+    ],
+    "c": 1,
+    "e": "Asistarea a atins Δp<sub>vac</sub>·A<sub>membrană</sub>; restul vine doar de la pedală."
+   },
+   {
+    "q": "Randamentul aparent η<sub>p</sub> la forțe mici (50 N) este mai mic deoarece:",
+    "o": [
+     "lichidul se comprimă",
+     "arcul de revenire al pompei preia o parte din forță",
+     "manometrul nu citește",
+     "temperatura este mică"
+    ],
+    "c": 1,
+    "e": "Forța arcului (≈ 40 N pe tijă) contează mult la forțe mici."
+   }
+  ]
+ },
+ {
+  "nr": 4,
+  "titlu": "Ecuația lui Bernoulli și măsurarea debitului: tubul Venturi și tubul Pitot",
+  "scop": "Verificarea experimentală a ecuației lui Bernoulli prin trasarea liniei piezometrice și a liniei energetice într-un tub Venturi, determinarea coeficientului de debit și măsurarea vitezei locale cu tubul Pitot.",
+  "relatii": "Q = v<sub>1</sub>A<sub>1</sub> = v<sub>2</sub>A<sub>2</sub>; &nbsp; z + p/(ρg) + v²/(2g) = const. − h<sub>r</sub>; &nbsp; v<sub>2</sub> = √(2gΔh/(1 − (A<sub>2</sub>/A<sub>1</sub>)²)); &nbsp; Q<sub>t</sub> = A<sub>2</sub>v<sub>2</sub>; &nbsp; C<sub>d</sub> = Q/Q<sub>t</sub>; &nbsp; Δh = l·sin α; &nbsp; v = √(2gΔh).",
+  "intrebari": [
+   [
+    "Scrieți ecuația lui Bernoulli pentru lichidul real și explicați semnificația energetică a fiecărui termen.",
+    "z + p/(ρg) + αv²/(2g) = const. − h<sub>r</sub>: energia de poziție, de presiune și cinetică, raportate la greutatea lichidului (sarcini în m coloană de lichid); h<sub>r</sub> este energia disipată prin frecări între cele două secțiuni."
+   ],
+   [
+    "De ce scade presiunea în gâtul tubului Venturi?",
+    "Din continuitate, viteza crește invers proporțional cu aria (v<sub>2</sub> = v<sub>1</sub>·A<sub>1</sub>/A<sub>2</sub>); energia totală rămânând (aproape) aceeași, creșterea sarcinii cinetice se face pe seama sarcinii de presiune."
+   ],
+   [
+    "Ce reprezintă distanța verticală dintre linia energetică și linia piezometrică?",
+    "Sarcina cinetică αv²/(2g) în secțiunea respectivă: mică la intrare (câțiva mm), maximă în gât."
+   ],
+   [
+    "Cum se măsoară viteza aerului cu tubul Pitot-Prandtl? Calculați viteza pentru Δp = 600 Pa și ρ = 1,2 kg/m³.",
+    "Tubul are orificiul frontal (presiunea totală) și orificii laterale (presiunea statică); un manometru diferențial măsoară Δp = ρv²/2. v = √(2·600/1,2) = 31,6 m/s."
+   ],
+   [
+    "Cum funcționează pompa cu jet din rezervorul de combustibil?",
+    "O parte din combustibilul refulat de pompa electrică (sau returul) trece printr-o duză: jetul rapid are presiune statică scăzută (Bernoulli) și antrenează combustibilul din cealaltă cameră a rezervorului („șa”), pe care îl trimite în vasul pompei – fără piese în mișcare."
+   ]
+  ],
+  "test": [
+   {
+    "q": "Ecuația de continuitate pentru un lichid incompresibil afirmă că:",
+    "o": [
+     "viteza este aceeași în toate secțiunile",
+     "debitul Q = v·A este același în toate secțiunile",
+     "presiunea este aceeași în toate secțiunile",
+     "energia crește în gât"
+    ],
+    "c": 1,
+    "e": "Masa (și volumul, la lichid incompresibil) se conservă: v<sub>1</sub>A<sub>1</sub> = v<sub>2</sub>A<sub>2</sub>."
+   },
+   {
+    "q": "Dacă diametrul scade la jumătate, viteza medie:",
+    "o": [
+     "se dublează",
+     "crește de 4 ori",
+     "scade de 2 ori",
+     "rămâne aceeași"
+    ],
+    "c": 1,
+    "e": "v ~ 1/A ~ 1/d²: (2)² = 4."
+   },
+   {
+    "q": "Piezometrul indică:",
+    "o": [
+     "presiunea totală",
+     "cota piezometrică z + p/(ρg)",
+     "sarcina cinetică",
+     "pierderea de sarcină"
+    ],
+    "c": 1,
+    "e": "Lichidul urcă în tub până la cota piezometrică; sarcina cinetică nu se vede în piezometru, ci în tubul Pitot."
+   },
+   {
+    "q": "Coeficientul de debit al unui tub Venturi bine executat este:",
+    "o": [
+     "0,60…0,65",
+     "0,95…0,99",
+     "exact 1",
+     "1,05…1,1"
+    ],
+    "c": 1,
+    "e": "Pierderile în confuzor sunt mici; o diafragmă are C<sub>d</sub> ≈ 0,6."
+   },
+   {
+    "q": "În regim turbulent, viteza din axă măsurată cu tubul Pitot raportată la viteza medie este:",
+    "o": [
+     "0,5",
+     "1",
+     "1,1…1,25",
+     "2"
+    ],
+    "c": 2,
+    "e": "Profilul turbulent este aplatizat; raportul 2 corespunde regimului laminar (parabolă)."
+   },
+   {
+    "q": "Senzorul Δp al filtrului de particule semnalează necesitatea regenerării deoarece:",
+    "o": [
+     "Δp scade cu încărcarea",
+     "la același debit de gaze, Δp crește cu încărcarea cu funingine",
+     "măsoară temperatura",
+     "măsoară viteza vehiculului"
+    ],
+    "c": 1,
+    "e": "Funinginea mărește rezistența hidraulică a filtrului; ECU compară Δp cu valoarea de referință la debitul de gaze dat."
+   }
+  ]
+ },
+ {
+  "nr": 5,
+  "titlu": "Regimuri de curgere. Experiența lui Reynolds",
+  "scop": "Vizualizarea regimurilor de curgere, determinarea numărului Reynolds critic superior și inferior și aplicarea criteriului Reynolds la curgerile din autovehicul.",
+  "relatii": "Re = v·d/ν; &nbsp; v = 4Q/(πd²); &nbsp; d<sub>h</sub> = 4A/P.",
+  "intrebari": [
+   [
+    "Ce reprezintă fizic numărul Reynolds?",
+    "Raportul dintre forțele de inerție și forțele de vâscozitate (ρv²/d raportat la ηv/d²); la Re mic vâscozitatea amortizează perturbațiile (laminar), la Re mare inerția le amplifică (turbulent)."
+   ],
+   [
+    "Care sunt valorile critice ale numărului Reynolds pentru conducte circulare?",
+    "Re ≈ 2300 – sub această valoare regimul laminar este stabil; 2300…4000 – tranziție; peste 4000 – turbulent. Re critic superior poate fi mult mai mare la intrare netedă și apă liniștită."
+   ],
+   [
+    "Cum se calculează diametrul hidraulic pentru un canal dreptunghiular de 4 × 20 mm?",
+    "d<sub>h</sub> = 4A/P = 4·80/(2·(4 + 20)) = 6,67 mm."
+   ],
+   [
+    "De ce uleiul rece curge laminar în galeriile motorului?",
+    "Vâscozitatea uleiului rece este foarte mare (ν ≈ 170…570 mm²/s), deci Re = v·d/ν este de ordinul zecilor – mult sub 2300."
+   ],
+   [
+    "De ce regimul turbulent favorizează răcirea?",
+    "Fluctuațiile de viteză amestecă fluidul în secțiune, subțiază stratul limită termic de lângă perete și cresc coeficientul de transfer de căldură (Nu ~ Re<sup>0,8</sup>)."
+   ]
+  ],
+  "test": [
+   {
+    "q": "Re pentru v = 0,106 m/s, d = 10 mm, ν = 1,004 mm²/s este:",
+    "o": [
+     "106",
+     "1057",
+     "10 570",
+     "2300"
+    ],
+    "c": 1,
+    "e": "0,106·0,01/1,004·10⁻⁶."
+   },
+   {
+    "q": "În regim laminar viteza maximă în axă este:",
+    "o": [
+     "egală cu viteza medie",
+     "dublul vitezei medii",
+     "cu 20 % mai mare",
+     "jumătate din medie"
+    ],
+    "c": 1,
+    "e": "Profil parabolic."
+   },
+   {
+    "q": "Diametrul hidraulic al unui canal 4 × 20 mm este:",
+    "o": [
+     "4 mm",
+     "6,67 mm",
+     "12 mm",
+     "20 mm"
+    ],
+    "c": 1,
+    "e": "4A/P."
+   },
+   {
+    "q": "La încălzirea apei de la 10 la 20 °C, la același debit, Re:",
+    "o": [
+     "scade",
+     "crește cu ≈ 30 %",
+     "nu se schimbă",
+     "se dublează"
+    ],
+    "c": 1,
+    "e": "ν scade de la 1,306 la 1,004 mm²/s."
+   },
+   {
+    "q": "Re critic la creșterea debitului față de cel la scădere este:",
+    "o": [
+     "mai mic",
+     "mai mare",
+     "egal",
+     "nedefinit"
+    ],
+    "c": 1,
+    "e": "Histerezis – laminarul persistă fără perturbații."
+   }
+  ]
+ },
+ {
+  "nr": 6,
+  "titlu": "Pierderi de sarcină longitudinale și locale într-un circuit de răcire",
+  "scop": "Determinarea experimentală a lui λ pentru conducta dreaptă și a coeficienților ξ pentru lărgire, îngustare, cot și robinet, comparația cu relațiile de calcul și punctul de funcționare al pompei de lichid de răcire.",
+  "relatii": "h<sub>d</sub> = λ·L/d·v²/2g; &nbsp; h<sub>l</sub> = ξ·v²/2g; &nbsp; λ = 0,3164/Re<sup>0,25</sup>; &nbsp; h<sub>r</sub> = M·Q², M = 8(λL/d + Σξ)/(gπ²d⁴).",
+  "intrebari": [
+   [
+    "Care este diferența dintre pierderile de sarcină longitudinale și cele locale?",
+    "Pierderile longitudinale sunt distribuite pe lungimea tronsoanelor drepte (frecare la perete, proporționale cu L/d), cele locale apar concentrat la schimbările de direcție sau de secțiune (cot, lărgire, robinet) prin desprinderi și vârtejuri."
+   ],
+   [
+    "De ce depinde coeficientul λ în regim laminar și în regim turbulent rugos?",
+    "În regim laminar numai de Re (λ = 64/Re); în regim turbulent rugos numai de rugozitatea relativă k/d (λ independent de Re)."
+   ],
+   [
+    "Cum se determină experimental coeficientul ξ al unui cot?",
+    "Se măsoară Δh între prizele de dinainte și de după cot, se scade pierderea longitudinală pe țeava dreaptă dintre prize (λ·L/d·v²/2g) și se împarte la v²/2g."
+   ],
+   [
+    "Ce este caracteristica unui circuit hidraulic și cum se determină punctul de funcționare al pompei?",
+    "Curba h = M·Q² a pierderilor circuitului; punctul de funcționare este intersecția ei cu caracteristica H(Q) a pompei."
+   ],
+   [
+    "Cum se modifică debitul de lichid de răcire când radiatorul se colmatează parțial?",
+    "Crește ξ al radiatorului, deci M; caracteristica circuitului devine mai abruptă și intersecția cu curba pompei se mută la debit mai mic și sarcină mai mare."
+   ]
+  ],
+  "test": [
+   {
+    "q": "λ măsurat pentru Δh = 352 mm pe 1,5 m, d = 17 mm, v²/2g = 0,1583 m este:",
+    "o": [
+     "0,0152",
+     "0,0252",
+     "0,0352",
+     "0,252"
+    ],
+    "c": 1,
+    "e": "0,352/(88,2·0,1583)."
+   },
+   {
+    "q": "La lărgirea bruscă cota piezometrică:",
+    "o": [
+     "scade întotdeauna",
+     "poate crește, deși se pierde energie",
+     "rămâne constantă",
+     "devine negativă"
+    ],
+    "c": 1,
+    "e": "Scăderea sarcinii cinetice depășește pierderea."
+   },
+   {
+    "q": "ξ Borda–Carnot pentru lărgirea 17/26 mm este:",
+    "o": [
+     "0,11",
+     "0,33",
+     "0,57",
+     "1,0"
+    ],
+    "c": 1,
+    "e": "(1 − 0,4275)²."
+   },
+   {
+    "q": "Pierderea totală a circuitului crește cu debitul:",
+    "o": [
+     "liniar",
+     "cu pătratul debitului",
+     "cu radical din debit",
+     "nu depinde"
+    ],
+    "c": 1,
+    "e": "h = M·Q² (regim turbulent)."
+   },
+   {
+    "q": "Dacă M se dublează, debitul pompei cu H = 4 − 10⁷Q² (M inițial 10⁷):",
+    "o": [
+     "scade la jumătate",
+     "scade cu ≈ 18 %",
+     "crește",
+     "rămâne același"
+    ],
+    "c": 1,
+    "e": "√(4/2·10⁷) → √(4/3·10⁷): 0,447 → 0,365 L/s."
+   }
+  ]
+ }
+];
+
+/**
+ * Colocviul de laborator (ultima ședință): testul recapitulativ individual, notat pe server, și portofoliul de lucrări
+ * bifat de cadrul didactic; nota se calculează în foaia „Colocviu” (formule) și se exportă în foaia „Note colocviu”.
+ *  - testul: grile din banca de întrebări a lucrărilor (date.js) + câte o problemă de calcul pe lucrare, cu valori individuale;
+ *    alegerea întrebărilor, ordinea variantelor și valorile problemelor rezultă din seed-ul sesiunii (nu se stochează nimic);
+ *  - răspunsurile corecte nu ajung în browser înainte de trimitere.
+ */
+const BANCA = { MF: typeof LUCRARI_MF !== "undefined" ? LUCRARI_MF : null };
+
+/* ------------------------------------------------------------------ problemele de calcul cu valori individuale */
+function f_(x, n) { return (Math.round(x * Math.pow(10, n)) / Math.pow(10, n)).toFixed(n).replace(".", ","); }
+function rot_(x, n) { return Math.round(x * Math.pow(10, n)) / Math.pow(10, n); }
+const PROBLEME = {
+  MF: [
+    function (u) { const K = rot_(u(0.08, 0.12), 3), rb = rot_(u(7.8, 8.1), 2), rl = rot_(u(0.84, 0.87), 3), t = rot_(u(45, 120), 1), eta = K * (rb - rl) * t;
+      return { text: `Vâscozimetrul Höppler: constanta K = ${f_(K, 3)} mPa·cm³/g, bila ρ<sub>b</sub> = ${f_(rb, 2)} g/cm³, uleiul ρ = ${f_(rl, 3)} g/cm³, timpul de cădere t = ${f_(t, 1)} s. Calculați vâscozitatea cinematică a uleiului.`, u: "mm²/s", rasp: eta / rl }; },
+    function (u) { const V0 = Math.round(u(60, 200)), dp = Math.round(u(50, 150)), K0 = u(1.3, 2.0) * 1000, dV = rot_(V0 * dp * 0.1 / K0, 2);
+      return { text: `Lichid de frână: volumul inițial V₀ = ${V0} cm³ se comprimă cu ΔV = ${f_(dV, 2)} cm³ la creșterea presiunii cu Δp = ${dp} bar. Calculați modulul de elasticitate K.`, u: "MPa", rasp: V0 * dp * 0.1 / dV }; },
+    function (u) { const d = [19.05, 20.64, 22.22, 23.81, 25.4][Math.floor(u(0, 5))], D = Math.round(u(38, 57)), F = Math.round(u(80, 200)) * 10;
+      return { text: `Pompa centrală are pistonul d = ${f_(d, 2)} mm, iar etrierul un piston D = ${D} mm. Tija pompei apasă cu F = ${F} N. Calculați forța de apăsare a pistonului etrierului (fără pierderi).`, u: "N", rasp: F * Math.pow(D / d, 2) }; },
+    function (u) { const D1 = Math.round(u(30, 42)), d2 = Math.round(u(14, 20)), dh = Math.round(u(100, 400)), Cd = rot_(u(0.96, 0.99), 2), A1 = Math.PI * D1 * D1 / 4e6, A2 = Math.PI * d2 * d2 / 4e6;
+      return { text: `Tubul Venturi: D₁ = ${D1} mm, d₂ = ${d2} mm, diferența de nivel între piezometre Δh = ${dh} mm, C<sub>d</sub> = ${f_(Cd, 2)} (g = 9,81 m/s²). Calculați debitul.`, u: "L/s", rasp: Cd * A2 * Math.sqrt(2 * 9.81 * dh / 1000 / (1 - Math.pow(A2 / A1, 2))) * 1000 }; },
+    function (u) { const d = Math.round(u(25, 36)), Q = rot_(u(0.3, 1.2), 2), ny = rot_(u(0.6, 1.0), 2);
+      return { text: `Lichidul de răcire (ν = ${f_(ny, 2)} mm²/s) curge prin furtunul radiatorului, d = ${d} mm, cu debitul Q = ${f_(Q, 2)} L/s. Calculați numărul Reynolds.`, u: "", rasp: 4 * Q / 1000 / (Math.PI * d / 1000 * ny * 1e-6) }; },
+    function (u) { const L = rot_(u(1.0, 3.0), 1), Q = rot_(u(0.2, 0.5), 2), ny = rot_(u(0.95, 1.1), 3), d = 0.017, v = Q / 1000 / (Math.PI * d * d / 4), re = v * d / (ny * 1e-6), lb = 0.3164 / Math.pow(re, 0.25);
+      return { text: `Conductă netedă d = 17 mm, L = ${f_(L, 1)} m, apă cu ν = ${f_(ny, 3)} mm²/s, Q = ${f_(Q, 2)} L/s. Cu λ după Blasius, calculați pierderea de sarcină longitudinală h<sub>d</sub>.`, u: "mm", rasp: lb * L / d * v * v / 2 / 9.81 * 1000 }; }
+  ]
+};
+
+/** testul individual (determinist din seed): grile cu variante amestecate și probleme de calcul */
+function testColocviu_(seed) {
+  const C = (infoDisc_() || {}).colocviu, B = BANCA[disc_()], P = PROBLEME[disc_()] || [];
+  if (!C || !B) throw new Error("Disciplina nu are colocviu configurat.");
+  const r = mulberry32(seed), amest = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = b[i]; b[i] = b[j]; b[j] = t; } return b; };
+  const grila = [], probleme = [];
+  B.slice(0, C.lucrari).forEach(l => {
+    amest(l.test.map((t, i) => i)).slice(0, C.grilaPeLucrare).forEach(i => {
+      const t = l.test[i], ord = amest(t.o.map((o, j) => j));
+      grila.push({ id: "g" + l.nr + "_" + i, lab: l.nr, q: t.q, o: ord.map(j => t.o[j]), c: ord.indexOf(t.c), e: t.e });
+    });
+  });
+  P.slice(0, C.lucrari).forEach((gen, k) => { const p = gen((a, b) => a + (b - a) * r()); probleme.push({ id: "p" + (k + 1), lab: k + 1, text: p.text, u: p.u, rasp: p.rasp }); });
+  return { grila: amest(grila), probleme, max: grila.length + probleme.length * C.punctePeProblema };
+}
+function testPublic_(T) { return { grila: T.grila.map(g => ({ id: g.id, lab: g.lab, q: g.q, o: g.o })), probleme: T.probleme.map(p => ({ id: p.id, lab: p.lab, text: p.text, u: p.u })), max: T.max }; }
+function noteazaTest_(T, rasp) {
+  const C = infoDisc_().colocviu; let p = 0; const det = [];
+  T.grila.forEach(g => { const v = rasp[g.id], ok = v !== undefined && v !== "" && Number(v) === g.c; if (ok) p++; det.push({ id: g.id, lab: g.lab, ok, corect: g.o[g.c], raspuns: v === undefined || v === "" ? "—" : g.o[Number(v)], e: g.e }); });
+  T.probleme.forEach(q => { const v = U.num(rasp[q.id]), ok = isFinite(v) && Math.abs(v - q.rasp) <= Math.abs(q.rasp) * 0.02; if (ok) p += C.punctePeProblema;
+    det.push({ id: q.id, lab: q.lab, ok, corect: (Math.abs(q.rasp) >= 1000 ? String(Math.round(q.rasp)) : f_(q.rasp, Math.abs(q.rasp) >= 10 ? 1 : 3)) + (q.u ? " " + q.u : ""), raspuns: isFinite(v) ? String(rasp[q.id]) : "—", puncte: C.punctePeProblema }); });
+  return { puncte: p, max: T.max, nota: rot_(Math.max(1, 10 * p / T.max), 2), detalii: det };
+}
+
+/* ------------------------------------------------------------------ foaia „Colocviu” */
+const CAP_COL_FIX = ["Nume și prenume", "E-mail", "Grupa"];
+function colConf_() { const C = (infoDisc_() || {}).colocviu; if (!C) throw new Error("Disciplina nu are colocviu configurat."); return C; }
+function colIdx_() {
+  const C = colConf_(), nb = C.lucrari * C.itemi.length, b0 = 4, dupa = b0 + nb;
+  return { C, nb, b0, bife: dupa, port: dupa + 1, puncte: dupa + 2, notaT: dupa + 3, finala: dupa + 4, nota: dupa + 5, data: dupa + 6, durata: dupa + 7, verdict: dupa + 8, obs: dupa + 9, ult: dupa + 9 };
+}
+function foaieColocviu_() {
+  const ss = SpreadsheetApp.getActive(), X = colIdx_(), C = X.C;
+  let sh = ss.getSheetByName("Colocviu");
+  if (!sh) {
+    sh = ss.insertSheet("Colocviu");
+    const cap = CAP_COL_FIX.slice(); for (let l = 1; l <= C.lucrari; l++) C.itemi.forEach((t, k) => cap.push("L" + l + "·" + (k + 1)));
+    cap.push("Bife", "Nota portofoliu", "Puncte test (din " + testMax_() + ")", "Nota test", "Nota finală", "Nota colocviu", "Test susținut la", "Durata test [min]", "Verdict test", "Observații");
+    sh.getRange(1, 1, 1, cap.length).setValues([cap]).setFontWeight("bold").setBackground("#e8f0f9").setWrap(true).setVerticalAlignment("middle");
+    for (let l = 1; l <= C.lucrari; l++) C.itemi.forEach((t, k) => sh.getRange(1, X.b0 + (l - 1) * C.itemi.length + k).setNote(t));
+    sh.setFrozenRows(1); sh.setFrozenColumns(1); sh.setColumnWidth(1, 210); sh.setColumnWidth(2, 220);
+    for (let c = X.b0; c < X.bife; c++) sh.setColumnWidth(c, 42);
+    sh.getRange(1, X.port, 1, 5).setBackground("#d7ebdd");
+  }
+  return sh;
+}
+function testMax_() { const C = colConf_(); return C.lucrari * C.grilaPeLucrare + C.lucrari * C.punctePeProblema; }
+function randColocviu_(email, nume, grupa) {
+  const sh = foaieColocviu_(), X = colIdx_(), C = X.C, last = sh.getLastRow();
+  const emails = last > 1 ? sh.getRange(2, 2, last - 1, 1).getValues().map(r => String(r[0]).toLowerCase().trim()) : [];
+  const i = emails.indexOf(email); if (i >= 0) return { sh, row: i + 2 };
+  const row = last + 1, L = c => col_(c) + row, wP = C.pondere.portofoliu, wT = C.pondere.test;
+  sh.getRange(row, 1, 1, 3).setValues([[nume, email, grupa]]);
+  sh.getRange(row, X.b0, 1, X.nb).insertCheckboxes();
+  sh.getRange(row, X.bife).setFormula(`=COUNTIF(${L(X.b0)}:${L(X.bife - 1)},TRUE)`);
+  sh.getRange(row, X.port).setFormula(`=ROUND(MAX(1,10*${L(X.bife)}/${X.nb}),2)`);
+  sh.getRange(row, X.notaT).setFormula(`=IF(${L(X.puncte)}="","",ROUND(MAX(1,10*${L(X.puncte)}/${testMax_()}),2))`);
+  sh.getRange(row, X.finala).setFormula(`=IF(${L(X.notaT)}="","",ROUND(${wP}*${L(X.port)}+${wT}*${L(X.notaT)},2))`);
+  sh.getRange(row, X.nota).setFormula(`=IF(${L(X.finala)}="","",ROUND(${L(X.finala)},0))`);
+  return { sh, row };
+}
+/** toți studenții din „Prezență” au rând în „Colocviu” */
+function sincronColocviu_() {
+  const sp = foaiePrezenta_(false), last = sp.getLastRow(); if (last < 2) return;
+  const sh = foaieColocviu_(), lc = sh.getLastRow(), are = {};
+  if (lc > 1) sh.getRange(2, 2, lc - 1, 1).getValues().forEach(r => { are[String(r[0]).toLowerCase().trim()] = 1; });
+  sp.getRange(2, 1, last - 1, 3).getValues().forEach(([n, e, g]) => { e = String(e).toLowerCase().trim(); if (e && !are[e]) { randColocviu_(e, n, g); are[e] = 1; } });
+}
+function cheieProf_() { return hmac_("prof|" + disc_()).slice(0, 10).toUpperCase(); }
+function arataCheieProf() {
+  colConf_();
+  SpreadsheetApp.getUi().alert("Cheia cadrului didactic pentru colocviu",
+    "Cheia: " + cheieProf_() + "\n\nSe introduce în pagina lucrării " + colConf_().lab + ", fila „Portofoliu (cadru didactic)”, pentru bifarea portofoliilor și exportul notelor. Nu o comunicați studenților.", SpreadsheetApp.getUi().ButtonSet.OK);
+}
+function citesteRanduri_() {
+  sincronColocviu_();
+  const sh = foaieColocviu_(), X = colIdx_(), last = sh.getLastRow(); if (last < 2) return [];
+  const v = sh.getRange(2, 1, last - 1, X.ult).getValues();
+  // referatele din „Prezență”
+  const sp = foaiePrezenta_(false), lp = sp.getLastRow(), ref = {};
+  if (lp > 1) sp.getRange(2, 2, lp - 1, 2 + X.C.lucrari).getValues().forEach(r => { ref[String(r[0]).toLowerCase().trim()] = r.slice(2).map(x => String(x || "")); });
+  return v.map((r, i) => ({ row: i + 2, nume: r[0], email: String(r[1]).toLowerCase().trim(), grupa: r[2], b: r.slice(X.b0 - 1, X.bife - 1).map(x => x === true), ref: ref[String(r[1]).toLowerCase().trim()] || [],
+    port: r[X.port - 1], puncte: r[X.puncte - 1], notaT: r[X.notaT - 1], finala: r[X.finala - 1], nota: r[X.nota - 1], data: r[X.data - 1] ? Utilities.formatDate(new Date(r[X.data - 1]), TZ, "dd.MM.yyyy HH:mm") : "", durata: r[X.durata - 1], verdict: r[X.verdict - 1], obs: r[X.obs - 1] })).filter(s => s.email);
+}
+function exportaNoteColocviu_() {
+  const rows = citesteRanduri_(), ss = SpreadsheetApp.getActive(), C = colConf_();
+  let sh = ss.getSheetByName("Note colocviu"); if (!sh) sh = ss.insertSheet("Note colocviu"); sh.clear();
+  const cap = ["Nr.", "Nume și prenume", "Grupa", "E-mail", "Nota portofoliu", "Nota test", "Nota finală", "Nota colocviu", "Situația"];
+  const date = rows.slice().sort((a, b) => String(a.grupa).localeCompare(String(b.grupa)) || String(a.nume).localeCompare(String(b.nume), "ro"))
+    .map((s, i) => [i + 1, s.nume, s.grupa, s.email, s.port, s.notaT, s.finala, s.nota, s.nota === "" ? "absent la test" : (s.nota >= C.notaMinimaPromovare ? "promovat" : "nepromovat")]);
+  sh.getRange(1, 1, 1, cap.length).setValues([cap]).setFontWeight("bold").setBackground("#e8f0f9");
+  if (date.length) sh.getRange(2, 1, date.length, cap.length).setValues(date);
+  sh.getRange(1, 1).setNote("Exportat la " + Utilities.formatDate(new Date(), TZ, "dd.MM.yyyy HH:mm") + ". Ponderi: portofoliu " + C.pondere.portofoliu * 100 + " %, test " + C.pondere.test * 100 + " %.");
+  sh.setFrozenRows(1); sh.setColumnWidth(2, 220); sh.setColumnWidth(4, 230);
+  // nota și în „Prezență”
+  const sp = foaiePrezenta_(false), n = nrLab_(), cn = 6 + n, lp = sp.getLastRow();
+  sp.getRange(1, cn).setValue("Nota colocviu").setFontWeight("bold").setBackground("#d7ebdd");
+  if (lp > 1) { const em = sp.getRange(2, 2, lp - 1, 1).getValues().map(r => String(r[0]).toLowerCase().trim()), m = {}; rows.forEach(s => m[s.email] = s.nota);
+    sp.getRange(2, cn, lp - 1, 1).setValues(em.map(e => [m[e] === undefined ? "" : m[e]])); }
+  return { n: date.length, url: ss.getUrl() + "#gid=" + sh.getSheetId() };
+}
+function exportaNoteColocviu() { const r = exportaNoteColocviu_(); anunta_("Notele de colocviu au fost exportate în foaia „Note colocviu” (" + r.n + " studenți) și în coloana „Nota colocviu” din „Prezență”."); }
+
+/* ------------------------------------------------------------------ API */
+function tokOk_(email, start, token) { return hmac_("tok|" + email + "|" + disc_() + "|" + colConf_().lab + "|" + start) === token; }
+function seedColocviu_(email, start) { return seed_(email, colConf_().lab, start); }
+function apiColocviuTest_(p) {
+  const email = String(p.email || "").toLowerCase().trim();
+  if (!tokOk_(email, p.start, p.token)) return { ok: false, eroare: "Sesiune invalidă: intrați cu codul afișat în sală." };
+  const { sh, row } = randColocviu_(email, String(p.nume || ""), String(p.grupa || "")), X = colIdx_();
+  if (sh.getRange(row, X.puncte).getValue() !== "") return { ok: false, eroare: "Testul de colocviu a fost deja susținut (" + sh.getRange(row, X.puncte).getValue() + " puncte). Pentru o reluare, cadrul didactic șterge punctajul din foaia „Colocviu”." };
+  const k = "col|" + email + "|" + p.start; let t0 = Number(props_().getProperty(k)); if (!t0) { t0 = Date.now(); props_().setProperty(k, String(t0)); }
+  const C = colConf_(), ramas = Math.max(0, Math.round(C.durataMin * 60 - (Date.now() - t0) / 1000));
+  return Object.assign({ ok: true, durataMin: C.durataMin, ramas }, testPublic_(testColocviu_(seedColocviu_(email, p.start))));
+}
+function apiColocviuTrimite_(d) {
+  const st = d.student || {}, email = String(st.email || "").toLowerCase().trim();
+  if (!tokOk_(email, d.start, d.token)) return { ok: false, eroare: "Sesiune invalidă: intrați cu codul afișat în sală." };
+  const C = colConf_(), X = colIdx_(), T = testColocviu_(seedColocviu_(email, d.start)), R = noteazaTest_(T, d.raspunsuri || {});
+  const t0 = Number(props_().getProperty("col|" + email + "|" + d.start)) || Date.parse(d.start), durata = rot_((Date.now() - t0) / 60000, 1);
+  const motive = [], integ = d.integritate || {};
+  if (durata > C.durataMin + 2) motive.push("timp depășit (" + durata + " min)");
+  if (integ.ascunsNr > 0) motive.push("a părăsit pagina testului de " + integ.ascunsNr + " ori (" + Math.round((integ.ascunsMs || 0) / 1000) + " s)");
+  if (integ.webdriver) motive.push("browser automatizat");
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const { sh, row } = randColocviu_(email, st.nume, st.grupa);
+    if (sh.getRange(row, X.puncte).getValue() !== "") return { ok: false, eroare: "Testul de colocviu a fost deja trimis." };
+    sh.getRange(row, X.puncte).setValue(R.puncte);
+    sh.getRange(row, X.data, 1, 4).setValues([[new Date(), durata, motive.length ? "DE VERIFICAT" : "OK", motive.join("; ")]]);
+    sh.getRange(row, X.verdict).setBackground(motive.length ? "#fdf0e1" : "#e5f4ea");
+    let jl = SpreadsheetApp.getActive().getSheetByName("L" + C.lab + " – test colocviu");
+    if (!jl) { jl = SpreadsheetApp.getActive().insertSheet("L" + C.lab + " – test colocviu"); jl.appendRow(["Trimis la", "Nume", "E-mail", "Grupa", "Puncte", "Nota test", "Durata [min]", "Verdict", "Răspunsuri (id: răspuns ✓/✗)"]); jl.getRange(1, 1, 1, 9).setFontWeight("bold").setBackground("#e8f0f9"); jl.setFrozenRows(1); }
+    jl.appendRow([new Date(), st.nume, email, st.grupa, R.puncte + "/" + R.max, R.nota, durata, motive.length ? "DE VERIFICAT: " + motive.join("; ") : "OK", R.detalii.map(x => x.id + ": " + x.raspuns + (x.ok ? " ✓" : " ✗")).join(" | ")]);
+    const { sh: sp, row: rp } = randStudent_(email, st.nume, st.grupa), cel = sp.getRange(rp, 3 + C.lab);
+    cel.setValue("P+T"); cel.setNote((cel.getNote() ? cel.getNote() + "\n" : "") + "test colocviu: " + R.puncte + "/" + R.max + " · " + Utilities.formatDate(new Date(), TZ, "dd.MM.yyyy HH:mm")); cel.setBackground("#cfe9d8");
+  } finally { lock.releaseLock(); }
+  return { ok: true, puncte: R.puncte, max: R.max, nota: R.nota, detalii: R.detalii, pondere: C.pondere };
+}
+function cheieOk_(k) { return String(k || "").toUpperCase().trim() === cheieProf_(); }
+function apiColocviuLista_(p) {
+  if (!cheieOk_(p.key)) return { ok: false, eroare: "Cheia cadrului didactic nu este corectă (meniul Laborator → Cheia cadrului didactic)." };
+  const C = colConf_();
+  return { ok: true, itemi: C.itemi, lucrari: C.lucrari, pondere: C.pondere, max: testMax_(), minim: C.notaMinimaPromovare, foaie: SpreadsheetApp.getActive().getUrl(), studenti: citesteRanduri_().map(s => { delete s.row; return s; }) };
+}
+function apiColocviuBifa_(d) {
+  if (!cheieOk_(d.key)) return { ok: false, eroare: "Cheie incorectă." };
+  const X = colIdx_(), lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = foaieColocviu_(), last = sh.getLastRow(), em = sh.getRange(2, 2, Math.max(1, last - 1), 1).getValues().map(r => String(r[0]).toLowerCase().trim());
+    const lista = d.bife || [{ email: d.email, i: d.i, val: d.val }];
+    lista.forEach(b => { const k = em.indexOf(String(b.email).toLowerCase().trim()), i = Number(b.i); if (k >= 0 && i >= 0 && i < X.nb) sh.getRange(k + 2, X.b0 + i).setValue(!!b.val); });
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
+  return apiColocviuLista_({ key: d.key });
+}
+function apiColocviuExport_(d) {
+  if (!cheieOk_(d.key)) return { ok: false, eroare: "Cheie incorectă." };
+  const r = exportaNoteColocviu_(); return { ok: true, n: r.n, url: r.url };
+}
+
 /**
  * Registrul de prezență și referate – portalul de laborator Autovehicule Rutiere (FIMIM, UOC).
  * Același script se folosește pentru fiecare disciplină, într-o foaie de calcul separată (legată de clasa din Classroom).
@@ -2611,6 +3400,9 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu("Laborator" + (d ? " " + d : ""))
     .addItem("Afișează codul de sesiune (proiector)", "arataCod")
     .addItem("Importă studenții din Google Classroom", "importaStudenti")
+    .addSeparator()
+    .addItem("Colocviu: cheia cadrului didactic", "arataCheieProf")
+    .addItem("Colocviu: exportă notele", "exportaNoteColocviu")
     .addSeparator()
     .addItem("Configurare inițială / schimbarea disciplinei", "configurare")
     .addToUi();
@@ -2738,7 +3530,7 @@ function importaStudenti() {
   sorteazaPrezenta_();
   ui.alert(`Importați/actualizați: ${n} studenți din „${c.name}”.`);
 }
-function sorteazaPrezenta_() { const sh = foaiePrezenta_(false); if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, 5 + nrLab_()).sort(1); }
+function sorteazaPrezenta_() { const sh = foaiePrezenta_(false); if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(5 + nrLab_(), sh.getLastColumn())).sort(1); }
 /** import din foaia „Import studenți” (coloanele: Nume și prenume | E-mail | Grupa) */
 function importDinFoaie_() {
   const ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActive();
@@ -2769,6 +3561,9 @@ function doGet(e) {
   try {
     const p = e.parameter || {};
     if (p.action === "ping") return json_({ ok: true, disc: disc_() });
+    if (p.disc && p.disc !== disc_() && /^colocviu/.test(p.action || "")) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });
+    if (p.action === "colocviuTest") return json_(apiColocviuTest_(p));
+    if (p.action === "colocviuLista") return json_(apiColocviuLista_(p));
     if (p.action !== "start") return json_({ ok: false, eroare: "Acțiune necunoscută." });
     if (p.disc && p.disc !== disc_()) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });
     const lab = parseInt(p.lab, 10), email = String(p.email || "").toLowerCase().trim(), nume = String(p.nume || "").trim().slice(0, 80), grupa = String(p.grupa || "").trim().slice(0, 40);
@@ -2792,6 +3587,10 @@ function doGet(e) {
 function doPost(e) {
   try {
     const d = JSON.parse(e.postData.contents);
+    if (d.disc && d.disc !== disc_() && /^colocviu/.test(d.action || "")) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });
+    if (d.action === "colocviuTrimite") return json_(apiColocviuTrimite_(d));
+    if (d.action === "colocviuBifa") return json_(apiColocviuBifa_(d));
+    if (d.action === "colocviuExport") return json_(apiColocviuExport_(d));
     if (d.action !== "trimite") return json_({ ok: false, eroare: "Acțiune necunoscută." });
     const lab = parseInt(d.lab, 10), st = d.student || {}, email = String(st.email || "").toLowerCase().trim();
     if (d.disc && d.disc !== disc_()) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });

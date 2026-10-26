@@ -24,6 +24,9 @@ function onOpen() {
     .addItem("Afișează codul de sesiune (proiector)", "arataCod")
     .addItem("Importă studenții din Google Classroom", "importaStudenti")
     .addSeparator()
+    .addItem("Colocviu: cheia cadrului didactic", "arataCheieProf")
+    .addItem("Colocviu: exportă notele", "exportaNoteColocviu")
+    .addSeparator()
     .addItem("Configurare inițială / schimbarea disciplinei", "configurare")
     .addToUi();
 }
@@ -150,7 +153,7 @@ function importaStudenti() {
   sorteazaPrezenta_();
   ui.alert(`Importați/actualizați: ${n} studenți din „${c.name}”.`);
 }
-function sorteazaPrezenta_() { const sh = foaiePrezenta_(false); if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, 5 + nrLab_()).sort(1); }
+function sorteazaPrezenta_() { const sh = foaiePrezenta_(false); if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(5 + nrLab_(), sh.getLastColumn())).sort(1); }
 /** import din foaia „Import studenți” (coloanele: Nume și prenume | E-mail | Grupa) */
 function importDinFoaie_() {
   const ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActive();
@@ -181,6 +184,9 @@ function doGet(e) {
   try {
     const p = e.parameter || {};
     if (p.action === "ping") return json_({ ok: true, disc: disc_() });
+    if (p.disc && p.disc !== disc_() && /^colocviu/.test(p.action || "")) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });
+    if (p.action === "colocviuTest") return json_(apiColocviuTest_(p));
+    if (p.action === "colocviuLista") return json_(apiColocviuLista_(p));
     if (p.action !== "start") return json_({ ok: false, eroare: "Acțiune necunoscută." });
     if (p.disc && p.disc !== disc_()) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });
     const lab = parseInt(p.lab, 10), email = String(p.email || "").toLowerCase().trim(), nume = String(p.nume || "").trim().slice(0, 80), grupa = String(p.grupa || "").trim().slice(0, 40);
@@ -204,6 +210,10 @@ function doGet(e) {
 function doPost(e) {
   try {
     const d = JSON.parse(e.postData.contents);
+    if (d.disc && d.disc !== disc_() && /^colocviu/.test(d.action || "")) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });
+    if (d.action === "colocviuTrimite") return json_(apiColocviuTrimite_(d));
+    if (d.action === "colocviuBifa") return json_(apiColocviuBifa_(d));
+    if (d.action === "colocviuExport") return json_(apiColocviuExport_(d));
     if (d.action !== "trimite") return json_({ ok: false, eroare: "Acțiune necunoscută." });
     const lab = parseInt(d.lab, 10), st = d.student || {}, email = String(st.email || "").toLowerCase().trim();
     if (d.disc && d.disc !== disc_()) return json_({ ok: false, eroare: "Registrul acesta este pentru altă disciplină." });

@@ -24,7 +24,13 @@ const PORTAL = {
         "Regimuri de curgere. Experiența lui Reynolds",
         "Pierderi de sarcină longitudinale și locale într-un circuit de răcire",
         "Definitivarea și susținerea referatelor"
-      ]
+      ],
+      /** colocviul de laborator (ultima ședință): portofoliul bifat de cadrul didactic + testul recapitulativ notat pe server */
+      colocviu: {
+        lab: 7, lucrari: 6, durataMin: 30, grilaPeLucrare: 2, punctePeProblema: 2,
+        itemi: ["Referat complet (tabele, calcule, grafice)", "Exemplul rezolvat recalculat cu valorile proprii", "Răspunsuri la întrebările de verificare", "Referat predat în Classroom"],
+        pondere: { portofoliu: 0.5, test: 0.5 }, notaMinimaPromovare: 5
+      }
     },
     DA: {
       nume: "Diagnosticarea autovehiculelor", an: "anul IV", sem: 1, cod: "MR4103", tip: "Laborator", dosar: "da",
@@ -82,7 +88,7 @@ const PORTAL = {
     }
   },
   /** descrierea din lista lucrărilor, pentru lucrările fără simulator */
-  descrieri: { "mf-l7": "recapitulare · pregătirea susținerii · întrebări și test de antrenament · anexe" },
+  descrieri: { "mf-l7": "colocviu · portofoliul lucrărilor + test recapitulativ notat automat · test de antrenament · anexe" },
   /** lucrările deja realizate în portal: cod → cale */
   realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "mf-l4": "mf/l4/", "mf-l5": "mf/l5/", "mf-l6": "mf/l6/", "mf-l7": "mf/l7/", "da-l1": "da/l1/", "da-l2": "da/l2/", "da-l3": "da/l3/", "da-l4": "da/l4/", "da-l5": "da/l5/", "saa-l1": "saa/l1/", "saa-l2": "saa/l2/", "saa-l3": "saa/l3/", "saa-l4": "saa/l4/", "saa-l5": "saa/l5/", "mam1-l1": "mam1/l1/", "mam1-l2": "mam1/l2/", "mam1-l3": "mam1/l3/", "mam1-l4": "mam1/l4/", "mam1-l5": "mam1/l5/" }
 };
