@@ -715,3 +715,214 @@ export function creeazaReynolds(gazda, opt = {}) {
   });
   return { seteaza(o) { Object.assign(V, o); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
 }
+/* ===================================================================== MF L6: standul pentru pierderi de sarcină
+   Standul de podea (ca în Fig. 6.1 a îndrumarului, la scara reală): cadrul din țeavă rectangulară vopsită, rezervorul din acril cu
+   termometrul digital, pompa centrifugă cu cutia de comandă, robinetul de reglare cu roată pe conducta de refulare, conducta orizontală
+   d = 17 mm cu racorduri olandeze și prizele 1–2 la 1,5 m, lărgirea bruscă 17/26 mm din tub transparent (prizele 3, 4), îngustarea
+   26/17, priza 5, cotul 90° cu rază mică, priza 6, robinetul cu bilă (pârghie), priza 7, rotametrul și debitmetrul cu turbină cu
+   afișaj, returul pe lângă cadru; panoul cu 7 piezometre de sticlă (scală milimetrică, colector presurizat cu supapă și pompă de
+   mână), furtunurile transparente de la prize cu robinetele de aerisire; opțional pompa electrică de 12 V, sursa de laborator și
+   manometrul digital pentru punctul de funcționare. */
+export function creeazaPierderi(gazda, opt = {}) {
+  const S = scena(gazda, [0.2, 1.55, 4.7], [0.2, 1.0, -0.2]), sc = S.scene; S.ctl.maxDistance = 6; S.ctl.minDistance = 0.12; S.ctl.maxPolarAngle = Math.PI * 0.56;
+  // încăperea: podeaua de laborator în locul mesei, peretele mai mare, umbrele pe tot standul
+  const [blat, perete] = sc.children.filter(o => o.isMesh); blat.visible = false;
+  perete.geometry = new THREE.PlaneGeometry(7, 3.2); perete.position.set(0.1, 1.6, -0.75);
+  const pod = add(sc, new THREE.Mesh(new THREE.PlaneGeometry(7, 4), mat({ color: 0x9aa3a8, roughness: 0.8 }))); pod.rotation.x = -Math.PI / 2; pod.position.set(0.1, 0, 0.8); pod.castShadow = false;
+  const plinta = add(sc, new THREE.Mesh(new THREE.BoxGeometry(7, 0.1, 0.02), mat({ color: 0x5d6770, roughness: 0.6 }))); plinta.position.set(0.1, 0.05, -0.74);
+  const sun = sc.children.find(o => o.isDirectionalLight); sun.position.set(1.2, 3.2, 2.2); Object.assign(sun.shadow.camera, { left: -2.2, right: 2.2, top: 2.2, bottom: -1.2, near: 0.5, far: 8 }); sun.shadow.camera.updateProjectionMatrix(); sun.shadow.bias = -0.0006;
+  const M = materialeMAM(), clic = [], k_ = (o, k, et) => { o.userData.k = k; o.userData.et = et; clic.push(o); return o; };
+  const albastruC = mat({ color: 0x1f5aa6, roughness: 0.45, metalness: 0.3 }), griT = mat({ color: 0x9ea4aa, roughness: 0.35, metalness: 0.55 }), griInch = mat({ color: 0x4a5057, roughness: 0.5, metalness: 0.4 });
+  const acril = new THREE.MeshPhysicalMaterial({ color: 0xf4fbff, roughness: 0.04, transmission: 0.95, thickness: 0.006, ior: 1.49, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false });
+  const apaM = new THREE.MeshPhysicalMaterial({ color: 0x9fd0ee, roughness: 0.05, transmission: 0.7, thickness: 0.1, ior: 1.33, transparent: true, opacity: 0.5, depthWrite: false });
+  const furtun = new THREE.MeshPhysicalMaterial({ color: 0xcfe6f7, roughness: 0.2, transmission: 0.4, thickness: 0.002, transparent: true, opacity: 0.7, depthWrite: false });
+  const sticla = sticlaM();
+  const V3 = (...a) => new THREE.Vector3(...a), UP = V3(0, 1, 0);
+  /** țeavă dreaptă între două puncte (opac sau transparent) */
+  const teava = (A, B, r, m, seg = 24) => { A = V3(...A); B = V3(...B); const o = add(sc, new THREE.Mesh(new THREE.CylinderGeometry(r, r, A.distanceTo(B), seg, 1, false), m)); o.position.copy(A).lerp(B, 0.5); o.quaternion.setFromUnitVectors(UP, B.clone().sub(A).normalize()); return o; };
+  const inel = (P, r, l, dir, m) => teava(P.map((v, i) => v - dir[i] * l / 2), P.map((v, i) => v + dir[i] * l / 2), r, m, 28);
+  /* ---- cadrul de bază (țeavă rectangulară 50×50, vopsită albastru) cu tălpi de cauciuc */
+  const XB0 = -1.4, XB1 = 1.8, ZB = 0.2, YB = 0.065;
+  [-ZB, ZB].forEach(z => add(sc, new THREE.Mesh(new RoundedBoxGeometry(XB1 - XB0, 0.05, 0.05, 2, 0.005), albastruC)).position.set((XB0 + XB1) / 2, YB, z));
+  [XB0 + 0.03, -0.85, 0.05, 1.0, XB1 - 0.03].forEach(x => add(sc, new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.05, 2 * ZB, 2, 0.005), albastruC)).position.set(x, YB, 0));
+  [[XB0 + 0.03, -ZB], [XB0 + 0.03, ZB], [XB1 - 0.03, -ZB], [XB1 - 0.03, ZB], [0.05, -ZB], [0.05, ZB]].forEach(([x, z]) => cyl(sc, 0.03, 0.035, 0.04, M.cauciuc, x, 0.02, z, 20));
+  add(sc, new THREE.Mesh(new BoxGeometryR(0.56, 0.012, 0.46), albastruC)).position.set(-1.1, 0.096, 0);
+  function BoxGeometryR(a, b, c) { return new RoundedBoxGeometry(a, b, c, 2, 0.004); }
+  /* ---- rezervorul din acril cu capac și termometrul digital */
+  const RX = -1.1, RW = 0.46, RH = 0.42, RD = 0.4, RY0 = 0.102;
+  const rez = add(sc, new THREE.Mesh(new THREE.BoxGeometry(RW, RH, RD), acril)); rez.position.set(RX, RY0 + RH / 2, 0); rez.castShadow = false; k_(rez, "rezervor", "Rezervorul de apă (circuit închis)");
+  const muchii = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(RW, RH, RD)), new THREE.LineBasicMaterial({ color: 0x8aa0b0 })); muchii.position.copy(rez.position); sc.add(muchii);
+  const apaR = add(sc, new THREE.Mesh(new THREE.BoxGeometry(RW - 0.012, 0.3, RD - 0.012), mat({ color: 0x5fa8d8, roughness: 0.1, transparent: true, opacity: 0.42, depthWrite: false }))); apaR.position.set(RX, RY0 + 0.155, 0); apaR.castShadow = false;
+  add(sc, new THREE.Mesh(BoxGeometryR(RW * 0.55, 0.01, RD + 0.01), griInch)).position.set(RX + RW * 0.22, RY0 + RH + 0.005, 0);
+  const TM = new THREE.Group(); TM.position.set(RX - 0.12, RY0 + RH + 0.01, 0.08); sc.add(TM);
+  cyl(TM, 0.003, 0.003, 0.34, M.inox, 0, -0.16, 0, 12); add(TM, new THREE.Mesh(BoxGeometryR(0.07, 0.11, 0.025), mat({ color: 0xf5f5f0, roughness: 0.5 }))).position.set(0, 0.07, 0);
+  const eT = ecran(192, 96); const fT = add(TM, new THREE.Mesh(new THREE.PlaneGeometry(0.056, 0.03), new THREE.MeshBasicMaterial({ map: eT.t }))); fT.position.set(0, 0.085, 0.0131); k_(fT, "termometru", "Termometrul digital cu sondă (°C)");
+  k_(TM.children[1], "termometru", "Termometrul digital cu sondă");
+  /* ---- pompa centrifugă (motor albastru, carcasa spirală gri) cu cutia de comandă */
+  const PX = -0.62, PY = 0.24;
+  const motor = cyl(sc, 0.075, 0.075, 0.24, albastruC, PX + 0.12, PY, 0, 40); motor.rotation.z = Math.PI / 2; k_(motor, "pompa", "Pompa centrifugă a standului (0,37 kW)");
+  for (let i = 0; i < 14; i++) { const n = add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.006, 0.012), albastruC)); const a = i / 14 * Math.PI * 2; n.position.set(PX + 0.12, PY + Math.sin(a) * 0.077, Math.cos(a) * 0.077); n.rotation.x = -a; }
+  cyl(sc, 0.06, 0.06, 0.04, albastruC, PX + 0.26, PY, 0, 30).rotation.z = Math.PI / 2;
+  add(sc, new THREE.Mesh(BoxGeometryR(0.09, 0.05, 0.09), albastruC)).position.set(PX + 0.12, PY + 0.095, 0);
+  const volut = cyl(sc, 0.095, 0.095, 0.07, griT, PX - 0.04, PY, 0, 40); volut.rotation.z = Math.PI / 2;
+  cyl(sc, 0.028, 0.028, 0.175, griT, -0.7825, PY, 0, 24).rotation.z = Math.PI / 2;           // aspirația, axial, spre rezervor
+  inel([RX + RW / 2 + 0.005, PY, 0], 0.035, 0.012, [1, 0, 0], griInch);
+  add(sc, new THREE.Mesh(BoxGeometryR(0.3, 0.02, 0.16), griInch)).position.set(PX + 0.08, 0.12, 0);
+  [PX - 0.04, PX + 0.2].forEach(x => add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.14), griInch)).position.set(x, 0.155, 0));
+  // refularea verticală cu robinetul de reglare (roată) și manometrul digital (montat la pompa de 12 V)
+  const XR = PX - 0.04, YT = 0.92, D1 = 0.0105, D2 = 0.0155;     // raza exterioară a țevii de 17 mm interior, a tronsonului de 26 mm
+  const pvcG = mat({ color: 0x9aa1a8, roughness: 0.35, metalness: 0.2 });
+  teava([XR, PY + 0.09, 0], [XR, YT - 0.03, 0], D1, pvcG);
+  const cotS = add(sc, new THREE.Mesh(new THREE.TorusGeometry(0.03, D1, 16, 24, Math.PI / 2), pvcG)); cotS.position.set(XR + 0.03, YT - 0.03, 0); cotS.rotation.z = Math.PI / 2;
+  const RV = new THREE.Group(); RV.position.set(XR, 0.5, 0); sc.add(RV);
+  add(RV, new THREE.Mesh(BoxGeometryR(0.05, 0.08, 0.05), M.alama)); cyl(RV, 0.016, 0.016, 0.035, M.alama, 0, 0, 0.04, 20).rotation.x = Math.PI / 2; cyl(RV, 0.004, 0.004, 0.05, M.otel || M.inox, 0, 0, 0.07, 10).rotation.x = Math.PI / 2;
+  [-0.045, 0.045].forEach(y => inel([0, y, 0].map((v, i) => v + [XR, 0.5, 0][i]), 0.017, 0.012, [0, 1, 0], M.alama));
+  const roata = new THREE.Group(); roata.position.set(0, 0, 0.095); RV.add(roata);
+  const mRoata = mat({ color: 0xc62828, roughness: 0.45, metalness: 0.2 });
+  k_(add(roata, new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.0055, 10, 40), mRoata)), "reglare", "Robinetul de reglare (clic = −5 %, Shift+clic = +5 %)");
+  [0, 1, 2].forEach(k => { const s = add(roata, new THREE.Mesh(new THREE.BoxGeometry(0.076, 0.006, 0.006), mRoata)); s.rotation.z = k * Math.PI / 3; k_(s, "reglare", "Robinetul de reglare"); });
+  cyl(roata, 0.009, 0.009, 0.012, mRoata, 0, 0, 0, 16).rotation.x = Math.PI / 2;
+  // cutia de comandă a pompei, pe un stâlp al cadrului
+  const CB = new THREE.Group(); CB.position.set(-0.3, 0.42, 0.2); sc.add(CB);
+  add(CB, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.34, 0.03), albastruC)).position.set(0, -0.17, -0.03);
+  add(CB, new THREE.Mesh(BoxGeometryR(0.12, 0.17, 0.08), mat({ color: 0xe3e3dc, roughness: 0.5 }))).position.set(0, 0.05, 0.025);
+  const bV = cyl(CB, 0.017, 0.017, 0.02, mat({ color: 0x2e7d32, roughness: 0.4 }), 0, 0.085, 0.07, 20); bV.rotation.x = Math.PI / 2; k_(bV, "start", "Pornire pompă (I)");
+  const bR = cyl(CB, 0.022, 0.022, 0.025, mat({ color: 0xc62828, roughness: 0.4 }), 0, 0.025, 0.07, 20); bR.rotation.x = Math.PI / 2; k_(bR, "stop", "Oprire pompă (0)");
+  const ledP = cyl(CB, 0.007, 0.007, 0.01, new THREE.MeshBasicMaterial({ color: 0x223322 }), 0.035, 0.11, 0.066, 12); ledP.rotation.x = Math.PI / 2;
+  sc.add(tubM([[-0.3, 0.36, 0.23], [-0.33, 0.2, 0.25], [-0.45, 0.24, 0.07], [PX + 0.12, PY + 0.12, 0.02]], 0.005, M.negru, 30));
+  sc.add(tubM([[-0.3, 0.36, 0.24], [-0.3, 0.12, 0.24], [-0.3, 0.04, 0.12], [-0.3, 0.01, -0.3], [-0.3, 0.02, -0.72], [-0.3, 0.3, -0.735]], 0.004, M.negru, 40));
+  add(sc, new THREE.Mesh(BoxGeometryR(0.08, 0.08, 0.03), mat({ color: 0xf0f0ea, roughness: 0.5 }))).position.set(-0.3, 0.32, -0.735);
+  /* ---- conducta orizontală de măsură, cu racorduri olandeze, lărgirea și îngustarea */
+  const XP1 = -0.45, XP2 = XP1 + 1.5, XL0 = XP2 + 0.07, XL1 = XL0 + 0.27, XC = XL1 + 0.3, YC = YT;
+  teava([XR + 0.03, YT, 0], [XL0, YT, 0], D1, pvcG);
+  [-0.12, 0.35, 0.8].forEach(x => inel([x, YT, 0], D1 + 0.008, 0.03, [1, 0, 0], griInch));
+  const lar = teava([XL0, YT, 0], [XL1, YT, 0], D2 + 0.003, acril); lar.castShadow = false; k_(lar, "largire", "Lărgirea bruscă 17/26 mm (tronson transparent)");
+  teava([XL0 + 0.005, YT, 0], [XL1 - 0.005, YT, 0], D2, apaM).castShadow = false;
+  [XL0, XL1].forEach(x => { inel([x, YT, 0], D2 + 0.012, 0.045, [1, 0, 0], pvcG); });
+  teava([XL1, YT, 0], [XC - 0.03, YT, 0], D1, pvcG); k_(sc.children[sc.children.length - 1], "ingustare", "Îngustarea bruscă 26/17 mm");
+  const cotJ = add(sc, new THREE.Mesh(new THREE.TorusGeometry(0.03, D1, 16, 24, Math.PI / 2), pvcG)); cotJ.position.set(XC - 0.03, YT - 0.03, 0); k_(cotJ, "cot", "Cotul 90° cu rază mică (prizele 5–6)");
+  inel([XC - 0.012, YT - 0.012, 0], D1 + 0.004, 0.02, [Math.SQRT1_2, -Math.SQRT1_2, 0], pvcG);
+  // ramura verticală: priza 6, robinetul cu bilă, priza 7, rotametrul, debitmetrul cu turbină, cotul de jos și returul
+  const Y6 = YT - 0.15, YBV = Y6 - 0.08, Y7 = Y6 - 0.2, YRot0 = 0.32, YRot1 = 0.5, YRet = 0.15;
+  teava([XC, YT - 0.03, 0], [XC, YRot1 + 0.02, 0], D1, pvcG);
+  const BV = new THREE.Group(); BV.position.set(XC, YBV, 0); sc.add(BV);
+  add(BV, new THREE.Mesh(BoxGeometryR(0.05, 0.075, 0.05), griT)); [-0.045, 0.045].forEach(y => cyl(BV, 0.018, 0.018, 0.02, griInch, 0, y, 0, 6));
+  cyl(BV, 0.005, 0.005, 0.03, M.inox, 0, 0, 0.035, 10).rotation.x = Math.PI / 2;
+  const maner = new THREE.Group(); maner.position.set(0, 0, 0.05); BV.add(maner);
+  k_(add(maner, new THREE.Mesh(BoxGeometryR(0.13, 0.014, 0.012), mat({ color: 0x1f5aa6, roughness: 0.5 }))), "bila", "Robinetul cu bilă (clic = deschis / parțial închis)").position.set(0.06, 0, 0);
+  // rotametrul (tub conic transparent cu plutitor roșu și scală)
+  inel([XC, YRot1 + 0.01, 0], 0.024, 0.025, [0, 1, 0], griInch); inel([XC, YRot0 - 0.01, 0], 0.024, 0.025, [0, 1, 0], griInch);
+  const rot = cyl(sc, 0.018, 0.014, YRot1 - YRot0 - 0.02, acril, XC, (YRot0 + YRot1) / 2, 0, 24); rot.castShadow = false; k_(rot, "rotametru", "Rotametrul (indicație orientativă; citirea exactă pe afișajul debitmetrului)");
+  const plut = cyl(sc, 0.012, 0.006, 0.02, mat({ color: 0xc62828, roughness: 0.4 }), XC, YRot0 + 0.01, 0, 16);
+  { const e = ecran(64, 512), x = e.x; x.fillStyle = "#fff"; x.fillRect(0, 0, 64, 512); x.fillStyle = "#123"; for (let i = 0; i <= 30; i++) { const y = 500 - i * 16; x.fillRect(0, y, i % 5 ? 14 : 26, 2); if (i % 10 === 0) { x.font = "bold 22px system-ui"; x.fillText(String(i), 30, y + 8); } } e.t.needsUpdate = true;
+    add(sc, new THREE.Mesh(new THREE.PlaneGeometry(0.016, YRot1 - YRot0 - 0.03), new THREE.MeshBasicMaterial({ map: e.t }))).position.set(XC + 0.028, (YRot0 + YRot1) / 2, 0.005); }
+  teava([XC, YRot0 - 0.02, 0], [XC, YRet + 0.03, 0], D1, pvcG);
+  // debitmetrul cu turbină și afișajul lui
+  const DB = new THREE.Group(); DB.position.set(XC, 0.25, 0); sc.add(DB); cyl(DB, 0.02, 0.02, 0.07, M.negru, 0, 0, 0, 20);
+  add(DB, new THREE.Mesh(BoxGeometryR(0.11, 0.075, 0.035), mat({ color: 0x263238, roughness: 0.5 }))).position.set(-0.075, 0.0, 0.03);
+  const eDB = ecran(256, 160); const fDB = add(DB, new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.056), new THREE.MeshBasicMaterial({ map: eDB.t }))); fDB.position.set(-0.075, 0, 0.0481); k_(fDB, "debitmetru", "Debitmetrul cu turbină: afișaj Q [L/s]");
+  sc.add(tubM([[XC - 0.02, 0.25, 0], [XC - 0.05, 0.25, 0.02]], 0.003, M.negru, 6));
+  const cotB = add(sc, new THREE.Mesh(new THREE.TorusGeometry(0.03, D1, 16, 24, Math.PI / 2), pvcG)); cotB.position.set(XC - 0.03, YRet + 0.03, 0); cotB.rotation.z = -Math.PI / 2;
+  // returul transparent pe lângă cadru, cu intrare în rezervor
+  const ZR = 0.12; teava([XC - 0.03, YRet, 0], [XC - 0.1, YRet, 0], D1, pvcG);
+  const ret = sc.add(tubM([[XC - 0.1, YRet, 0], [XC - 0.2, YRet, ZR], [0.6, YRet, ZR], [-0.5, YRet, ZR], [-0.75, YRet + 0.02, ZR + 0.03], [RX + RW / 2 + 0.06, 0.32, ZR], [RX + RW / 2 - 0.01, 0.32, ZR]], D1, furtun, 80));
+  /* ---- prizele de presiune (racord de alamă cu robinet de aerisire cu bilă albastră) */
+  const PR = [[XP1, YT, "s"], [XP2, YT, "s"], [XL0 + 0.06, YT + 0.005, "s"], [XL1 - 0.06, YT + 0.005, "s"], [XC - 0.15, YT, "s"], [XC, Y6, "x"], [XC, Y7, "x"]];
+  const bulePriza = [];
+  PR.forEach(([x, y, o], i) => {
+    const G = new THREE.Group(); G.position.set(x, y, 0); sc.add(G);
+    const r0 = o === "s" ? (i === 2 || i === 3 ? D2 + 0.003 : D1) : D1;
+    if (o === "s") { cyl(G, 0.006, 0.006, 0.05, M.alama, 0, r0 + 0.02, 0, 12); add(G, new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.018), M.alama)).position.set(0, r0 + 0.045, 0);
+      cyl(G, 0.0035, 0.0035, 0.025, M.alama, 0, r0 + 0.045, 0.014, 10).rotation.x = Math.PI / 2; k_(add(G, new THREE.Mesh(new THREE.SphereGeometry(0.0075, 14, 10), mat({ color: 0x1e4fc2, roughness: 0.3 }))), "aerisire", `Priza ${i + 1}: robinetul de aerisire (clic = aerisește)`).position.set(0, r0 + 0.045, 0.03); }
+    else { cyl(G, 0.006, 0.006, 0.05, M.alama, r0 + 0.02, 0, 0, 12).rotation.z = Math.PI / 2; add(G, new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.018), M.alama)).position.set(r0 + 0.045, 0, 0);
+      cyl(G, 0.0035, 0.0035, 0.025, M.alama, r0 + 0.045, 0, 0.014, 10).rotation.x = Math.PI / 2; k_(add(G, new THREE.Mesh(new THREE.SphereGeometry(0.0075, 14, 10), mat({ color: 0x1e4fc2, roughness: 0.3 }))), "aerisire", `Priza ${i + 1}: robinetul de aerisire (clic = aerisește)`).position.set(r0 + 0.045, 0, 0.03); }
+    // eticheta rotundă portocalie cu numărul prizei
+    const e = ecran(64, 64); e.x.fillStyle = "#e67e22"; e.x.beginPath(); e.x.arc(32, 32, 30, 0, 7); e.x.fill(); e.x.strokeStyle = "#333"; e.x.lineWidth = 3; e.x.stroke(); e.x.fillStyle = "#fff"; e.x.font = "bold 40px system-ui"; e.x.textAlign = "center"; e.x.fillText(String(i + 1), 32, 46); e.t.needsUpdate = true;
+    const et = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 0.035), new THREE.MeshBasicMaterial({ map: e.t, transparent: true })); et.position.set(o === "s" ? 0 : r0 + 0.1, o === "s" ? r0 + 0.1 : 0, 0.02); G.add(et);
+  });
+  /* ---- panoul cu piezometre, montat pe perete în spatele standului */
+  const PZ = { x0: 0.0, dx: 0.13, y0: 1.12, H: 1.0, z: -0.62 };
+  const cS = document.createElement("canvas"); cS.width = 1024; cS.height = 2304;
+  { const x = cS.getContext("2d"), k = 2.048, y0 = 2304 - 120; x.fillStyle = "#fbfaf4"; x.fillRect(0, 0, 1024, 2304); x.fillStyle = "#1b2733"; x.textAlign = "right";
+    for (let i = 0; i < 7; i++) { const cx = 150 + i * 133; for (let mm = 0; mm <= 1000; mm += 2) { const y = y0 - mm * k, L = mm % 100 === 0 ? 40 : mm % 10 === 0 ? 26 : 12; x.fillRect(cx + 16, y - 1, L, mm % 10 === 0 ? 2.4 : 1.2); }
+      x.font = "bold 46px system-ui"; x.textAlign = "left"; x.fillText(String(i + 1), cx + 46, y0 + 62); x.textAlign = "right"; }
+    for (let mm = 0; mm <= 1000; mm += 100) { x.font = "bold 34px system-ui"; x.fillText(String(mm), 95, y0 - mm * 2.048 + 12); }
+    x.font = "28px system-ui"; x.textAlign = "left"; x.fillText("mm H₂O", 20, 70); }
+  const tS = new THREE.CanvasTexture(cS); tS.colorSpace = THREE.SRGBColorSpace; tS.anisotropy = 8;
+  const PW = 1.0, PH = 2304 / 1024 * PW * 0.5;      // panou 1,0 × 1,125 m
+  const panou = add(sc, new THREE.Mesh(new THREE.BoxGeometry(PW + 0.04, PH + 0.04, 0.025), mat({ color: 0x37474f, roughness: 0.5 }))); panou.position.set(PZ.x0 + 0.39, PZ.y0 + PH / 2 - 120 / 2304 * PH, PZ.z - 0.02);
+  const fata = add(sc, new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), mat({ map: tS, roughness: 0.6 }))); fata.position.set(PZ.x0 + 0.39, PZ.y0 + PH / 2 - 120 / 2304 * PH, PZ.z - 0.006); fata.castShadow = false;
+  const xTub = i => PZ.x0 + 0.39 - PW / 2 + (150 + i * 133) / 1024 * PW;
+  const yMm = mm => PZ.y0 + (mm) / 1000 * (2.048 * 1000 / 2304 * PH);       // corespondența scalei
+  const HT = yMm(1000) - yMm(0);
+  const coloane = PR.map((_, i) => { const x = xTub(i);
+    const g = cyl(sc, 0.0065, 0.0065, HT + 0.08, sticla, x, yMm(0) + HT / 2, PZ.z + 0.02, 16); g.castShadow = false; k_(g, "piezo", `Piezometrul ${i + 1}`);
+    const w = cyl(sc, 0.0045, 0.0045, 1, new THREE.MeshBasicMaterial({ color: 0x3d8fd1 }), x, yMm(0), PZ.z + 0.02, 12); w.castShadow = false;
+    const men = cyl(sc, 0.0052, 0.0052, 0.003, new THREE.MeshBasicMaterial({ color: 0x0b3a63 }), x, yMm(0), PZ.z + 0.02, 12);
+    [yMm(0) - 0.05, yMm(1000) + 0.04].forEach(y => add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.03), M.alu)).position.set(x, y, PZ.z + 0.012));
+    return { w, men, x }; });
+  // colectorul de sus (aerul comprimat deasupra coloanelor), supapa și pompa de mână; colectorul de jos cu racordurile
+  teava([xTub(0) - 0.04, yMm(1000) + 0.06, PZ.z + 0.02], [xTub(6) + 0.06, yMm(1000) + 0.06, PZ.z + 0.02], 0.012, M.alu);
+  coloane.forEach(c => teava([c.x, yMm(1000) + 0.03, PZ.z + 0.02], [c.x, yMm(1000) + 0.06, PZ.z + 0.02], 0.007, M.alu));
+  const sup = new THREE.Group(); sup.position.set(xTub(6) + 0.08, yMm(1000) + 0.06, PZ.z + 0.02); sc.add(sup); cyl(sup, 0.008, 0.008, 0.04, M.alama, 0, 0.0, 0, 12).rotation.z = Math.PI / 2;
+  k_(cyl(sup, 0.012, 0.012, 0.015, mat({ color: 0xc62828, roughness: 0.4 }), 0.03, 0, 0, 16), "aer", "Supapa de aer a colectorului (clic = coboară nivelurile cu ≈ 50 mm)").rotation.z = Math.PI / 2;
+  const pm = new THREE.Group(); pm.position.set(xTub(0) - 0.15, yMm(1000) - 0.25, PZ.z + 0.05); sc.add(pm);
+  k_(cyl(pm, 0.018, 0.018, 0.3, mat({ color: 0x263238, roughness: 0.5 }), 0, 0, 0, 20), "pompaAer", "Pompa de mână a colectorului (clic = ridică nivelurile cu ≈ 50 mm)");
+  cyl(pm, 0.004, 0.004, 0.08, M.inox, 0, 0.18, 0, 8); add(pm, new THREE.Mesh(BoxGeometryR(0.09, 0.02, 0.025), M.negru)).position.set(0, 0.225, 0);
+  sc.add(tubM([[xTub(0) - 0.15, yMm(1000) - 0.4, PZ.z + 0.05], [xTub(0) - 0.2, yMm(1000) - 0.5, PZ.z + 0.07], [xTub(0) - 0.1, yMm(1000) + 0.02, PZ.z + 0.06], [xTub(0) - 0.04, yMm(1000) + 0.06, PZ.z + 0.03]], 0.004, M.negru, 30));
+  // furtunurile transparente de la prize la baza piezometrelor (cu bule de aer până la aerisire)
+  const furt = PR.map(([x, y, o], i) => { const r0 = (i === 2 || i === 3) ? D2 + 0.003 : D1, A = o === "s" ? [x, y + r0 + 0.055, 0] : [x + r0 + 0.055, y, 0], c = coloane[i];
+    const pts = o === "s" ? [A, [x, y + 0.12, -0.04], [x * 0.6 + c.x * 0.4, y + 0.1, -0.35], [c.x, yMm(0) - 0.2, PZ.z + 0.03], [c.x, yMm(0) - 0.06, PZ.z + 0.02]]
+      : [A, [A[0] + 0.07, y, -0.05], [A[0] + 0.05, y + 0.2, -0.3], [c.x + 0.1, yMm(0) - 0.25, PZ.z + 0.04], [c.x, yMm(0) - 0.06, PZ.z + 0.02]];
+    const crv = new THREE.CatmullRomCurve3(pts.map(p => V3(...p))); const t = add(sc, new THREE.Mesh(new THREE.TubeGeometry(crv, 50, 0.004, 8), furtun)); t.castShadow = false;
+    const b = [0.3, 0.55, 0.8].map(u => { const s = add(sc, new THREE.Mesh(new THREE.SphereGeometry(0.0033, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }))); s.position.copy(crv.getPointAt(u)); return s; });
+    bulePriza.push(b); return t; });
+  // suporturile verticale ale conductei (stâlpi albaștri cu bride)
+  [0.05, 1.0].forEach(x => { add(sc, new THREE.Mesh(BoxGeometryR(0.04, YT - 0.09, 0.04), albastruC)).position.set(x, (YT + 0.09) / 2 - 0.02, 0); inel([x, YT, 0], D1 + 0.005, 0.03, [1, 0, 0], griInch); });
+  /* ---- pompa electrică de 12 V, sursa de laborator și manometrul digital (opțional) */
+  const P12 = new THREE.Group(); P12.position.set(-0.45, 0.0, 0.48); P12.visible = false; sc.add(P12);
+  add(P12, new THREE.Mesh(BoxGeometryR(0.22, 0.02, 0.14), M.gri)).position.set(0, 0.01, 0);
+  cyl(P12, 0.04, 0.04, 0.12, M.negru, 0.02, 0.07, 0, 30).rotation.z = Math.PI / 2; cyl(P12, 0.047, 0.047, 0.035, mat({ color: 0x3a3a3a, roughness: 0.5 }), -0.06, 0.07, 0, 30).rotation.z = Math.PI / 2;
+  cyl(P12, 0.012, 0.012, 0.06, M.negru, -0.1, 0.07, 0, 16).rotation.z = Math.PI / 2; cyl(P12, 0.011, 0.011, 0.05, M.negru, -0.06, 0.12, 0, 16);
+  k_(P12.children[1], "p12", "Pompa electrică de lichid de răcire, 12 V");
+  const furtP12 = tubM([[-0.51, 0.145, 0.48], [-0.55, 0.3, 0.35], [XR, 0.36, 0.1], [XR, 0.4, 0.012]], 0.011, M.negru, 30); furtP12.visible = false; sc.add(furtP12);
+  const aspP12 = tubM([[-0.58, 0.07, 0.48], [-0.75, 0.05, 0.45], [-0.9, 0.35, 0.28], [-0.97, 0.6, 0.12], [-1.0, 0.42, 0.08]], 0.012, M.negru, 40); aspP12.visible = false; sc.add(aspP12);
+  const SRS = new THREE.Group(); SRS.position.set(0.1, 0, 0.5); SRS.visible = false; sc.add(SRS);
+  add(SRS, new THREE.Mesh(BoxGeometryR(0.26, 0.13, 0.22), mat({ color: 0xdedfd8, roughness: 0.5 }))).position.y = 0.065;
+  add(SRS, new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.12), mat({ color: 0x2b2f33, roughness: 0.5 }))).position.set(0, 0.065, 0.1105);
+  const eSR = ecran(320, 120); k_(add(SRS, new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.056), new THREE.MeshBasicMaterial({ map: eSR.t }))), "sursa", "Sursa de laborator 12 V (clic = pornește / oprește ieșirea)").position.set(-0.03, 0.08, 0.111);
+  [[0.08, 0.035, 0xc62828], [0.105, 0.035, 0x111111]].forEach(([x, y, c]) => cyl(SRS, 0.008, 0.008, 0.02, mat({ color: c, roughness: 0.4 }), x, y, 0.115, 14).rotation.x = Math.PI / 2);
+  [[0.08, 0xc62828], [0.105, 0x111111]].forEach(([x, c]) => SRS.add(tubM([[x, 0.035, 0.12], [x, 0.0, 0.2], [-0.2, 0.01, 0.1], [-0.55 + 0.1 - x * 0.2, 0.07, -0.02]].map(p => p), 0.003, mat({ color: c, roughness: 0.5 }), 30)));
+  const MDg = new THREE.Group(); MDg.position.set(XR + 0.04, 0.4, 0.02); MDg.visible = false; sc.add(MDg);
+  cyl(MDg, 0.005, 0.005, 0.04, M.alama, -0.02, 0, 0, 10).rotation.z = Math.PI / 2; cyl(MDg, 0.04, 0.04, 0.03, M.inox, 0.02, 0, 0.0, 32).rotation.x = Math.PI / 2;
+  const eMD = ecran(192, 96); k_(add(MDg, new THREE.Mesh(new THREE.CircleGeometry(0.034, 32), new THREE.MeshBasicMaterial({ map: eMD.t }))), "manometru", "Manometrul digital pe refulare [kPa]").position.set(0.02, 0, 0.0155);
+  /* ---- curgerea vizibilă: particule fine în tronsonul transparent și în retur */
+  const NB = 90, partic = new THREE.InstancedMesh(new THREE.SphereGeometry(0.0016, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }), NB); partic.frustumCulled = false; partic.renderOrder = 2; sc.add(partic);
+  const PB = Array.from({ length: NB }, (_, i) => ({ s: Math.random(), r: Math.sqrt(Math.random()) * 0.9, a: Math.random() * 6.3, z: i < 50 }));
+  const curbaRet = new THREE.CatmullRomCurve3([[XC - 0.1, YRet, 0], [XC - 0.2, YRet, ZR], [0.6, YRet, ZR], [-0.5, YRet, ZR], [-0.75, YRet + 0.02, ZR + 0.03], [RX + RW / 2 + 0.06, 0.32, ZR]].map(p => V3(...p)));
+  interactiune(S, clic, opt.laClic);
+  const V = { pompa: false, Q: 0, Qaf: 0, h: [0, 0, 0, 0, 0, 0, 0], a: 0, bila: true, T: 20, aerisit: false, p12: false, sursa: false, U12: 0, I12: 0, kPa: 0 };
+  let ultDB = "", ultT = "", ultSR = "", ultMD = "", tt = 0;
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s1 = new THREE.Vector3(1, 1, 1);
+  S.porneste(dt => {
+    tt += dt;
+    ledP.material.color.set(V.pompa ? 0x3cff4a : 0x223322);
+    roata.rotation.z = -(V.a / 100) * Math.PI * 6; maner.rotation.z = V.bila ? 0 : Math.PI / 3.5;
+    coloane.forEach((c, i) => { const mm = Math.max(0, Math.min(1035, V.h[i])), y = yMm(mm), hh = Math.max(0.0005, y - yMm(-30)); c.w.scale.y = hh; c.w.position.y = yMm(-30) + hh / 2; c.men.position.y = y; c.men.visible = mm > 1 && mm < 1030; });
+    bulePriza.forEach(b => b.forEach((s, j) => { s.visible = !V.aerisit; }));
+    const q = V.Q; plut.position.y = YRot0 + 0.012 + Math.min(1, q / 0.5) * (YRot1 - YRot0 - 0.04) + (q > 0 ? Math.sin(tt * 9) * 0.0015 : 0);
+    const k = (V.pompa || (V.p12 && V.sursa)) ? V.Qaf.toFixed(3) : "0.000";
+    if (k !== ultDB) { ultDB = k; const { x, c } = eDB; x.fillStyle = "#0e1a14"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#7dff8a"; x.font = "bold 76px 'Courier New',monospace"; x.textAlign = "right"; x.fillText(k, 200, 100); x.font = "bold 26px system-ui"; x.fillText("L/s", 250, 100); x.font = "20px system-ui"; x.textAlign = "left"; x.fillStyle = "#4caf50"; x.fillText("FLOW  Q", 12, 30); eDB.t.needsUpdate = true; }
+    const kT = V.T.toFixed(1); if (kT !== ultT) { ultT = kT; lcd(eT, kT, "°C"); }
+    [P12, furtP12, aspP12, SRS, MDg].forEach(o => o.visible = V.p12);
+    if (V.p12) { const ks = `${V.sursa}|${V.U12.toFixed(1)}|${V.I12.toFixed(2)}`; if (ks !== ultSR) { ultSR = ks; const { x, c } = eSR; x.fillStyle = "#0d0f12"; x.fillRect(0, 0, c.width, c.height); x.font = "bold 56px 'Courier New',monospace"; x.textAlign = "right"; x.fillStyle = "#ff5252"; x.fillText(V.U12.toFixed(1), 140, 75); x.fillStyle = "#69f0ae"; x.fillText(V.I12.toFixed(2), 300, 75); x.font = "18px system-ui"; x.fillStyle = "#bbb"; x.fillText("V", 158, 100); x.fillText("A", 316, 100); eSR.t.needsUpdate = true; }
+      const km = V.kPa.toFixed(1); if (km !== ultMD) { ultMD = km; const { x, c } = eMD; x.fillStyle = "#b9c7b0"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1d2414"; x.font = "bold 50px 'Courier New',monospace"; x.textAlign = "center"; x.fillText(km, 96, 58); x.font = "16px system-ui"; x.fillText("kPa", 96, 84); eMD.t.needsUpdate = true; } }
+    const vel = (V.Qaf / 1000) / (Math.PI * 0.017 * 0.017 / 4);
+    PB.forEach((b, i) => { let p;
+      if (b.z) { const v2 = vel * Math.pow(17 / 26, 2) * (1.15 - b.r * b.r * 0.4); b.s = (b.s + v2 * dt / (XL1 - XL0)) % 1; p = v3.set(XL0 + b.s * (XL1 - XL0), YT + Math.sin(b.a) * b.r * 0.012, Math.cos(b.a) * b.r * 0.012); }
+      else { b.s = (b.s + vel * dt / curbaRet.getLength()) % 1; const c = curbaRet.getPointAt(b.s); p = v3.set(c.x, c.y + Math.sin(b.a) * b.r * 0.007, c.z + Math.cos(b.a) * b.r * 0.007); }
+      m4.compose(p, q0, s1); partic.setMatrixAt(i, m4); });
+    partic.instanceMatrix.needsUpdate = true; partic.visible = vel > 0.02;
+  });
+  return { seteaza(o) { Object.assign(V, o); if (o.h) V.h = o.h.slice(); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
+}
