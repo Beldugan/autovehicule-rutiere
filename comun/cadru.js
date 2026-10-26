@@ -57,6 +57,7 @@ const Cadru = {
     const tabs = [["sim", "Simulator"]];
     if (LAB.vehicul3d) tabs.push(["v3d", LAB.vehicul3d.titluTab || "Pe autovehicul (3D)"]);
     if (LAB.atelierSenzori) tabs.push(["sz", LAB.atelierSenzori.titluTab || "Senzorii (3D)"]);
+    if (LAB.animatie) tabs.push(["anim", LAB.animatie.titluTab || "Animație (3D)"]);
     tabs.push(["det", "Determinări"]);
     tabs.push(["teorie", "Teorie"], ["probleme", "Exemplu și probleme"]);
     if (LAB.continut.aplicatii) tabs.push(["aplicatii", LAB.continut.aplicatii.titluTab || "Aplicații la autovehicul"]);
@@ -85,6 +86,7 @@ const Cadru = {
   </section>
   ${LAB.vehicul3d ? `<section id="tab-v3d" class="tab"><div class="card"><h2>${LAB.vehicul3d.titlu || "Sistemul pe autovehicul"}</h2>${LAB.vehicul3d.intro || ""}<div id="v3d-gazda"><p class="nota">Se încarcă modelul 3D…</p></div>${LAB.vehicul3d.dupa || ""}</div></section>` : ""}
   ${LAB.atelierSenzori ? `<section id="tab-sz" class="tab"><div class="card"><h2>${LAB.atelierSenzori.titlu || "Senzorii autovehiculului: construcție, mufă și verificare"}</h2>${LAB.atelierSenzori.intro || ""}<div id="sz-gazda"><p class="nota">Se încarcă atelierul senzorilor…</p></div></div></section>` : ""}
+  ${LAB.animatie ? `<section id="tab-anim" class="tab"><div class="card"><h2>${LAB.animatie.titlu || "Animație"}</h2>${LAB.animatie.intro || ""}<div id="anim-gazda"><p class="nota">Se încarcă animația…</p></div>${LAB.animatie.dupa || ""}</div></section>` : ""}
   <section id="tab-det" class="tab">
     <div class="card">
       <h2>Date de lucru</h2>
@@ -368,6 +370,11 @@ const Cadru = {
       this._sz = true;
       import(BAZA_COMUN + "senzori3d.js?v=7").then(m => { this.sz = m.creeaza($("#sz-gazda"), LAB.atelierSenzori.optiuni || {}); })
         .catch(e => { $("#sz-gazda").innerHTML = `<p class="nota">Atelierul senzorilor nu a putut fi încărcat (${esc(e.message)}). Este necesar un browser cu WebGL.</p>`; });
+    }
+    if (id === "anim" && !this._anim) {
+      this._anim = true;
+      import(BAZA_COMUN + LAB.animatie.modul).then(m => { this.anim = m[LAB.animatie.functie]($("#anim-gazda"), LAB.animatie.optiuni || {}); })
+        .catch(e => { $("#anim-gazda").innerHTML = `<p class="nota">Animația nu a putut fi încărcată (${esc(e.message)}). Este necesar un browser cu WebGL.</p>`; });
     }
     if (id === "referat") this.genReferat();
     this.redeseneaza();
