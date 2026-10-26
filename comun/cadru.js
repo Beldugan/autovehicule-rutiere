@@ -28,7 +28,7 @@ const Cadru = {
     this.construiesteContinut();
     this.construiesteReferatForm();
     this.leaga();
-    this.acordeon();
+    this.acordeon(); this.leagaTooltip();
     let tab = Stocare.citeste("ar-tab-" + LAB.cod, "sim");
     if (!$("#tab-" + tab)) tab = "sim";
     this.arataTab(tab);
@@ -223,9 +223,9 @@ const Cadru = {
   construiesteTabele() {
     const c = $("#tabele");
     c.innerHTML = (LAB.tabele || []).map(tb => `<div class="card"><h2>${tb.titlu}</h2>${tb.nota ? `<p class="nota">${tb.nota}</p>` : ""}<div class="tabel-scroll"><table class="tabel" id="tb-${tb.id}">
-      <thead><tr><th>${tb.antetRand || ""}</th>${tb.coloane.map(k => `<th>${k.t}</th>`).join("")}</tr></thead><tbody>
-      ${tb.randuri.map(r => `<tr><td><b>${r.et}</b></td>${tb.coloane.map(k => {
-        if (!k.intrare) return `<td class="calc" data-t="${tb.id}" data-r="${r.k}" data-c="${k.k}"></td>`;
+      <thead><tr><th>${tb.antetRand || ""}</th>${tb.coloane.map(k => `<th${this.attrFormula(k, null, tb)}>${k.t}</th>`).join("")}</tr></thead><tbody>
+      ${tb.randuri.map(r => `<tr><td${r.f ? this.attrFormula({ t: r.et, f: r.f }) : ""}><b>${r.et}</b></td>${tb.coloane.map(k => {
+        if (!k.intrare) return `<td class="calc" data-t="${tb.id}" data-r="${r.k}" data-c="${k.k}"${this.attrFormula(k, r, tb)}></td>`;
         const v = this.D.t[tb.id][r.k][k.k] ?? "", ro = MOD.eval && !k.manualEval;
         if (k.tip === "select") return `<td><select data-t="${tb.id}" data-r="${r.k}" data-c="${k.k}"${ro ? " disabled" : ""}><option value=""></option>${k.optiuni.map(o => `<option${o === v ? " selected" : ""}>${o}</option>`).join("")}</select></td>`;
         return `<td><input inputmode="decimal" data-t="${tb.id}" data-r="${r.k}" data-c="${k.k}" value="${esc(String(v).replace(".", ","))}"${ro ? " readonly" : ""}></td>`;
@@ -240,6 +240,27 @@ const Cadru = {
     this.recalculeaza();
   },
   reconstruiesteTabele() { this.construiesteTabele(); },
+  /** tooltipul cu formula (specificația UX): col.f = formula (HTML) sau {rand: formula}; rândul poate avea propria formulă r.f */
+  attrFormula(k, r, tb) {
+    let f = k.f ?? (tb && typeof FORMULE_TABELE !== "undefined" ? (((FORMULE_TABELE[LAB.cod] || {})[tb.id] || {})[k.k]) : null);
+    if (k.intrare) f = null;
+    if (f && typeof f === "object") f = r ? (f[r.k] ?? f["*"]) : (Object.keys(f).length === 1 ? Object.values(f)[0] : null); if (!f && r && r.f && !k.intrare) f = r.f;
+    if (!f) return "";
+    const rowSpec = r && ((k.f && typeof k.f === "object") || (tb && typeof FORMULE_TABELE !== "undefined" && typeof (((FORMULE_TABELE[LAB.cod] || {})[tb.id] || {})[k.k]) === "object"));
+    const tit = String(k.t || "") + (rowSpec ? " – " + String(r.et || "") : "");
+    return ` data-formula="${esc(f)}" data-ftitlu="${esc(tit.replace(/<(?!\/?(sub|sup)>)[^>]+>/g, ""))}"`;
+  },
+  leagaTooltip() {
+    let tt = null;
+    const arata = (el, x, y) => {
+      if (!tt) { tt = document.createElement("div"); tt.className = "tt-formula"; tt.setAttribute("role", "tooltip"); document.body.appendChild(tt); }
+      tt.innerHTML = `<b>${el.dataset.ftitlu || ""}</b>${el.dataset.formula}`; tt.hidden = false;
+      const w = tt.offsetWidth, h = tt.offsetHeight; tt.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 14)) + "px"; tt.style.top = (y + h + 24 > innerHeight ? y - h - 12 : y + 16) + "px";
+    };
+    document.addEventListener("pointerover", e => { const el = e.target.closest("[data-formula]"); if (el) arata(el, e.clientX, e.clientY); else if (tt) tt.hidden = true; });
+    document.addEventListener("pointermove", e => { if (tt && !tt.hidden && e.target.closest("[data-formula]")) arata(e.target.closest("[data-formula]"), e.clientX, e.clientY); });
+    document.addEventListener("scroll", () => { if (tt) tt.hidden = true; }, true);
+  },
   coloana(t, c) { const tb = (LAB.tabele || []).find(x => x.id === t); return tb ? tb.coloane.find(k => k.k === c) || {} : {}; },
   /** validarea automată a câmpurilor (specificația UX): valori nenumerice și valori negative la mărimile strict pozitive
       (masă, putere, rezistență, turație, timp, debit, volum, frecvență…); coloana poate declara neg: true / pozitiv: true */
@@ -248,7 +269,8 @@ const Cadru = {
     if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(v)) return "Valoare nenumerică – folosiți cifre și virgula zecimală";
     const u = ((String(col.t || "").replace(/<[^>]+>/g, "").match(/\[([^\]]+)\]/) || [])[1] || "").trim();
     const POZ = /^(kg|g|mg|t|W|kW|kWh|Wh|rot\/min|min⁻¹|rot|Ω|kΩ|MΩ|mΩ|mm|cm|km|km\/h|L|l|ml|L\/s|l\/min|L\/min|Hz|kHz|ms|s|µs|min|h|ppm|mg\/cursă|mAh|Ah|kg\/m³|g\/cm³|% vol|mm²\/s|cSt|mPa·s|ani)$/;
-    if (Number(v) < 0 && col.neg !== true && (col.pozitiv || POZ.test(u))) return `Mărimea [${u}] nu poate fi negativă`;
+    const dif = /Δ|abatere|eroare|diferen|variați|corecți/i.test(String(col.t || ""));
+    if (Number(v) < 0 && col.neg !== true && (col.pozitiv || (POZ.test(u) && !dif))) return `Mărimea [${u}] nu poate fi negativă`;
     return "";
   },
   val(t, r, c) { const v = ((this.D.t[t] || {})[r] || {})[c]; return num(v); },

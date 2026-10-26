@@ -654,7 +654,10 @@ input.invalid, .tabel td input.invalid { border-color: var(--pericol); box-shado
 /* tooltipul Fluent cu formula */
 .tt-formula { position: fixed; z-index: 60; max-width: 340px; background: var(--suprafata); color: var(--text); border: 1px solid var(--linie); border-radius: 8px; box-shadow: var(--umbra-ridicata); padding: .5rem .65rem; font-size: .8rem; pointer-events: none; }
 .tt-formula b { color: var(--accent); display: block; margin-bottom: .15rem; }
-[data-formula] { cursor: help; text-decoration: underline dotted color-mix(in srgb, var(--accent) 60%, transparent); text-underline-offset: 3px; }
+[data-formula] { cursor: help; }
+th[data-formula] { text-decoration: underline dotted color-mix(in srgb, var(--accent) 70%, transparent); text-underline-offset: 3px; }
+.tt-formula { line-height: 1.5; }
+.tt-formula b { font-family: var(--font-titlu); }
 
 /* portalul (pagina principală și paginile disciplinelor) */
 .portal-hero { background: linear-gradient(120deg, var(--antet-1) 0%, var(--antet-2) 100%); color: #fff; border-bottom: 0; position: relative; }
