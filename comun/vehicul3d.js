@@ -4,7 +4,8 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=13";
+import { ataseazaViz } from "./viz3d.js?v=1";
+import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=15";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -232,12 +233,18 @@ export function creeaza(gazda, optiuni = {}) {
   }
 
   /* --- sistemul de frânare */
-  let motCtx = null;
+  let motCtx = null; REG_MOT = [];
   if (sistem === "retea" || sistem === "frana" || !sistem) { ascundeContur(ctx, ["motor", "cutie", "radiator"]); motCtx = motorAutoturism(caroserie, 0.5); }
   const S = sistem === "racire" ? construiesteRacire({ caroserie, ctxMotor: ctx }) : sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : sistem === "senzori" ? construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "hibrid" ? construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "retea" ? construiesteRetea({ caroserie, optiuni }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
 
   // celelalte sisteme ale autoturismului (transmisie, direcție, baterie, combustibil, evacuare)
   { const mSist = motCtx || (S.motor || null); const gs = sistemeAutoturism(caroserie, mSist); if (motCtx) estompeaza(gs, 0.5); }
+
+  const motoare = REG_MOT; REG_MOT = null;
+  // stilurile de vizualizare (realist / prezentare secționată / termic CFD); motorul unui autoturism „în mers” este cald
+  const viz = ataseazaViz({ renderer, scene, camera, cont: scena, decor: [asfalt, umbra, drum], pozitie: "jos",
+    profil: Object.assign({ titlu: "Temperatura suprafețelor", T0: 20, Tmin: 20, Tmax: sistem === "hibrid" ? 160 : 400 }, optiuni.vizProfil || {}),
+    surse: () => { const L = []; motoare.forEach(m => { if (m.grup.visible) L.push(...m.surseTermice(true)); }); if (S.surseTermice) L.push(...S.surseTermice()); return L; } });
 
   /* --- etichete HTML */
   const elEt = gazda.querySelector(".v3d-etichete");
@@ -447,7 +454,7 @@ export function creeaza(gazda, optiuni = {}) {
     for (let k = 0; k < 4; k++) pas(dt / 4);
     if (zbor) { zbor.k = Math.min(1, zbor.k + dt / 0.9); const e = sstep(0, 1, zbor.k); camera.position.lerpVectors(zbor.p0, zbor.p1, e); ctl.target.lerpVectors(zbor.t0, zbor.t1, e); if (zbor.k >= 1) zbor = null; }
     ctl.update();
-    asfalt.visible = camera.position.y > 0.02; mobil.visible = asfalt.visible;
+    asfalt.visible = camera.position.y > 0.02 && !viz.mod(); mobil.visible = asfalt.visible;
     const [w, h] = redim();
     renderer.render(scene, camera);
     etichetePoz(w, h);
@@ -662,8 +669,9 @@ function sistemeAutoturism(caroserie, mot) {
 const CONTUR = { motor: [1.82, 0.62], cutie: [1.62, 0.5], radiator: [2.25, 0.55] };
 function ascundeContur(ctx, ce) { ctx.children.forEach(l => { const p = l.position; if (ce.some(k => Math.abs(p.x - CONTUR[k][0]) < 0.01 && Math.abs(p.y - CONTUR[k][1]) < 0.01)) l.visible = false; }); }
 /** motorul K7J complet (transmisia accesoriilor, evacuarea cu GPF, sistemul de răcire), montat transversal în autoturism */
+let REG_MOT = null;   // motoarele create în scena curentă (sursele termice ale vizualizării CFD)
 function motorAutoturism(caroserie, opacitate, interior, racire) {
-  const mot = construiesteMotor({ stand: false, filtruAer: false, interior: !!interior, racire: !!racire });
+  const mot = construiesteMotor({ stand: false, filtruAer: false, interior: !!interior, racire: !!racire }); if (REG_MOT) REG_MOT.push(mot);
   mot.grup.rotation.y = -Math.PI / 2; mot.grup.position.set(1.78, 0.42, 0.02); mot.grup.scale.setScalar(0.98);
   if (opacitate) estompeaza(mot.grup, opacitate);
   caroserie.add(mot.grup); return mot;
@@ -1464,7 +1472,7 @@ function construiesteRetea({ caroserie, optiuni }) {
      comandă a puterii (invertoarele + convertorul ridicător) pe transmisie, bateria HV în portbagaj, cablurile portocalii; fără demaror și alternator;
    • plug-in hybrid (P2): modulul P2 (motorul electric și ambreiajul K0) între motor și cutie, invertorul, bateria HV mare sub podea, încărcătorul
      de bord (OBC) și priza de tip 2. Fluxurile de energie sunt animate (portocaliu – mecanic, albastru – electric spre motor, verde – recuperare). */
-import { construiesteDemaror } from "./pornire3d.js?v=1";
+import { construiesteDemaror } from "./pornire3d.js?v=2";
 export const TIPURI_HIBRID = { ss: "Start-stop (12 V)", mh: "Mild hybrid 48 V (BSG, P0)", fh: "Full hybrid (e-CVT, MG1 + MG2)", phev: "Plug-in hybrid (P2, încărcare din rețea)" };
 function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   ascundeContur(ctxMotor, ["motor", "cutie", "radiator"]);
@@ -1478,6 +1486,9 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   const carc = o => { o.material = o.material.clone(); carcase.push(o); return o; };
   const eticheta = (obj, text, tip) => et.push({ obj, text, filtru: () => stareRef.tip === tip });
   const ancora = (p, v) => { const o = new THREE.Object3D(); o.position.copy(v); p.add(o); return o; };
+  // sursele termice ale componentelor electrice (vizualizarea „Termic CFD”): temperatura urmează pierderile ∝ |P|
+  const TE = { bat: 25, inv: 30, mot: 32, obc: 25 };
+  const cald = (p, v, r, k, f = 1) => { const o = ancora(p, v); o.userData.vzT = () => 20 + (TE[k] - 20) * f; o.userData.vzSf = { c: new THREE.Vector3(), r }; o.userData.vzR = 1; return o; };
   const portocaliu = new THREE.MeshStandardMaterial({ color: 0xf07d00, roughness: 0.45 }), alb48 = new THREE.MeshStandardMaterial({ color: 0x1f4f9a, roughness: 0.5 });
   const aluC = new THREE.MeshStandardMaterial({ color: 0xa7adb4, roughness: 0.55, metalness: 0.75, side: THREE.DoubleSide }), cupru = M.cupru, otelS = M.otel;
   const tex = (w, h, f) => { const c = document.createElement("canvas"); c.width = w; c.height = h; f(c.getContext("2d"), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
@@ -1515,6 +1526,7 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     const pB = inM(B.position.clone().add(V(0.2, 0.0, -0.1)));
     tub([pB, pB.clone().add(V(-0.05, -0.15, 0)), V(1.45, 0.18, 0.4), V(0.9, 0.16, 0.42), V(P48.x + 0.17, P48.y - 0.02, P48.z)], 0.011, alb48, c);
     tub([V(P48.x + 0.17, P48.y + 0.02, P48.z + 0.05), V(DC.x - 0.08, DC.y, DC.z + 0.05)], 0.008, alb48, c); tub([V(DC.x + 0.08, DC.y, DC.z), V(1.3, 0.3, 0.2), V(1.8, 0.7, -0.5), V(1.95, 0.81, -0.56)], 0.006, new THREE.MeshStandardMaterial({ color: 0xb02020, roughness: 0.5 }), c);
+    cald(B, V(0.28, 0, 0), 0.12, "mot"); cald(c, P48, 0.2, "bat"); cald(c, DC, 0.12, "inv");
     G.mh.P48 = P48; G.mh.pB = pB; }
   /* ---------- FULL HYBRID: transmisia e-CVT (MG1, angrenajul planetar, MG2, reductorul, diferențialul), PCU, bateria HV */
   { const g = G.fh.mot, DY = -0.087, DZ = 0.335;
@@ -1546,6 +1558,7 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     eticheta(ancora(c, HB.clone().add(V(0, 0.2, 0))), "Bateria HV (portbagaj)", "fh");
     const pP = inM(PU.clone().add(V(0.12, 0.0, -0.18)));
     [-0.02, 0.02].forEach(dz => tub([pP.clone().add(V(0, 0, dz)), V(pP.x - 0.2, 0.16, 0.25 + dz), V(0.3, 0.13, 0.32 + dz), V(-1.2, 0.15, 0.32 + dz), V(HB.x + 0.17, HB.y - 0.1, 0.3 + dz)], 0.009, portocaliu, c, 120));
+    cald(g, V(-0.37, -0.02, 0), 0.12, "mot", 0.85); cald(g, V(-0.57, -0.02, 0), 0.17, "mot"); cald(g, PU, 0.2, "inv"); cald(c, HB, 0.3, "bat");
     G.fh.HB = HB; G.fh.pP = pP; }
   /* ---------- PLUG-IN HYBRID (P2): modulul P2 cu ambreiajul K0, invertorul, bateria HV sub podea, OBC, priza de tip 2 */
   { const g = G.phev.mot;
@@ -1570,6 +1583,7 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     fata.position.set(PR.x, PR.y, PR.z - 0.021); fata.rotation.y = Math.PI; c.add(fata);
     eticheta(ancora(c, PR.clone().add(V(0, 0.08, 0))), "Priza de încărcare de tip 2 (c.a.)", "phev");
     tub([V(PR.x, PR.y - 0.03, PR.z + 0.03), V(PR.x + 0.02, 0.6, -0.6), V(OBC.x, OBC.y + 0.02, OBC.z - 0.1)], 0.009, portocaliu, c, 40); tub([V(OBC.x + 0.12, OBC.y, OBC.z), V(-0.6, 0.18, -0.38), V(-0.2, 0.21, -0.36)], 0.009, portocaliu, c, 60);
+    cald(g, V(-0.365, -0.02, 0), 0.17, "mot"); cald(c, INV, 0.18, "inv"); cald(c, V(0.3, 0.205, -0.36), 0.45, "bat"); cald(c, V(0.3, 0.205, 0.36), 0.45, "bat"); cald(c, OBC, 0.15, "obc");
     G.phev.OBC = OBC; G.phev.PR = PR; G.phev.INV = INV; G.phev.pP2 = pP2; }
   Object.values(G).forEach(g => g.mot.traverse(o => { if (o.isMesh) o.userData.fixMat = true; }));
   /* ---------- fluxurile de energie (particule) */
@@ -1644,6 +1658,7 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     st.PelT = { stop: tip === "ss" ? 0.4 : 0.6, pornire: tip === "ss" ? 3.5 : tip === "mh" ? 6 : 15, acc: tip === "ss" ? -0.6 : 0.6 * Pmax, croaziera: tip === "ss" ? -0.4 : tip === "mh" ? -0.5 : -2, franare: tip === "ss" ? -1.5 : -0.8 * Pmax, ev: 0.35 * Pmax, priza: -7.2 }[r];
     if (r === "pornire" && tip === "ss" && st.tReg > 0.9) st.PelT = -0.6;
     st.Pel += (st.PelT - st.Pel) * Math.min(1, dt / 0.3);
+    { const f = Math.min(1, Math.abs(st.Pel) / Pmax), k = Math.min(1, dt / 3); TE.bat += (25 + 22 * f + (r === "priza" ? 8 : 0) - TE.bat) * k; TE.inv += (30 + 55 * f - TE.inv) * k; TE.mot += (32 + 85 * f - TE.mot) * k; TE.obc += ((r === "priza" ? 62 : 25) - TE.obc) * k; }
     const cap = { ss: 0.8, mh: 0.5, fh: 1.3, phev: 13 }[tip] * 3600; st.soc = Math.max(0.15, Math.min(0.97, st.soc - st.Pel * dt * 4 / cap));
     // animațiile: roțile, motorul, mașinile electrice, fluxurile
     roti.forEach(rr => { rr.rot.rotation.z -= st.v / CAR.Rroata * dt; });

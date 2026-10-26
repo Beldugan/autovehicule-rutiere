@@ -1,92 +1,121 @@
+/* ===== Interfața Fluent (Windows 11) – specificația UI/UX „Autovehicule Rutiere” v2.0: fundal #F3F3F3, carduri albe cu umbre fine și colțuri
+   de 8 px, accent #0067C0 (hover #004E92), text #1E293B, tipografie Segoe UI Variable; tema întunecată echivalentă */
 :root {
-  --fundal: #f6f7f9;
+  --fundal: #f3f3f3;
   --suprafata: #ffffff;
-  --suprafata-2: #f0f2f5;
-  --text: #1c2430;
-  --text-sec: #5b6575;
-  --linie: #dde1e7;
-  --accent: #1f5f9e;
-  --accent-slab: #e8f0f9;
-  --ok: #1d7a46;
-  --ok-fundal: #e5f4ea;
-  --atentie: #a5560b;
-  --atentie-fundal: #fdf0e1;
-  --pericol: #b42318;
-  --pericol-fundal: #fdecea;
-  --serie-0: #1f5f9e;
-  --serie-1: #c0492b;
-  --serie-2: #2e8b57;
-  --serie-3: #8a5a9e;
-  --grila: #e6e9ee;
+  --suprafata-2: #f1f5f9;
+  --suprafata-3: #f8fafc;
+  --text: #1e293b;
+  --titlu: #0f172a;
+  --text-sec: #475569;
+  --linie: #e2e8f0;
+  --linie-tare: #cbd5e1;
+  --accent: #0067c0;
+  --accent-hover: #004e92;
+  --accent-slab: #e8f1fb;
+  --ok: #107c10;
+  --ok-fundal: #e7f4e4;
+  --atentie: #9d5d00;
+  --atentie-fundal: #fff4ce;
+  --pericol: #c42b1c;
+  --pericol-fundal: #fde7e9;
+  --serie-0: #0067c0;
+  --serie-1: #e8590c;
+  --serie-2: #107c10;
+  --serie-3: #8764b8;
+  --serie-4: #ca5010;
+  --serie-5: #038387;
+  --grila: #e8ecf1;
   --otel-1: #c9ced6;
   --otel-2: #8d96a3;
   --otel-3: #5f6874;
   --roata: #2b4a7a;
   --lichid: #d4a93c;
-  --serie-4: #b07d12;
-  --serie-5: #2a9d9f;
   --pe-accent: #ffffff;
+  --umbra: 0 1px 2px rgba(15, 23, 42, .06), 0 2px 8px rgba(15, 23, 42, .05);
+  --umbra-ridicata: 0 4px 16px rgba(15, 23, 42, .1), 0 1px 3px rgba(15, 23, 42, .08);
+  --antet-1: #0067c0;
+  --antet-2: #004e92;
+  --raza: 8px;
+  --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", "Helvetica Neue", sans-serif;
+  --font-titlu: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --fundal: #14181e;
-    --suprafata: #1c222a;
-    --suprafata-2: #232a33;
-    --text: #e6e9ee;
-    --text-sec: #9aa4b2;
-    --linie: #2f3741;
-    --accent: #6ea8e6;
-    --accent-slab: #1f2c3b;
-    --ok: #6fcf97;
-    --ok-fundal: #183526;
-    --atentie: #f0a957;
-    --atentie-fundal: #3a2a17;
-    --pericol: #ff8a7a;
-    --pericol-fundal: #3d1d1a;
-    --serie-0: #6ea8e6;
-    --serie-1: #ef7d5f;
-    --serie-2: #6fcf97;
-    --serie-3: #c39be0;
-    --grila: #29313b;
+    --fundal: #202020;
+    --suprafata: #2b2b2b;
+    --suprafata-2: #323232;
+    --suprafata-3: #292929;
+    --text: #f1f5f9;
+    --titlu: #ffffff;
+    --text-sec: #a7b0bd;
+    --linie: #3b3b3b;
+    --linie-tare: #4a4a4a;
+    --accent: #4ca6f0;
+    --accent-hover: #7cbdf4;
+    --accent-slab: #1e3347;
+    --ok: #6ccb5f;
+    --ok-fundal: #1e3a1c;
+    --atentie: #fce100;
+    --atentie-fundal: #433519;
+    --pericol: #ff99a4;
+    --pericol-fundal: #442726;
+    --serie-0: #4ca6f0;
+    --serie-1: #ff8c42;
+    --serie-2: #6ccb5f;
+    --serie-3: #b69ce0;
+    --serie-4: #f2a65a;
+    --serie-5: #4fc3c5;
+    --grila: #363636;
     --otel-1: #8a929e;
     --otel-2: #5f6874;
     --otel-3: #434b55;
     --roata: #5b84c4;
-    --serie-4: #e3b341;
-    --serie-5: #4fc3c5;
-    --pe-accent: #0e1620;
+    --pe-accent: #04192c;
+    --umbra: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 8px rgba(0, 0, 0, .22);
+    --umbra-ridicata: 0 4px 16px rgba(0, 0, 0, .45);
+    --antet-1: #005a9e;
+    --antet-2: #003a6b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-    --fundal: #14181e;
-    --suprafata: #1c222a;
-    --suprafata-2: #232a33;
-    --text: #e6e9ee;
-    --text-sec: #9aa4b2;
-    --linie: #2f3741;
-    --accent: #6ea8e6;
-    --accent-slab: #1f2c3b;
-    --ok: #6fcf97;
-    --ok-fundal: #183526;
-    --atentie: #f0a957;
-    --atentie-fundal: #3a2a17;
-    --pericol: #ff8a7a;
-    --pericol-fundal: #3d1d1a;
-    --serie-0: #6ea8e6;
-    --serie-1: #ef7d5f;
-    --serie-2: #6fcf97;
-    --serie-3: #c39be0;
-    --grila: #29313b;
-    --otel-1: #8a929e;
-    --otel-2: #5f6874;
-    --otel-3: #434b55;
-    --roata: #5b84c4;
-    --serie-4: #e3b341;
-    --serie-5: #4fc3c5;
-    --pe-accent: #0e1620;
-    color-scheme: dark;
+  --fundal: #202020;
+  --suprafata: #2b2b2b;
+  --suprafata-2: #323232;
+  --suprafata-3: #292929;
+  --text: #f1f5f9;
+  --titlu: #ffffff;
+  --text-sec: #a7b0bd;
+  --linie: #3b3b3b;
+  --linie-tare: #4a4a4a;
+  --accent: #4ca6f0;
+  --accent-hover: #7cbdf4;
+  --accent-slab: #1e3347;
+  --ok: #6ccb5f;
+  --ok-fundal: #1e3a1c;
+  --atentie: #fce100;
+  --atentie-fundal: #433519;
+  --pericol: #ff99a4;
+  --pericol-fundal: #442726;
+  --serie-0: #4ca6f0;
+  --serie-1: #ff8c42;
+  --serie-2: #6ccb5f;
+  --serie-3: #b69ce0;
+  --serie-4: #f2a65a;
+  --serie-5: #4fc3c5;
+  --grila: #363636;
+  --otel-1: #8a929e;
+  --otel-2: #5f6874;
+  --otel-3: #434b55;
+  --roata: #5b84c4;
+  --pe-accent: #04192c;
+  --umbra: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 8px rgba(0, 0, 0, .22);
+  --umbra-ridicata: 0 4px 16px rgba(0, 0, 0, .45);
+  --antet-1: #005a9e;
+  --antet-2: #003a6b;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -494,3 +523,160 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .ecran-tester table.x4-flux tr.x4-afara td:nth-child(2) b { color: #d71920; }
 .x4-subsol { display: flex; gap: 2px; margin: .4rem -.6rem -.5rem; background: #dfe5ec; border-radius: 0 0 6px 6px; overflow: hidden; }
 .x4-subsol span { flex: 1; text-align: center; font-size: .66rem; padding: .3rem .1rem; background: #f4f6f9; color: #1857a8; font-weight: 600; }
+
+/* ---- stilurile de vizualizare 3D (Realist / Prezentare / Termic CFD) */
+.vz-bara { position: absolute; z-index: 4; top: .5rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 8px;
+  background: rgba(255, 255, 255, .86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 2px 8px rgba(0, 0, 0, .14), 0 0 0 1px rgba(0, 0, 0, .06); max-width: calc(100% - 1rem); flex-wrap: wrap; justify-content: center; }
+.vz-bara button { font-size: .74rem; padding: .22rem .6rem; border: 0; border-radius: 6px; background: transparent; color: #1e293b; line-height: 1.3; white-space: nowrap; }
+.vz-bara button:hover { background: rgba(0, 103, 192, .1); }
+.vz-bara button[aria-pressed="true"] { background: #0067c0; color: #fff; }
+.vz-bara .vz-sect { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; color: #475569; padding: 0 .35rem; }
+.vz-bara .vz-sect[hidden] { display: none; }
+.vz-bara .vz-sect input { width: 7rem; padding: 0; accent-color: #0067c0; }
+.vz-legenda { position: absolute; z-index: 4; right: .6rem; top: 3rem; background: rgba(255, 255, 255, .88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #1e293b; border-radius: 8px; padding: .4rem .55rem; font-size: .7rem; box-shadow: 0 2px 8px rgba(0, 0, 0, .14); pointer-events: none; }
+.vz-legenda b { display: block; margin-bottom: .25rem; font-weight: 600; max-width: 9rem; }
+.vz-scala { display: flex; gap: .35rem; height: 150px; }
+.vz-scala i { width: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
+.vz-scala span { display: flex; flex-direction: column; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.vz-scala em { font-style: normal; line-height: 1; }
+.vz-sonda { position: absolute; z-index: 5; pointer-events: none; background: rgba(15, 23, 42, .88); color: #fff; font-size: .72rem; padding: .25rem .5rem; border-radius: 6px; white-space: nowrap; line-height: 1.35; }
+.vz-sonda i { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .35rem; vertical-align: -1px; }
+.vz-prez .m3d-eticheta, .vz-prez .v3d-eticheta { opacity: .85; }
+.vz-termic .m3d-ajutor, .vz-prez .m3d-ajutor { display: none; }
+@media (max-width: 640px) { .vz-bara button { padding: .2rem .4rem; font-size: .7rem; } .vz-scala { height: 100px; } }
+
+/* =====================================================================================================================
+   Componentele Fluent (specificația UI/UX v2.0): antet albastru, meniul cu taburi de tip „pivot”, carduri ridicate,
+   butoane și câmpuri Windows 11, panoul de comenzi în stânga cu secțiuni pliabile, tabele de date minimaliste
+   ===================================================================================================================== */
+body { font-family: var(--font); font-size: 14.5px; background: var(--fundal); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { font-family: var(--font-titlu); color: var(--titlu); }
+h2 { font-size: 1rem; font-weight: 600; letter-spacing: -.005em; }
+h3 { font-size: .95rem; font-weight: 600; }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+/* butoane (secundar = alb cu contur, primar = accent) */
+button, a.buton { border-radius: 6px; border: 1px solid var(--linie-tare); border-bottom-color: color-mix(in srgb, var(--linie-tare) 70%, #000 30%); background: var(--suprafata); color: var(--text);
+  font-weight: 500; transition: background .12s, border-color .12s, color .12s, box-shadow .12s; }
+:root[data-theme="dark"] button, :root[data-theme="dark"] a.buton { border-bottom-color: var(--linie-tare); }
+button:hover, a.buton:hover { background: var(--suprafata-3); border-color: var(--linie-tare); }
+button:active { background: var(--suprafata-2); color: var(--text-sec); }
+button.primar { background: var(--accent); border-color: var(--accent); border-bottom-color: color-mix(in srgb, var(--accent) 70%, #000 30%); color: var(--pe-accent); font-weight: 600; }
+button.primar:hover { background: var(--accent-hover); border-color: var(--accent-hover); filter: none; }
+button[aria-pressed="true"], button.activ { background: var(--accent); border-color: var(--accent); color: var(--pe-accent); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* câmpuri: albe, cu linia de bază accentuată la focalizare; valorile în accent, semibold, cifre tabulare */
+input, select, textarea { border-radius: 6px; border: 1px solid var(--linie-tare); border-bottom-color: color-mix(in srgb, var(--text-sec) 55%, transparent); background: var(--suprafata); transition: border-color .12s, box-shadow .12s; }
+input:hover, select:hover, textarea:hover { background: var(--suprafata-3); }
+input:focus, select:focus, textarea:focus { outline: none; border-bottom-color: var(--accent); box-shadow: inset 0 -1px 0 var(--accent); background: var(--suprafata); }
+input[type="number"], input[type="text"]:not(.liber), .tabel td input, .camp input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.camp { color: var(--text-sec); font-size: .82rem; }
+.camp select { color: var(--text); }
+input[type="range"] { accent-color: var(--accent); border: 0; background: transparent; box-shadow: none; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+input.invalid, .tabel td input.invalid { border-color: var(--pericol); box-shadow: inset 0 -1px 0 var(--pericol); color: var(--pericol); background: var(--pericol-fundal); }
+
+/* antetul aplicației (bara albastră) */
+.antet { position: relative; background: linear-gradient(120deg, var(--antet-1) 0%, var(--antet-2) 100%); color: #fff; border-bottom: 0; padding: .9rem clamp(16px, 3vw, 2rem) 1rem; align-items: center; }
+.antet::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(1200px 160px at 85% -40%, rgba(255, 255, 255, .16), transparent 60%); }
+.antet > * { position: relative; z-index: 1; }
+.antet h1 { color: #fff; font-weight: 700; font-size: clamp(1.15rem, 2.2vw, 1.45rem); margin: .15rem 0 .2rem; }
+.antet p { color: rgba(255, 255, 255, .82); font-size: .84rem; }
+.antet .supratitlu { color: #cfe5fb; font-size: .72rem; letter-spacing: .06em; }
+.antet .marca { display: inline-flex; align-items: center; gap: .45rem; font-weight: 700; font-size: .8rem; letter-spacing: .02em; color: #fff; margin-bottom: .2rem; }
+.antet .marca img { width: 18px; height: 18px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .55); }
+.antet .marca span { font-weight: 500; opacity: .75; }
+.antet a.buton, .antet-butoane > button { background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .28); }
+.antet a.buton:hover, .antet-butoane > button:hover { background: rgba(255, 255, 255, .22); border-color: rgba(255, 255, 255, .45); }
+.antet .comutator-tema { border-color: rgba(255, 255, 255, .3); border-radius: 6px; }
+.antet .comutator-tema button { background: rgba(255, 255, 255, .1); color: #fff; border: 0; }
+.antet .comutator-tema button[aria-pressed="true"] { background: #fff; color: var(--antet-1); }
+
+/* meniul cu taburi (pivot Fluent: indicator albastru sub tabul activ) */
+.taburi { background: var(--suprafata); border-bottom: 1px solid var(--linie); box-shadow: 0 1px 3px rgba(15, 23, 42, .05); gap: .1rem; padding-top: .25rem; padding-bottom: 0; }
+.taburi button { position: relative; border: 0; border-radius: 6px 6px 0 0; background: transparent; color: var(--text-sec); font-weight: 500; padding: .6rem .85rem .7rem; }
+.taburi button:hover { background: var(--suprafata-3); color: var(--text); }
+.taburi button[aria-selected="true"] { background: transparent; color: var(--titlu); font-weight: 600; }
+.taburi button[aria-selected="true"]::after { content: ""; position: absolute; left: 50%; bottom: 0; width: min(46px, 60%); height: 3px; border-radius: 3px; transform: translateX(-50%); background: var(--accent); }
+
+/* bara studentului */
+.bara-student { background: var(--suprafata-3); border-bottom: 1px solid var(--linie); }
+
+/* carduri */
+.card { border-radius: var(--raza); border: 1px solid color-mix(in srgb, var(--linie) 80%, transparent); box-shadow: var(--umbra); padding: 1rem 1.15rem; }
+.card > h2:first-child { margin-top: 0; }
+.nota { color: var(--text-sec); }
+.formula { background: var(--suprafata-3); border: 1px solid var(--linie); border-radius: 6px; }
+.formula .rez { color: var(--accent); }
+.afisaj { background: var(--suprafata-3); border: 1px solid var(--linie); border-radius: 6px; }
+.afisaj b { color: var(--accent); font-weight: 600; }
+.eticheta { border-radius: 4px; font-weight: 500; }
+.verdict, .avertizare { border-radius: 6px; }
+
+/* panoul de comenzi în stânga (ecran lat), cu secțiuni pliabile (accordion) */
+@media (min-width: 981px) {
+  .sim-grila { grid-template-columns: 330px minmax(0, 1fr); }
+  .sim-grila > .sim-comenzi { order: -1; position: sticky; top: 3.4rem; max-height: calc(100vh - 4.2rem); overflow: auto; }
+  .sim-grila:fullscreen, .sim-grila.ecran-plin { grid-template-columns: 310px minmax(0, 1fr); }
+  .sim-grila:fullscreen > .sim-comenzi, .sim-grila.ecran-plin > .sim-comenzi { position: static; max-height: none; }
+}
+.sim-comenzi { padding: .55rem .6rem .7rem; scrollbar-width: thin; }
+.sim-comenzi > h2, .acord > summary h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-sec); font-weight: 700; margin: 0; }
+.sim-comenzi > h2 { background: var(--suprafata-2); border-radius: 6px; padding: .45rem .6rem; margin: .7rem 0 .4rem; }
+.sim-comenzi > h2:first-child { margin-top: 0; }
+.acord { border-radius: 6px; margin: 0 0 .35rem; }
+.acord > summary { list-style: none; display: flex; align-items: center; gap: .4rem; cursor: pointer; background: var(--suprafata-2); border-radius: 6px; padding: .45rem .6rem; user-select: none; }
+.acord > summary::-webkit-details-marker { display: none; }
+.acord > summary::before { content: ""; width: .42rem; height: .42rem; border-right: 2px solid var(--text-sec); border-bottom: 2px solid var(--text-sec); transform: rotate(-45deg); transition: transform .15s; margin: 0 .15rem 0 .05rem; flex: none; }
+.acord[open] > summary::before { transform: rotate(45deg); }
+.acord > summary:hover { background: color-mix(in srgb, var(--accent) 9%, var(--suprafata-2)); }
+.acord > summary:hover h2 { color: var(--accent); }
+.acord-corp { padding: .35rem .3rem .2rem; }
+
+/* tabele de date (grilă minimalistă, rânduri evidențiate la trecerea cursorului) */
+.tabel { border-collapse: separate; border-spacing: 0; border: 1px solid var(--linie); border-radius: 6px; overflow: hidden; }
+.tabel th, .tabel td { border: 0; border-bottom: 1px solid var(--linie); border-right: 1px solid color-mix(in srgb, var(--linie) 55%, transparent); padding: .38rem .5rem; }
+.tabel th:last-child, .tabel td:last-child { border-right: 0; }
+.tabel tr:last-child td { border-bottom: 0; }
+.tabel th { background: var(--suprafata-2); color: var(--text-sec); font-weight: 600; font-size: .76rem; }
+.tabel tbody tr:hover td { background: var(--suprafata-3); }
+.tabel td.calc { color: var(--accent); font-weight: 600; }
+.tabel td.rau { background: var(--pericol-fundal); }
+.rezultat { border-bottom: 1px solid var(--linie); }
+.rezultat b { color: var(--accent); font-weight: 600; }
+
+/* graficele: cursorul de citire */
+.grafic-gazda { position: relative; }
+.grafic-cursor { position: absolute; pointer-events: none; background: rgba(15, 23, 42, .9); color: #fff; font-size: .72rem; padding: .25rem .5rem; border-radius: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; z-index: 3; line-height: 1.4; }
+.grafic-cursor i { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; margin-right: .3rem; vertical-align: -1px; }
+
+/* tooltipul Fluent cu formula */
+.tt-formula { position: fixed; z-index: 60; max-width: 340px; background: var(--suprafata); color: var(--text); border: 1px solid var(--linie); border-radius: 8px; box-shadow: var(--umbra-ridicata); padding: .5rem .65rem; font-size: .8rem; pointer-events: none; }
+.tt-formula b { color: var(--accent); display: block; margin-bottom: .15rem; }
+[data-formula] { cursor: help; text-decoration: underline dotted color-mix(in srgb, var(--accent) 60%, transparent); text-underline-offset: 3px; }
+
+/* portalul (pagina principală și paginile disciplinelor) */
+.portal-hero { background: linear-gradient(120deg, var(--antet-1) 0%, var(--antet-2) 100%); color: #fff; border-bottom: 0; position: relative; }
+.portal-hero h1 { color: #fff; font-weight: 700; }
+.portal-hero p, .portal-hero .supratitlu { color: rgba(255, 255, 255, .85); }
+.portal-hero a { color: #fff; }
+.portal-hero a.buton { background: rgba(255, 255, 255, .12); color: #fff; border-color: rgba(255, 255, 255, .3); }
+.portal-hero .comutator-tema button { background: rgba(255, 255, 255, .1); color: #fff; }
+.portal-hero .comutator-tema button[aria-pressed="true"] { background: #fff; color: var(--antet-1); }
+.disc-card, .lucrare { border-radius: var(--raza); border: 1px solid color-mix(in srgb, var(--linie) 80%, transparent); box-shadow: var(--umbra); transition: box-shadow .15s, transform .15s, border-color .15s; }
+.disc-card:hover, a.lucrare:hover { box-shadow: var(--umbra-ridicata); border-color: color-mix(in srgb, var(--accent) 45%, var(--linie)); transform: translateY(-1px); }
+.disc-card .tip { color: var(--accent); }
+.lucrare .nr { color: var(--accent); font-family: var(--font-titlu); }
+.progres i { background: var(--accent); }
+
+/* scenele 3D: colțuri și umbre Fluent */
+.m3d, .v3d-scena, .sz-3d { border-radius: var(--raza); box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .06); }
+.m3d-vederi button, .vz-bara button { border-radius: 4px; }
+.m3d-vederi button.activ { background: #0067c0; color: #fff; border-color: #004e92; }
+.m3d:has(.vz-bara) .m3d-ajutor { top: 2.9rem; }
+.vz-bara.vz-jos { top: auto; bottom: .6rem; }
+.vz-jos ~ .vz-legenda { top: 3.2rem; }
+.taburi { z-index: 20; }
+.v3d-scena:has(.vz-jos) .v3d-ajutor { display: none; }
+.vz-bara { left: 0; right: 0; margin: 0 auto; width: max-content; transform: none; }

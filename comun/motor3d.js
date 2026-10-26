@@ -1178,11 +1178,36 @@ export function construiesteMotor(opt = {}) {
       o.material = cache[mod]; o.castShadow = o.userData.carcasa && mod === "sectionat";
     });
   }
-  return { grup: g, comp, ancore, conectori, rot, M, XC, matCald, modCarcasa, mod: () => modCurent, interior: !!actInterior, racire: !!actRacire, acAnc: rac.acAnc,
+  /* starea termică (pentru vizualizarea „Termic CFD”): blocul și uleiul se încălzesc lent spre temperatura lichidului, evacuarea repede;
+     camerele de ardere „fulgeră” la fiecare aprindere (ordinea 1-3-4-2), cu ciclul încetinit ca în animație */
+  const termo = { rpm: 0, tps: 0, E: 20, U: 20, Ev: 20, th: 0, ac: null };
+  const VW = new THREE.Vector3();
+  function surseTermice(caldImplicit) {
+    g.updateMatrixWorld(); const sc = g.matrixWorld.getMaxScaleOnAxis(), W = (x, y, z) => VW.set(x, y, z).applyMatrix4(g.matrixWorld).clone(), S = [];
+    if (caldImplicit && !termo.act) { termo.rpm = 850; termo.E = termo.U = 90; termo.Ev = 420; termo.th = performance.now() / 1000 * 2.4; }
+    const merge = termo.rpm > 50, sar = termo.tps / 100, thD = termo.th * 180 / Math.PI, E = termo.E;
+    S.push({ p: W(-0.01, 0.06, 0), r: 0.22 * sc, T: E - 3 }, { p: W(-0.01, -0.19, 0), r: 0.16 * sc, T: termo.U }, { p: W(-0.01, 0.33, 0), r: 0.17 * sc, T: E + (merge ? 8 + 20 * sar : 0) });
+    XC.forEach((x, i) => { const phi = ((thD - OF_CIL[i]) % 720 + 720) % 720, fl = merge && phi < 70 ? Math.pow(1 - phi / 70, 1.5) : 0;
+      S.push({ p: W(x, 0.25, 0), r: 0.045 * sc, T: E + (merge ? 70 + 90 * sar : 0) + 1500 * fl }); });
+    const ev = Math.max(E, termo.Ev);
+    XC.forEach(x => S.push({ p: W(x, 0.27, -0.18), r: 0.055 * sc, T: ev }));
+    S.push({ p: W(0, 0.17, -0.235), r: 0.075 * sc, T: ev * 0.97 }, { p: W(0.0, -0.05, -0.3), r: 0.07 * sc, T: Math.max(E, ev * 0.8) });
+    if (ancore.turbo) S.push({ p: W(ancore.turbo.x, ancore.turbo.y, ancore.turbo.z), r: 0.09 * sc, T: ev * 0.92 });
+    [["dpf", 0.85], ["gpf", 0.85], ["evacIesire", 0.7], ["intercooler", 0]].forEach(([k, f]) => { const a = ancore[k]; if (a) S.push({ p: W(a.x, a.y, a.z), r: 0.09 * sc, T: f ? Math.max(E, ev * f) : (merge ? 45 + 60 * sar : 22) }); });
+    if (ancore.radiator && actRacire) S.push({ p: W(ancore.radiator.x, ancore.radiator.y, ancore.radiator.z), r: 0.16 * sc, T: Math.max(20, E - 20) });
+    if (rac.acAnc && termo.ac) { const a = rac.acAnc, t = termo.ac; if (a.inCond) S.push({ p: W(a.inCond.x, a.inCond.y, a.inCond.z), r: 0.14 * sc, T: t.cond });
+      if (a.evap) S.push({ p: W(a.evap.x, a.evap.y, a.evap.z), r: 0.1 * sc, T: t.evap }); }
+    return S;
+  }
+  return { grup: g, comp, ancore, conectori, rot, M, XC, matCald, modCarcasa, mod: () => modCurent, interior: !!actInterior, racire: !!actRacire, acAnc: rac.acAnc, surseTermice,
     /** actualizarea animației: st = { rpm, tps (0…100), ect, selectat, decuplat{}, timp } */
     actualizeaza(st, dt) {
       const w = (st.rpm || 0) / 60 * 2 * Math.PI;
       const vis = w * dt / 30;                                 // rotația afișată (încetinită ×30 pentru a se vedea)
+      { const merge = (st.rpm || 0) > 50, k = (tau, a, b) => a + (b - a) * Math.min(1, dt / tau);
+        termo.act = true; termo.rpm = st.rpm || 0; termo.tps = st.tps || 0; termo.th += vis; termo.ac = st.acTermic || null;
+        termo.E = k(st.ect != null ? 1.5 : 25, termo.E, st.ect ?? (merge ? 88 : termo.E)); termo.U = k(30, termo.U, merge ? termo.E + 4 : Math.min(termo.U, termo.E));
+        termo.Ev = k(merge ? 3 : 20, termo.Ev, st.tEv > 25 ? st.tEv : merge ? 330 + 420 * termo.tps / 100 + termo.rpm / 30 : 20); }
       rot.volant.rotation.x -= vis; acc.roteste(vis); if (st.vent) rot.vent.rotation.z -= dt * 22;
       rot.clapeta.rotation.y = (st.tps || 0) / 100 * Math.PI / 2 * 0.95;
       matCald.emissiveIntensity = Math.max(0, Math.min(0.9, ((st.tEv || 20) - 480) / 500));
@@ -1211,6 +1236,7 @@ export function construiesteMotor(opt = {}) {
 /* ======================================================================= standul de laborator (scenă separată) */
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
+import { ataseazaViz } from "./viz3d.js?v=1";
 
 export function creeazaStand(gazda, optiuni = {}) {
   gazda.innerHTML = `<div class="m3d"><canvas></canvas><div class="m3d-etichete"></div><div class="m3d-vederi"></div><div class="m3d-ajutor">clic pe o componentă = selectare · trageți = rotire · rotița = zoom</div></div>`;
@@ -1469,6 +1495,11 @@ export function creeazaStand(gazda, optiuni = {}) {
         o.e.el.classList.toggle("sel", o.e.k === sel);
       });
   }
+  // stilurile de vizualizare (realist / prezentare secționată / câmpul termic de tip CFD)
+  let modAnt = null;
+  const viz = ataseazaViz({ renderer, scene, camera, cont, decor: [pod, linii], profil: Object.assign({ titlu: "Temperatura suprafețelor", T0: 20, Tmin: 20, Tmax: 400 }, optiuni.vizProfil || {}),
+    surse: () => { const S = mot.surseTermice(); if (optiuni.vizSurse) S.push(...optiuni.vizSurse()); return S; },
+    laMod: (m, ant) => { if (!mot.interior) return; if (m && !ant) { modAnt = mot.mod(); setMod("sectionat"); } else if (!m && modAnt) { setMod(modAnt); modAnt = null; } } });
   let stare = { rpm: 0, tps: 0, selectat: null, decuplat: {}, timp: 0, vent: false, tEv: 20, eticheteVizibile: true }, raf = 0, tP = performance.now();
   function bucla(t) {
     raf = requestAnimationFrame(bucla);
@@ -1491,7 +1522,7 @@ export function creeazaStand(gazda, optiuni = {}) {
   temaFundal(); window.addEventListener("schimbare-tema", temaFundal);
   raf = requestAnimationFrame(bucla);
   return {
-    stare, scene, mot, camera, ctl, cont, canvas,
+    stare, scene, mot, camera, ctl, cont, canvas, viz,
     seteaza(s) { Object.assign(stare, s); },
     modCarcasa: m => mot.interior && setMod(m),
     vedere(pz, tg) { zboara(pz, tg); },

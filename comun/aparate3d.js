@@ -6,6 +6,7 @@ import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
+import { ataseazaViz } from "./viz3d.js?v=1";
 
 const mat = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 0.7; return m; };
 function scena(gazda, cam0, tinta) {
@@ -25,7 +26,8 @@ function scena(gazda, cam0, tinta) {
   const perete = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.6), mat({ color: 0xeef1f3, roughness: 0.9 })); perete.position.set(0, 0.6, -0.36); scene.add(perete);
   const tema = () => { const t = document.documentElement.getAttribute("data-theme"), inchis = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches); scene.background = new THREE.Color(inchis ? 0x1a1f25 : 0xdfe4e8); perete.material.color.set(inchis ? 0x2a3038 : 0xeef1f3); };
   tema(); window.addEventListener("schimbare-tema", tema);
-  return { cont, canvas, renderer, scene, camera, ctl,
+  const viz = ataseazaViz({ renderer, scene, camera, cont, decor: [perete], profil: { titlu: "Temperatura suprafețelor", T0: 20, Tmin: 15, Tmax: 100 } });
+  return { cont, canvas, renderer, scene, camera, ctl, viz,
     porneste(fn) { let tP = performance.now(); const bucla = t => { requestAnimationFrame(bucla); const dt = Math.min(0.1, (t - tP) / 1000); tP = t; if (!cont.getClientRects().length) return; fn(dt);
       ctl.update(); const w = cont.clientWidth, h = cont.clientHeight; if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } renderer.render(scene, camera); }; requestAnimationFrame(bucla); } };
 }
@@ -62,6 +64,7 @@ export function creeazaBaie(gazda) {
   for (let k = 1; k <= 8; k++) { const l = add(sc, new THREE.Mesh(new THREE.BoxGeometry(k % 2 ? 0.012 : 0.02, 0.0012, 0.001), new THREE.MeshBasicMaterial({ color: 0xffffff }))); l.position.set(-0.02, H0 + k * 0.021, RB + 0.0006); }
   const HA = 0.165, apa = new THREE.MeshPhysicalMaterial({ color: 0xcfe8f6, roughness: 0.04, transmission: 0.92, thickness: 0.12, ior: 1.33, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
   const coloana = cyl(sc, RB - 0.003, RB - 0.003, HA, apa, 0, H0 + 0.004 + HA / 2, 0, 64); coloana.castShadow = false;
+  coloana.userData.vzT = () => st.Tw ?? 20; coloana.userData.vzR = 1.4; PL.userData.vzT = () => Math.max(st.Tw ?? 20, 20 + 280 * mPlaca.emissiveIntensity / 0.55); PL.userData.vzR = 0.5;
   const YA = H0 + 0.004 + HA;
   // stativul de laborator: talpa din fontă, tija, mufa, brațul orizontal, cârligul și sârma
   cyl(sc, 0.006, 0.006, 0.62, M.crom, -0.2, 0.31, -0.12, 20);
@@ -1208,7 +1211,7 @@ export function creeazaStandEV(gazda, opt = {}) {
     [-0.226, 0.226].forEach(z => { const pl = C(RB(0.28, 0.11, 0.012, 0.004), mat({ color: 0x3a3f46, roughness: 0.5, metalness: 0.6 })); pl.position.set(0, 0.005, z); G.add(pl); });
     const pcb = add(G, new THREE.Mesh(RB(0.06, 0.008, 0.4, 0.002), verdePCB)); pcb.position.set(0, 0.06, 0); for (let k = 0; k < 6; k++) add(G, new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.006, 0.025), negru)).position.set(0, 0.066, -0.17 + k * 0.068);
     [-0.07, 0.07].forEach(dx => add(G, new THREE.Mesh(RB(0.025, 0.006, 0.42, 0.002), mat({ color: 0xd8dde2, roughness: 0.25, metalness: 0.95 }))).position.set(dx, 0.059, 0));
-    modCel.push(G);
+    const ix = modCel.length; G.userData.vzT = () => tempModul(ix); G.userData.vzR = 0.75; modCel.push(G);
   }
   // bare de legătură între module (izolate portocaliu) și cablajul plăcilor de monitorizare
   for (let i = 0; i < 5; i++) [-1, 1].forEach(sz => add(sc, new THREE.Mesh(RB(0.08, 0.012, 0.03, 0.004), port)).position.set(XB0 + 0.33 + i * 0.3, YB + 0.095, sz * 0.245 + sz * 0.17));
@@ -1370,7 +1373,12 @@ export function creeazaStandEV(gazda, opt = {}) {
   function cordoane(dela) { const P = [borne[1].getWorldPosition(V3()), borne[0].getWorldPosition(V3())]; cord.forEach((c, i) => { const A = dela.clone().add(V3(i ? 0.03 : -0.03, 0.06, 0.1)), T = i ? V3(XB1 + 0.25, YR - 0.04, 0.62) : P[0];
     c.geometry.dispose(); c.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([A, A.clone().add(V3(-0.2, -0.3, 0.3)), V3((A.x + T.x) / 2, 0.12, (A.z + T.z) / 2 + 0.4), T.clone().add(V3(0.12, 0.06, 0)), T]), 60, 0.0045, 6); }); }
   interactiune(S, clic, opt.laClic);
-  const V = { contact: false, ready: false, vci: false, cheieDep: false, zona: false, service: true, lacat: false, manusiTest: 0, aparat: null, afis: "", afisU: "", hvil: true, transparent: false, ventilator: false };
+  const V = { contact: false, ready: false, vci: false, cheieDep: false, zona: false, service: true, lacat: false, manusiTest: 0, aparat: null, afis: "", afisU: "", hvil: true, transparent: false, ventilator: false, Tmin: 22, Tmax: 25 };
+  // câmpul termic al pachetului (vizualizarea „Termic CFD”): modulele între Tmin și Tmax raportate de BMS, cel mai cald spre ieșirea lichidului
+  const FT = [0.15, 0.35, 0.3, 0.55, 0.5, 0.8, 0.2, 0.4, 0.45, 0.7, 0.65, 1.0];
+  function tempModul(i) { return V.Tmin + (V.Tmax - V.Tmin) * FT[i % 12]; }
+  [[EDU, () => V.ready ? V.Tmin + 14 : V.Tmin + 2, 0.22], [INV, () => V.ready ? V.Tmin + 10 : V.Tmin + 1, 0.25], [BDU, () => V.ready ? V.Tmin + 6 : V.Tmin, 0.15]].forEach(([g, f, r]) => { g.userData.vzT = f; g.userData.vzSf = { c: new THREE.Vector3(), r }; g.userData.vzR = 1; });
+  S.viz.adaugaDecor(pod); S.viz.profil({ titlu: "Temperatura pachetului HV și a unității de propulsie", Tmin: 15, Tmax: 50 });
   let tt = 0, ultM = "", ultP = "", ultPan = "", ultTr = null;
   S.porneste(dt => {
     tt += dt;

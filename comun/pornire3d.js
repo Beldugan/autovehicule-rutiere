@@ -11,6 +11,7 @@ import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
+import { ataseazaViz } from "./viz3d.js?v=1";
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const mat = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 0.75; return m; };
@@ -132,7 +133,8 @@ function scena(gazda, cam0, tinta, o = {}) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x50555a, 0.5));
   const tema = () => { const t = document.documentElement.getAttribute("data-theme"), inchis = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches); scene.background = new THREE.Color(inchis ? 0x1a1f25 : 0xdfe4e8); };
   tema(); window.addEventListener("schimbare-tema", tema);
-  return { cont, canvas, renderer, scene, camera, ctl,
+  const viz = ataseazaViz({ renderer, scene, camera, cont, profil: Object.assign({ titlu: "Temperatura suprafețelor", T0: 20, Tmin: 15, Tmax: 120 }, o.vizProfil || {}) });
+  return { cont, canvas, renderer, scene, camera, ctl, viz,
     porneste(fn) { let tP = performance.now(); const bucla = t => { requestAnimationFrame(bucla); const dt = Math.min(0.1, (t - tP) / 1000); tP = t; if (!cont.getClientRects().length) return; fn(dt);
       ctl.update(); const w = cont.clientWidth, h = cont.clientHeight; if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } renderer.render(scene, camera); }; requestAnimationFrame(bucla); } };
 }

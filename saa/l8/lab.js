@@ -193,7 +193,7 @@ function deseneaza() {
 const SV = { s3: null };
 function porneste3D() {
   const el = $("#st3d"); if (!el) return;
-  import(BAZA_COMUN + "clima3d.js?v=1").then(m => { SV.s3 = m.creeazaStandClima(el, { psat: MD.psat, laClic: (k, et) => alegeComp(k, et) }); vedere3d(PASI[pasActiv].vedere); })
+  import(BAZA_COMUN + "clima3d.js?v=2").then(m => { SV.s3 = m.creeazaStandClima(el, { psat: MD.psat, laClic: (k, et) => alegeComp(k, et) }); vedere3d(PASI[pasActiv].vedere); })
     .catch(e => { el.innerHTML = `<p class="nota">Standul 3D nu a putut fi încărcat (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#st3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp(b.dataset.c3))); });
 }
 function actualizeaza3D() {
@@ -354,7 +354,7 @@ Cadru.porneste({
     titluTab: "Animație: ciclul frigorific", titlu: "Circuitul frigorific, ciclul în diagrama p–h și pompa de căldură",
     intro: `<p>Alegeți varianta (climatizare cu supapă de destindere sau cu orificiu calibrat și acumulator, pompă de căldură, pompă de căldură cu R744) și modificați temperatura exterioară și turația compresorului: urmăriți starea agentului pe circuit (culorile) și deplasarea ciclului 1–2–3–4 în diagrama p–h, efectul frigorific / căldura utilă și coeficientul de performanță (COP).</p>`,
     dupa: `<p class="nota">Diagrama p–h este schematică (proprietăți aproximative), pentru înțelegerea ciclului și compararea variantelor; calculele lucrării se fac cu Tabelul 8.2.</p>`,
-    modul: "clima3d.js?v=1", functie: "creeazaAnimatieClima"
+    modul: "clima3d.js?v=2", functie: "creeazaAnimatieClima"
   },
   referat: {
     scop: "Măsurarea presiunilor și temperaturilor din instalația de climatizare, determinarea supraîncălzirii și subrăcirii și diagnoza pe baza acestora; agenții frigorifici actuali, pompa de căldură, procedura de recuperare și încărcare.",

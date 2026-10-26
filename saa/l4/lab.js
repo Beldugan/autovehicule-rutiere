@@ -110,7 +110,7 @@ function debite() {
 const SV = { m3d: null };
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=13").then(m => { SV.m3d = m.creeazaStand(el, { interior: true, mod: "sectionat", etichete: ET3D, onSelect: k => alegeComp(k, false) }); })
+  import(BAZA_COMUN + "motor3d.js?v=15").then(m => { SV.m3d = m.creeazaStand(el, { interior: true, mod: "sectionat", etichete: ET3D, onSelect: k => alegeComp(k, false) }); })
     .catch(e => { el.innerHTML = `<p class="nota">Macheta 3D nu a putut fi încărcată (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#motor3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp(b.dataset.c3))); });
 }
 function actualizeaza3D() {

@@ -339,7 +339,7 @@ function arataScena(k) {
   sim.scena = k; $("#st3d").hidden = k !== "stand"; $("#vh3d").hidden = k !== "hib"; $$(".saa7-scena .stand-doar").forEach(e => e.style.display = k !== "stand" ? "none" : "");
   $$("[data-scena]").forEach(b => b.classList.toggle("activ", b.dataset.scena === k));
   if (k === "hib" && !SV.vh) { SV.vh = true;
-    import(BAZA_COMUN + "vehicul3d.js?v=28").then(m => { SV.vh = m.creeaza($("#vh3d"), { sistem: "hibrid", masurare: true, tip: sim.tipH, date: MD.tipuri(P()),
+    import(BAZA_COMUN + "vehicul3d.js?v=29").then(m => { SV.vh = m.creeaza($("#vh3d"), { sistem: "hibrid", masurare: true, tip: sim.tipH, date: MD.tipuri(P()),
       laTip: t => { sim.tipH = t; actualizeazaPasi(); }, laMasurare: r => { (sim.masHib[r.tip] = sim.masHib[r.tip] || {})[r.ev] = r; actualizeazaPasi(); } }); })
       .catch(e => { $("#vh3d").innerHTML = `<p class="nota">Motopropulsorul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; }); }
   actualizeazaPasi();
@@ -355,7 +355,7 @@ function inregHib(e) {
 function porneste3D() {
   const el = $("#st3d"); if (!el) return;
   const pr = P();
-  import(BAZA_COMUN + "pornire3d.js?v=1").then(m => { SV.s3 = m.creeazaStandPornire(el, { laClic: (k, et) => alegeComp(k, et), etichetaBaterie: `${pr.tip} 12 V ${pr.Cn} Ah`, etichetaBaterie2: `${pr.CCAn} A (EN) · START-STOP`, deseneazaOsc: (g, W, H, on) => desOsc(g, W, H, on && sim.cleste === "dem", true) }); vedere3d(PASI[pasActiv].vedere); })
+  import(BAZA_COMUN + "pornire3d.js?v=2").then(m => { SV.s3 = m.creeazaStandPornire(el, { laClic: (k, et) => alegeComp(k, et), etichetaBaterie: `${pr.tip} 12 V ${pr.Cn} Ah`, etichetaBaterie2: `${pr.CCAn} A (EN) · START-STOP`, deseneazaOsc: (g, W, H, on) => desOsc(g, W, H, on && sim.cleste === "dem", true) }); vedere3d(PASI[pasActiv].vedere); })
     .catch(e => { el.innerHTML = `<p class="nota">Standul 3D nu a putut fi încărcat (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#st3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp(b.dataset.c3))); });
 }
 function actualizeaza3D() {

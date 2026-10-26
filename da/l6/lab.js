@@ -439,7 +439,7 @@ const TEST = [
 const SV = { s3: null };
 function porneste3D() {
   const el = $("#st3d"); if (!el) return;
-  import(BAZA_COMUN + "aparate3d.js?v=8").then(m => { SV.s3 = m.creeazaStandABS(el, { laClic: laClic3d }); vedere3d(PASI[pasActiv].vedere); })
+  import(BAZA_COMUN + "aparate3d.js?v=9").then(m => { SV.s3 = m.creeazaStandABS(el, { laClic: laClic3d }); vedere3d(PASI[pasActiv].vedere); })
     .catch(e => { el.innerHTML = `<p class="nota">Standul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 function laClic3d(k) {

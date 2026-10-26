@@ -2,9 +2,10 @@
 "use strict";
 
 
+const BAZA_PORTAL = ((document.currentScript && document.currentScript.src) || "").replace(/[^/]*$/, "");
 function antetPortal(titlu, sub, inapoi) {
   return `<header class="antet">
-    <div class="antet-text"><p class="supratitlu">${esc(PORTAL.univ)} · ${esc(PORTAL.facultate)} · ${esc(PORTAL.an)}</p><h1>${titlu}</h1><p>${sub}</p></div>
+    <div class="antet-text"><div class="marca"><img src="${BAZA_PORTAL}icon.svg" alt="" width="18" height="18">Autovehicule Rutiere <span>· Laboratoare virtuale v2.0</span></div><p class="supratitlu">${esc(PORTAL.univ)} · ${esc(PORTAL.facultate)} · ${esc(PORTAL.an)}</p><h1>${titlu}</h1><p>${sub}</p></div>
     <div class="antet-butoane">${inapoi ? `<a class="buton" href="${inapoi}">← Toate disciplinele</a>` : ""}${Tema.html()}</div>
   </header>`;
 }

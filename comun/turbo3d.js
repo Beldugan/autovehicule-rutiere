@@ -10,6 +10,7 @@ import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
+import { ataseazaViz } from "./viz3d.js?v=1";
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const mat = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 0.75; return m; };
@@ -204,10 +205,14 @@ export function construiesteTurbo(opt = {}) {
     if (A.tija) { const dx = tip === "vgt" ? A.L * Math.sin(fi) : A.L * Math.sin(0.6 * (u.wg || 0)); A.tija.position.x = A.x0 + dx; if (A.memb) A.memb.position.x = dx * 0.6; }
     A.roti.forEach((g, i) => { g.rotation.z = sU * (i === 0 ? -14 : i === 1 ? 6 : -2.2); });
     if (stator) stator.material.emissive && (stator.material = stator.material);
-    const T = u.Tgaz ?? 20; M.fonta.emissiveIntensity = Math.max(0, Math.min(0.6, (T - 640) / 500)); M.inconel.emissiveIntensity = Math.max(0, Math.min(0.5, (T - 600) / 500));
+    const T = u.Tgaz ?? 20; TT.t = T; TT.c = u.Tcomp ?? 20 + Math.max(0, T - 20) * 0.16; M.fonta.emissiveIntensity = Math.max(0, Math.min(0.6, (T - 640) / 500)); M.inconel.emissiveIntensity = Math.max(0, Math.min(0.5, (T - 600) / 500));
   }
+  // temperaturile (vizualizarea „Termic CFD”): voluta turbinei ≈ gazele, carcasa lagărelor răcită cu ulei / apă, compresorul ≈ aerul comprimat
+  const TT = { t: 20, c: 20 };
+  [[XT, 0.075, () => TT.t], [XT - 0.035, 0.035, () => TT.t * 0.9], [0.0, 0.035, () => 20 + (TT.t - 20) * 0.22], [XC, 0.07, () => TT.c]].forEach(([x, r, f]) => {
+    const a = new THREE.Object3D(); a.position.set(x, 0, 0); a.userData.vzT = f; a.userData.vzSf = { c: new THREE.Vector3(), r }; a.userData.vzR = 1; G.add(a); });
   seteaza({});
-  return { G, M, rotor, carcase, taiate, clic, seteaza, ancore, cai: { aer: cAer, gaz: cGaz, wg: cWg }, tip, act, stator };
+  return { G, M, rotor, carcase, taiate, clic, seteaza, ancore, termic: TT, cai: { aer: cAer, gaz: cGaz, wg: cWg }, tip, act, stator };
 }
 
 /* ------------------------------------------------------------------ scena de bază */
@@ -225,7 +230,8 @@ function scena(gazda, cam0, tinta, o = {}) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x50555a, 0.5));
   const tema = () => { const t = document.documentElement.getAttribute("data-theme"), inchis = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches); scene.background = new THREE.Color(inchis ? 0x1a1f25 : 0xdfe4e8); if (o.tema) o.tema(inchis); };
   tema(); window.addEventListener("schimbare-tema", tema);
-  return { cont, canvas, renderer, scene, camera, ctl, tema,
+  const viz = ataseazaViz({ renderer, scene, camera, cont, profil: Object.assign({ titlu: "Temperatura suprafețelor", T0: 20, Tmin: 20, Tmax: 800 }, o.vizProfil || {}) });
+  return { cont, canvas, renderer, scene, camera, ctl, tema, viz,
     porneste(fn) { let tP = performance.now(); const bucla = t => { requestAnimationFrame(bucla); const dt = Math.min(0.1, (t - tP) / 1000); tP = t; if (!cont.getClientRects().length) return; fn(dt);
       ctl.update(); const w = cont.clientWidth, h = cont.clientHeight; if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } renderer.render(scene, camera); }; requestAnimationFrame(bucla); } };
 }

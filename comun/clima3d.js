@@ -7,13 +7,13 @@
    • creeazaAnimatieClima – animația 2D a circuitului și a ciclului în diagrama p–h: climatizare cu TXV, climatizare cu orificiu calibrat
      și acumulator, pompă de căldură (încălzire), pompă de căldură cu R744 (transcritic). */
 import * as THREE from "./vendor/three.module.min.js";
-import * as MOT from "./motor3d.js?v=14";
-import { scena, interactiune, particule, aplicaTransparent, materiale, mat, RB, texCanvas, ecran, V3 } from "./turbo3d.js?v=2";
+import * as MOT from "./motor3d.js?v=15";
+import { scena, interactiune, particule, aplicaTransparent, materiale, mat, RB, texCanvas, ecran, V3 } from "./turbo3d.js?v=3";
 
 export function creeazaStandClima(gazda, opt = {}) {
   // standul motorului comun (aceeași machetă realistă ca la celelalte lucrări), cu transmisia de accesorii, compresorul de climatizare
   // și circuitul A/C complet: condensatorul, filtrul deshidrator, conductele, racordurile de service, supapa de destindere, blocul HVAC
-  const ST = MOT.creeazaStand(gazda, { racire: true, ac: true, interior: true, mod: "opac", vedere: "gen", onSelect: k => opt.laClic && opt.laClic({ ventilator: "ventilatorCond", ac: "senzorP" }[k] || k) });
+  const ST = MOT.creeazaStand(gazda, { racire: true, ac: true, interior: true, mod: "opac", vedere: "gen", vizProfil: { titlu: "Temperatura (management termic)", Tmin: -5, Tmax: 110 }, onSelect: k => opt.laClic && opt.laClic({ ventilator: "ventilatorCond", ac: "senzorP" }[k] || k) });
   const sc = ST.scene, A = ST.mot.acAnc, S = { cont: ST.cont, canvas: ST.canvas, camera: ST.camera };
   const M = materiale(), clic = [], k_ = (o, k, et) => { o.userData.k = k; o.userData.et = et; clic.push(o); return o; };
   const add = (o, par = sc) => { o.castShadow = o.receiveShadow = true; par.add(o); return o; };
@@ -127,7 +127,7 @@ export function creeazaStandClima(gazda, opt = {}) {
     const k4 = `${V.Ta}|${V.RH}`; if (k4 !== kH) { kH = k4; lcd(eTH, [["°C", V.Ta.toFixed(1)], ["%RH", String(Math.round(V.RH))]], "#d7dccc"); }
     const k5 = V.ag + V.masa; if (k5 !== kE) { kE = k5; eticheta(V.ag, V.masa); }
     const k6 = JSON.stringify(V.statie); if (k6 !== kS) { kS = k6; statie(V.statie); }
-    ST.seteaza({ rpm: V.n, vent: V.n > 50 && (V.ac || V.pIP > 14), racire: { Tm: 88, Tr: 70, x: 0.5, Q: V.n / 4000, capVas: true } });
+    ST.seteaza({ rpm: V.n, acTermic: V.ac && V.n > 50 ? { cond: V.Tlic + 8, evap: Math.min(V.Tev, V.Tasp) } : { cond: V.Ta, evap: V.Ta }, vent: V.n > 50 && (V.ac || V.pIP > 14), racire: { Tm: 88, Tr: 70, x: 0.5, Q: V.n / 4000, capVas: true } });
   };
   requestAnimationFrame(bucla);
   return { seteaza(o) { Object.assign(V, o); }, vedere(p, tg) { ST.vedere(p, tg); }, modCarcasa: m => ST.modCarcasa(m) };

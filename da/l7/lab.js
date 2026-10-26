@@ -373,7 +373,7 @@ const TEST = [
 const SV = { s3: null };
 function porneste3D() {
   const el = $("#st3d"); if (!el) return;
-  import(BAZA_COMUN + "aparate3d.js?v=8").then(m => { SV.s3 = m.creeazaStandEV(el, { laClic: laClic3d }); vedere3d(PASI[pasActiv].vedere); })
+  import(BAZA_COMUN + "aparate3d.js?v=9").then(m => { SV.s3 = m.creeazaStandEV(el, { laClic: laClic3d }); vedere3d(PASI[pasActiv].vedere); })
     .catch(e => { el.innerHTML = `<p class="nota">Vehiculul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
 function laClic3d(k) {
@@ -491,7 +491,7 @@ Cadru.porneste({
       if (sim.tManusi >= 0) { sim.tManusi += h; if (sim.tManusi > 3) { sim.tManusi = -1; sim.manusiOk = true; C.mesajTemporar("Mănușile au rămas umflate – fără pierderi de aer: pot fi folosite.", "ok"); } }
       if (SV.s3) SV.s3.seteaza({ contact: sim.contact, ready: sim.ready, vci: sim.vci, cheieDep: sim.cheieDep, zona: sim.zona, service: sim.service, lacat: sim.lacat, manusiTest: sim.tManusi >= 0 ? Math.min(1, sim.tManusi / 1.2) : 0,
         aparat: sim.aparat, afis: sim.aparat === "meg" && sim.meg.R != null ? (sim.meg.R < 1 ? (sim.meg.R * 1000).toFixed(0) : sim.meg.R.toFixed(2)) : sim.aparat === "det" ? String(Math.round(uCond())) : "", afisU: sim.aparat === "meg" && sim.meg.R != null ? (sim.meg.R < 1 ? "kΩ" : "MΩ") : sim.aparat === "det" ? "V" : "",
-        hvil: P().defect.tip !== "hvil", transparent: sim.transparent, ventilator: sim.ready });
+        hvil: P().defect.tip !== "hvil", Tmin: MD.temperaturi(P()).min, Tmax: MD.temperaturi(P()).max, transparent: sim.transparent, ventilator: sim.ready });
       if (!vizibil) return;
       const now = performance.now();
       if (now - (this._td || 0) > 250) { this._td = now; deseneaza(); }

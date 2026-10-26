@@ -955,7 +955,7 @@ Cadru.porneste({
       construiestePasi(); dmmCtl();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
-      import(BAZA_COMUN + "aparate3d.js?v=8").then(m => { SV3 = m.creeazaStandTemp($("#st3d"), { laClic: laClic3d }); $(".tk-plansa").classList.add("cu3d"); $("#tk-vederi").hidden = false; $("#aj-3d").hidden = false; $("#aj-svg").hidden = true; sincron3d(true); })
+      import(BAZA_COMUN + "aparate3d.js?v=9").then(m => { SV3 = m.creeazaStandTemp($("#st3d"), { laClic: laClic3d }); $(".tk-plansa").classList.add("cu3d"); $("#tk-vederi").hidden = false; $("#aj-3d").hidden = false; $("#aj-svg").hidden = true; sincron3d(true); })
         .catch(e => { console.warn("Standul 3D nu s-a încărcat:", e); $("#st3d").remove(); });
       C.mesaj("Pasul 1: porniți simularea și lăsați senzorii să se stabilizeze în aer (cel puțin 5 minute – accelerați timpul).", "");
     },

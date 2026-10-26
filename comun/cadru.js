@@ -28,6 +28,7 @@ const Cadru = {
     this.construiesteContinut();
     this.construiesteReferatForm();
     this.leaga();
+    this.acordeon();
     let tab = Stocare.citeste("ar-tab-" + LAB.cod, "sim");
     if (!$("#tab-" + tab)) tab = "sim";
     this.arataTab(tab);
@@ -44,6 +45,21 @@ const Cadru = {
     requestAnimationFrame(bucla);
     window.addEventListener("resize", () => this.redeseneaza());
     window.addEventListener("schimbare-tema", () => this.redeseneaza());
+  },
+
+  /** panoul de comenzi al simulatorului în secțiuni pliabile (accordion Fluent); starea se păstrează în browser */
+  acordeon() {
+    $$(".sim-grila > .sim-comenzi").forEach((a, ia) => {
+      const hs = [...a.children].filter(e => e.tagName === "H2"); if (hs.length < 2) return;
+      const cheie = "ar-acord-" + LAB.cod + "-" + ia, inchise = new Set(Stocare.citeste(cheie, []));
+      hs.forEach((h2, i) => {
+        const d = document.createElement("details"), sm = document.createElement("summary"), corp = document.createElement("div");
+        d.className = "acord"; d.open = !inchise.has(i); corp.className = "acord-corp"; a.insertBefore(d, h2); sm.appendChild(h2); d.appendChild(sm);
+        let n = d.nextSibling; while (n && !(n.nodeType === 1 && (n.tagName === "H2" || n.classList.contains("acord")))) { const nx = n.nextSibling; corp.appendChild(n); n = nx; }
+        d.appendChild(corp);
+        d.addEventListener("toggle", () => { if (d.open) inchise.delete(i); else inchise.add(i); Stocare.scrie(cheie, [...inchise]); });
+      });
+    });
   },
 
   parametri() {
@@ -65,6 +81,7 @@ const Cadru = {
     document.body.innerHTML = `
 <header class="antet">
   <div class="antet-text">
+    <div class="marca"><img src="${BAZA_COMUN}icon.svg" alt="" width="18" height="18">Autovehicule Rutiere <span>· Laboratoare virtuale v2.0</span></div>
     <p class="supratitlu"><a href="../index.html">${esc(d.nume)}</a> · ${esc(d.an)} · Lucrarea ${LAB.nr}</p>
     <h1>${esc(LAB.titlu)}</h1>
     <p>${esc(LAB.subtitlu || "Laborator virtual")} · ${esc(PORTAL.univ)} · ${esc(PORTAL.facultate)}</p>
@@ -214,7 +231,8 @@ const Cadru = {
         return `<td><input inputmode="decimal" data-t="${tb.id}" data-r="${r.k}" data-c="${k.k}" value="${esc(String(v).replace(".", ","))}"${ro ? " readonly" : ""}></td>`;
       }).join("")}</tr>`).join("")}</tbody></table></div></div>`).join("");
     $$("input[data-t], select[data-t]", c).forEach(i => i.addEventListener(i.tagName === "SELECT" ? "change" : "input", () => {
-      const v = i.tagName === "SELECT" ? i.value : i.value.trim().replace(",", ".");
+      let v = i.tagName === "SELECT" ? i.value : i.value.trim().replace(",", ".");
+      if (i.tagName !== "SELECT") { const err = this.valideaza(v, this.coloana(i.dataset.t, i.dataset.c)); i.classList.toggle("invalid", !!err); i.title = err; if (err) v = ""; }
       this.D.t[i.dataset.t][i.dataset.r][i.dataset.c] = v;
       if (MOD.eval && i.tagName === "SELECT") this.D.log.push({ t: new Date().toISOString(), ms: STUDENT ? Date.now() - Date.parse(STUDENT.start) : null, obs: [i.dataset.t, i.dataset.r, i.dataset.c, v] });
       this.recalculeaza(); this.salveaza();
@@ -222,6 +240,17 @@ const Cadru = {
     this.recalculeaza();
   },
   reconstruiesteTabele() { this.construiesteTabele(); },
+  coloana(t, c) { const tb = (LAB.tabele || []).find(x => x.id === t); return tb ? tb.coloane.find(k => k.k === c) || {} : {}; },
+  /** validarea automată a câmpurilor (specificația UX): valori nenumerice și valori negative la mărimile strict pozitive
+      (masă, putere, rezistență, turație, timp, debit, volum, frecvență…); coloana poate declara neg: true / pozitiv: true */
+  valideaza(v, col) {
+    if (v === "" || !col || col.text || col.tip === "select") return "";
+    if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(v)) return "Valoare nenumerică – folosiți cifre și virgula zecimală";
+    const u = ((String(col.t || "").replace(/<[^>]+>/g, "").match(/\[([^\]]+)\]/) || [])[1] || "").trim();
+    const POZ = /^(kg|g|mg|t|W|kW|kWh|Wh|rot\/min|min⁻¹|rot|Ω|kΩ|MΩ|mΩ|mm|cm|km|km\/h|L|l|ml|L\/s|l\/min|L\/min|Hz|kHz|ms|s|µs|min|h|ppm|mg\/cursă|mAh|Ah|kg\/m³|g\/cm³|% vol|mm²\/s|cSt|mPa·s|ani)$/;
+    if (Number(v) < 0 && col.neg !== true && (col.pozitiv || POZ.test(u))) return `Mărimea [${u}] nu poate fi negativă`;
+    return "";
+  },
   val(t, r, c) { const v = ((this.D.t[t] || {})[r] || {})[c]; return num(v); },
 
   recalculeaza() {
@@ -363,7 +392,7 @@ const Cadru = {
     if (id === "det") this.recalculeaza();
     if (id === "v3d" && !this._v3d) {
       this._v3d = true;
-      import(BAZA_COMUN + "vehicul3d.js?v=28").then(m => { this.v3d = m.creeaza($("#v3d-gazda"), LAB.vehicul3d.optiuni ? LAB.vehicul3d.optiuni(this) : {}); })
+      import(BAZA_COMUN + "vehicul3d.js?v=29").then(m => { this.v3d = m.creeaza($("#v3d-gazda"), LAB.vehicul3d.optiuni ? LAB.vehicul3d.optiuni(this) : {}); })
         .catch(e => { $("#v3d-gazda").innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}). Este necesar un browser cu WebGL.</p>`; });
     }
     if (id === "sz" && !this._sz) {

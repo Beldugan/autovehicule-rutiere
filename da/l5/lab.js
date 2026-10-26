@@ -386,7 +386,7 @@ const TEST = [
 const SV = { m3d: null };
 function porneste3D() {
   const el = $("#motor3d"); if (!el) return;
-  import(BAZA_COMUN + "motor3d.js?v=13").then(m => { SV.m3d = m.creeazaStand(el, { varianta: "dci", postTratare: true, interior: true, mod: "transparent", vedere: "gen", aparate: ["obd", "opac", "cilindru"],
+  import(BAZA_COMUN + "motor3d.js?v=15").then(m => { SV.m3d = m.creeazaStand(el, { varianta: "dci", postTratare: true, interior: true, mod: "transparent", vedere: "gen", aparate: ["obd", "opac", "cilindru"],
     etichete: { rampa: "rampa", senz: "senzor presiune", imv: "IMV", egr: "EGR", dpf: "DOC + DPF", dp: "Δp DPF", egt1: "T1", egt2: "T2", dozare: "dozare AdBlue", nox1: "NOₓ amonte", nox2: "NOₓ aval", scr: "SCR", adblue: "AdBlue", kitRetur: "eprubete retur" }, onSelect: () => {} }); })
     .catch(e => { el.innerHTML = `<p class="nota">Modelul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; });
 }
