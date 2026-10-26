@@ -735,6 +735,13 @@ Cadru.porneste({
     return l;
   },
   exemplu(D) { const t = D.t; Object.assign(t.t31.s40, { U1: "2.150", U2: "1.075" }); Object.assign(t.t32.d3, { U1: "2.150", U2: "0.950" }); },
+  animatie: {
+    titluTab: "Montajul real (3D)", titlu: "Montajul real al lucrării – aceleași legături ca în planșa Tinkercad",
+    intro: `<p>Standul de lucru la scară reală: senzorul pedalei de accelerație (două piste) pe suportul imprimat 3D, cu pârghia izolantă și raportorul din acril, cutia de conexiuni cu bornele 1…6, conectorul X1, cutia de simulare a defectelor (S1, S2, S3, punctele de test), Arduino Mega 2560 cu afișajul OLED și lampa EPC, multimetrul cu sondele și laptopul cu programul. Cablajul dintre borne și placă apare după identificarea pinilor; montajul urmărește simulatorul (pârghia, comutatoarele, X1, sondele, ecranele). Rotiți, apropiați sau depărtați vederea.</p>`,
+    modul: "montaj3d.js?v=1", functie: "creeazaMontaj",
+    optiuni: { svgVB: [0, 0, 1300, 800], construieste: L => montaj3dL3(L), cam: [0.0, 0.58, 0.86], tinta: [-0.02, 0.04, 0.0],
+      vederi: { tot: [[0.0, 0.58, 0.86], [-0.02, 0.04, 0.0], "Ansamblu"], pedala: [[-0.3, 0.2, 0.42], [-0.37, 0.08, 0.04], "Pedala"], cutii: [[-0.15, 0.25, 0.45], [-0.18, 0.02, 0.2], "Cutiile"], mega: [[0.24, 0.2, 0.4], [0.24, 0.02, 0.1], "Mega și OLED"] } }
+  },
   vehicul3d: {
     titluTab: "Pe autovehicul (3D)",
     titlu: "Pedala de accelerație electronică în autoturism",
@@ -819,3 +826,92 @@ Cadru.porneste({
     }
   }
 });
+
+/* ------------------------------------------------------------------ montajul real 3D (aceleași legături ca planșa) */
+function montaj3dL3(L) {
+  const { V3, mm, M, THREE } = L, R = 0xe53935, N = 0x222222, CP = { 1: 0xd32f2f, 2: 0xef9a9a, 3: 0x6d4c41, 4: 0x2e7d32, 5: 0xbcaaa4, 6: 0xf9d71c };
+  const eticheta = (w, h, f) => { const e = L.ecran(w, h); f(e.x, w, h); e.t.needsUpdate = true; return e.t; };
+  const banana = (p, cul) => { const g = L.grup(p); L.cyl(mm(4.2), mm(4.2), mm(16), L.M.plastic.clone ? new THREE.MeshStandardMaterial({ color: cul, roughness: 0.5 }) : M.plastic, g, 0, mm(10), 0, "y", 18); L.cyl(mm(2), mm(2), mm(4), M.alu, g, 0, mm(1), 0, "y", 10); return p.clone().add(V3(0, mm(18), 0)); };
+  /* ---- standul pedalei: profil de aluminiu, suportul imprimat 3D, raportorul, senzorul cu două piste, pârghia */
+  const PG = L.grup([-0.37, 0, 0.04], 0.3);
+  L.k_(L.box(0.2, mm(20), mm(20), M.alu, PG, 0, mm(10), 0, mm(1.5)), "stand", "Profil de aluminiu 20 × 20 mm (baza standului)");
+  [-1, 1].forEach(sx => L.box(mm(2), mm(20), mm(20), M.negru, PG, sx * 0.101, mm(10), 0, mm(0.8)));
+  L.k_(L.box(0.16, 0.13, mm(6), M.pla, PG, 0, mm(20) + 0.065, 0, mm(3)), "stand", "Suportul imprimat 3D (PLA) – fixează senzorul pedalei");
+  [-1, 1].forEach(sx => L.box(mm(6), mm(30), mm(30), M.pla, PG, sx * 0.06, mm(35), mm(-17), mm(2)));
+  [[-0.068, 0.142], [0.068, 0.142], [-0.068, 0.03], [0.068, 0.03]].forEach(([x, y]) => L.cyl(mm(3), mm(3), mm(3), M.crom, PG, x, y, mm(4.5), "z", 16));
+  const yP = 0.068, zF = mm(3);
+  { const g = new THREE.RingGeometry(0.066, 0.092, 72, 1, (90 - 72) * Math.PI / 180, 84 * Math.PI / 180);
+    const t = eticheta(1024, 1024, (x, w) => { x.clearRect(0, 0, w, w); const c = w / 2, k = w / 2 / 0.092; x.strokeStyle = "#1d3557"; x.fillStyle = "#1d3557"; x.font = "bold 34px sans-serif"; x.textAlign = "center";
+      for (let a = -12; a <= 72; a++) { const r0 = 0.092 * k - 4, l = a % 10 === 0 ? 46 : a % 5 === 0 ? 30 : 16, s = Math.sin(a * Math.PI / 180), cc = Math.cos(a * Math.PI / 180); x.lineWidth = a % 10 ? 2 : 4; x.beginPath(); x.moveTo(c + r0 * s, c - r0 * cc); x.lineTo(c + (r0 - l) * s, c - (r0 - l) * cc); x.stroke();
+        if (a % 10 === 0) x.fillText(String(a), c + (r0 - 76) * s, c - (r0 - 76) * cc + 12); } });
+    const m = new THREE.MeshStandardMaterial({ color: 0xd6ecff, map: t, transparent: true, opacity: 0.75, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false });
+    const r = new THREE.Mesh(g, m); r.position.set(0, yP, zF + mm(1)); PG.add(r); L.k_(r, "rap", "Raportorul din acril (0…70°)"); }
+  const SN = L.grup(V3(0, yP, zF), 0, PG);
+  L.k_(L.box(mm(72), mm(26), mm(16), M.negru, SN, 0, 0, mm(8), mm(6)), "senzor", "Senzorul pedalei de accelerație cu două piste (6 pini: 2 × alimentare, 2 × masă, 2 × semnal)");
+  L.k_(L.cyl(mm(22), mm(22), mm(14), M.negruMat, SN, 0, 0, mm(10), "z", 40), "senzor", "Senzorul pedalei – carcasa traductorului (Hall / potențiometric, două piste)");
+  [-1, 1].forEach(sx => { L.cyl(mm(3.6), mm(3.6), mm(3), M.crom, SN, sx * mm(30), 0, mm(16.5), "z", 14); });
+  const con = L.box(mm(24), mm(20), mm(14), M.negru, SN, mm(42), mm(-26), mm(8), mm(2)); L.k_(con, "senzor", "Conectorul senzorului (6 pini)");
+  const PR = L.grup(V3(0, 0, mm(18)), 0, SN);
+  L.k_(L.box(mm(18), 0.1, mm(8), M.alb, PR, 0, 0.05, 0, mm(4)), "parghie", "Pârghia izolantă (unghiul θ se citește pe raportor)");
+  L.box(mm(26), mm(22), mm(10), L.M.bej, PR, 0, 0.098, 0, mm(5)); L.box(mm(1.5), mm(50), mm(0.5), L.M.rosu, PR, 0, 0.07, mm(4.3), mm(0.2)); L.cyl(mm(10), mm(10), mm(10), M.crom, PR, 0, 0, 0, "z", 24);
+  PG.updateMatrixWorld(true); const conW = con.getWorldPosition(new THREE.Vector3());
+  /* ---- cutia de conexiuni (bornele 1…6) */
+  const BX = L.grup([-0.33, 0, 0.215], 0);
+  L.k_(L.box(0.19, mm(45), mm(70), M.gri, BX, 0, mm(22.5), 0, mm(4)), "br", "Cutia de conexiuni – pinii 1…6 ai conectorului senzorului (borne de 4 mm)");
+  L.plan(eticheta(1024, 380, (x, w, h) => { x.fillStyle = "#2f3439"; x.fillRect(0, 0, w, h); x.fillStyle = "#e6ebf0"; x.font = "bold 40px sans-serif"; x.fillText("CUTIA DE CONEXIUNI – SENZORUL PEDALEI", 30, 60); x.font = "bold 54px sans-serif"; x.textAlign = "center"; for (let i = 1; i <= 6; i++) x.fillText(String(i), w / 2 + (i - 3.5) * 0.03 / 0.19 * w, 150); }), 0.188, mm(69), BX, 0, mm(45.1), 0);
+  const SO = {};
+  for (let i = 1; i <= 6; i++) { const x = (i - 3.5) * 0.03; L.cyl(mm(7), mm(7), mm(3), new THREE.MeshStandardMaterial({ color: CP[i], roughness: 0.45 }), BX, x, mm(46.5), mm(8), "y", 24); L.k_(L.cyl(mm(4), mm(4), mm(6), M.aur, BX, x, mm(49), mm(8), "y", 18), "p" + i, `Borna ${i} (pinul ${i} al senzorului)`); L.cyl(mm(1.8), mm(1.8), mm(0.2), M.negru, BX, x, mm(52.05), mm(8), "y", 12); BX.updateMatrixWorld(true); SO[i] = BX.localToWorld(V3(x, mm(52), mm(8))); }
+  L.tub([conW, conW.clone().add(V3(0.02, -0.03, 0.03)), V3(-0.27, mm(6), 0.16), V3(-0.33, mm(10), 0.17), V3(-0.33, mm(22), 0.18)], mm(3.5), M.negru);
+  /* ---- conectorul X1 (cuplat / decuplat) */
+  const X1 = V3(-0.17, 0, 0.29), xA = L.box(mm(18), mm(14), mm(34), M.negru, null || L.sc, X1.x, mm(7), X1.z, mm(2)), xB = L.box(mm(20), mm(14), mm(34), M.gri, L.sc, X1.x + mm(19), mm(7), X1.z, mm(2));
+  L.k_(xA, "x1", "Conectorul X1 (partea cablajului senzorului)"); L.k_(xB, "x1", "Conectorul X1 (partea plăcii) – decuplat pentru măsurarea rezistențelor");
+  const xin = i => V3(X1.x - mm(9), mm(7), X1.z - mm(12) + (i - 1) * mm(4.8)), xout = i => V3(xB.position.x + mm(10), mm(7), X1.z - mm(12) + (i - 1) * mm(4.8));
+  /* ---- cutia de simulare a defectelor */
+  const FB = L.grup([-0.03, 0, 0.16], 0);
+  L.k_(L.box(0.155, mm(45), mm(107), new THREE.MeshStandardMaterial({ color: 0x1f4e8c, roughness: 0.5 }), FB, 0, mm(22.5), 0, mm(4)), "fb", "Cutia de simulare a defectelor (S1 întrerupere pistă 2, S2 scurt la masă pistă 1, S3 R serie 2,2 kΩ)");
+  L.plan(eticheta(1024, 700, (x, w, h) => { x.fillStyle = "#1f4e8c"; x.fillRect(0, 0, w, h); x.fillStyle = "#fff"; x.font = "bold 40px sans-serif"; x.fillText("SIMULAREA DEFECTELOR", 24, 54); x.font = "bold 46px sans-serif"; x.textAlign = "center";
+    [["S1", "întrerupere", 0.2], ["S2", "scurt la masă", 0.5], ["S3", "R serie 2,2 kΩ", 0.8]].forEach(([t, d, u]) => { x.fillText(t, u * w, 300); x.font = "28px sans-serif"; x.fillText(d, u * w, 340); x.font = "bold 46px sans-serif"; });
+    x.font = "bold 30px sans-serif"; [["TP A0", 0.14], ["TP A1", 0.38], ["TP 5V", 0.62], ["TP GND", 0.86]].forEach(([t, u]) => x.fillText(t, u * w, 560)); x.fillText("IN A0  IN A1", 0.16 * w, 120); x.fillText("OUT A0  OUT A1", 0.82 * w, 120); }), 0.153, mm(105), FB, 0, mm(45.1), 0);
+  const SW = {}; [["s1", -0.047], ["s2", 0], ["s3", 0.047]].forEach(([k, x]) => { L.cyl(mm(5), mm(5), mm(4), M.crom, FB, x, mm(47), mm(-6), "y", 6); const b = L.grup(V3(x, mm(49), mm(-6)), 0, FB); const bat = L.cyl(mm(1.6), mm(2.2), mm(16), M.crom, b, 0, mm(8), 0, "y", 14); L.k_(bat, "sw-" + k, `Comutatorul ${k.toUpperCase()}`);
+    const lm = new THREE.MeshStandardMaterial({ color: 0x400000, emissive: 0xff3d00, emissiveIntensity: 0 }); L.mesh(new THREE.SphereGeometry(mm(2.2), 14, 10), lm, FB, x + mm(11), mm(46), mm(-6)); SW[k] = { b, lm }; });
+  FB.updateMatrixWorld(true); const fw = (x, y, z) => FB.localToWorld(V3(x, y, z));
+  L.rezistor(fw(0.035, mm(45), mm(16)), fw(0.06, mm(45), mm(16)), 2200, { h: 2, et: "Rezistorul serie de 2,2 kΩ (defectul S3)" });
+  const TPW = {}; [["tA0", -0.056, 0xf2f2f2], ["tA1", -0.019, 0xf2f2f2], ["t5V", 0.019, 0xc62828], ["tGND", 0.056, 0x111111]].forEach(([k, x, c]) => { L.cyl(mm(6), mm(6), mm(3), new THREE.MeshStandardMaterial({ color: c, roughness: 0.4 }), FB, x, mm(46.5), mm(36), "y", 20); L.k_(L.cyl(mm(3.6), mm(3.6), mm(6), M.aur, FB, x, mm(49), mm(36), "y", 16), k, { tA0: "Punct de test A0", tA1: "Punct de test A1", t5V: "Punct de test 5 V", tGND: "Punct de test GND" }[k]); TPW[k] = fw(x, mm(52), mm(36)); });
+  const IN = { A0: fw(-0.065, mm(48), mm(-38)), A1: fw(-0.05, mm(48), mm(-38)) }, OUT = { A0: fw(0.05, mm(48), mm(-38)), A1: fw(0.065, mm(48), mm(-38)) };
+  [[IN.A0, 0x2e7d32], [IN.A1, 0xf9d71c], [OUT.A0, 0x2e7d32], [OUT.A1, 0xf9d71c]].forEach(([p, c]) => { const l = FB.worldToLocal(p.clone()); L.cyl(mm(4.5), mm(4.5), mm(4), new THREE.MeshStandardMaterial({ color: c, roughness: 0.45 }), FB, l.x, mm(46.5), l.z, "y", 18); });
+  /* ---- Arduino Mega, OLED, lampa EPC, multimetrul, laptopul */
+  const MG = L.arduinoMega([0.18, 0, 0.15]);
+  const OL = L.oled([0.33, 0, 0.07], { ecran: [888, 72, 184, 118], roty: -0.3 });
+  ["GND", "5V", "D21", "D20"].forEach((n, i) => L.fir(OL.pin(i), MG.pin(n === "5V" ? "5V" : n === "GND" ? "GND2" : n), [N, R, 0x1e88e5, 0x43a047][i]));
+  const EP = L.grup([0.36, 0, -0.06], -0.4); L.k_(L.box(mm(80), mm(46), mm(56), M.gri, EP, 0, mm(23), 0, mm(5)), "epc", "Lampa de avarie EPC (D13 + rezistor)");
+  const lm = new THREE.MeshStandardMaterial({ color: 0x3a2a00, emissive: 0xffb300, emissiveIntensity: 0, roughness: 0.2 }); L.cyl(mm(12), mm(12), mm(4), lm, EP, 0, mm(30), mm(28), "z", 28);
+  L.planB(eticheta(256, 96, (x, w, h) => { x.fillStyle = "#26292e"; x.fillRect(0, 0, w, h); x.fillStyle = "#ddd"; x.font = "bold 46px sans-serif"; x.textAlign = "center"; x.fillText("EPC", w / 2, 66); }), mm(30), mm(11), EP, 0, mm(9), mm(28.2));
+  const sEPC = L.stralucire(EP, V3(0, mm(30), mm(33)), 0xffb300, mm(60)); EP.updateMatrixWorld(true);
+  L.fir(EP.localToWorld(V3(mm(-10), mm(46), mm(-20))), MG.pin("D13"), 0xff9800); L.fir(EP.localToWorld(V3(mm(10), mm(46), mm(-20))), MG.pin("GND_T"), N);
+  const DM = L.multimetru([-0.08, 0, -0.2], { ecran: [504, 62, 154, 66], et: "Multimetru digital (V⎓, Ω) cu două sonde" });
+  const PC = L.laptop([0.43, 0, -0.17], { roty: -0.35, cod: () => L.textCod(), titlu: () => `Arduino IDE – ${PROG.titlu}.ino` });
+  L.cabluUSB(V3(0.18 - 0.0582, 0.01, 0.1389), PC.usb);
+  // ieșirile cutiei de defecte spre A0 / A1 și punctele de test 5 V / GND legate la placă
+  L.fir(OUT.A0, MG.pin("A0"), 0x2e7d32); L.fir(OUT.A1, MG.pin("A1"), 0xf9d71c);
+  /* ---- cablajul variabil: bornele → X1 → destinațiile alese la identificarea pinilor */
+  let dyn = [], cheie = "";
+  const reface = () => {
+    dyn.forEach(o => { L.sc.remove(o); }); dyn = []; const n0 = L.sc.children.length;
+    const dest = { "5V": MG.pin("5V"), GND: MG.pin("GND"), A0: IN.A0, A1: IN.A1 };
+    for (let i = 1; i <= 6; i++) { const top = banana(SO[i], CP[i]); L.cablu(top, xin(i), CP[i], { r: 0.9, burta: 0.03, db: V3(mm(-20), mm(6), 0) });
+      if (sim.as && dest[sim.as[i]]) L.cablu(xout(i), dest[sim.as[i]], CP[i], { r: 0.9, burta: 0.04, da: V3(mm(20), mm(4), 0), dupontB: true }); }
+    dyn = L.sc.children.slice(n0);
+  };
+  const sd = [L.sonda(DM.v, 0xd32f2f, V3(-0.03, 0.003, -0.06), { et: "Sonda + a multimetrului" }), L.sonda(DM.com, 0x1b1d20, V3(-0.13, 0.003, -0.06), { et: "Sonda − (COM) a multimetrului" })];
+  const P3 = Object.assign({}, TPW); for (let i = 1; i <= 6; i++) P3["p" + i] = SO[i].clone().add(V3(0, mm(1), 0));
+  const f = id => ($(id) || { getAttribute: () => "" }).getAttribute("fill");
+  return { actualizeaza() {
+    PR.rotation.z = -sim.teta * Math.PI / 180;
+    const k = JSON.stringify(sim.as) + sim.dec; if (k !== cheie) { cheie = k; reface(); }
+    xB.position.x = X1.x + mm(sim.dec ? 44 : 19);
+    ["s1", "s2", "s3"].forEach(q => { SW[q].b.rotation.z = sim.f[q] ? -0.45 : 0.45; SW[q].lm.emissiveIntensity = sim.f[q] ? 2.5 : 0; });
+    const avarie = sim.run && sim.pr && sim.pr.fault; lm.emissiveIntensity = avarie ? 2.6 : 0; sEPC.material.opacity = avarie ? 0.9 : 0;
+    MG.led("ON", sim.run ? 1 : 0); MG.led("L", f("#ledL") === "#ffd04a" ? 1 : 0); MG.led("TX", f("#ledTX") === "#ffd04a" ? 1 : 0);
+    DM.mod(sim.dmm.mod); sd[0].muta(P3[sim.dmm.s.dmmR] || null); sd[1].muta(P3[sim.dmm.s.dmmB] || null);
+  } };
+}

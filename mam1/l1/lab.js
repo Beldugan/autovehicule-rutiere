@@ -774,6 +774,13 @@ Cadru.porneste({
     const t = D.t;
     Object.assign(t.t12.p3, { U: "2.500", N: "512" }); Object.assign(t.t13.o199, { f: "20000", dc: "25.00", um: "1.250" });
   },
+  animatie: {
+    titluTab: "Montajul real (3D)", titlu: "Montajul real al lucrării – aceleași legături ca în planșa Tinkercad",
+    intro: `<p>Standul de lucru la scară reală: Arduino Mega 2560, placa de test cu potențiometrul (A0), LED-ul cu rezistorul de 220 Ω (D13) și butonul cu rezistorul de 10 kΩ (D2), STM32 „Blue Pill” cu ST-Link V2, generatorul de funcții, osciloscopul și multimetrul. Montajul urmărește simulatorul: LED-urile, potențiometrele, butonul, ecranele aparatelor și sondele mutate pe planșă. Rotiți, apropiați sau depărtați vederea; treceți cu mouse-ul peste componente.</p>`,
+    modul: "montaj3d.js?v=1", functie: "creeazaMontaj",
+    optiuni: { svgVB: [0, 0, 1300, 790], construieste: L => montaj3dL1(L), cam: [0.0, 0.56, 0.82], tinta: [0.0, 0.03, -0.01],
+      vederi: { tot: [[0.0, 0.56, 0.82], [0.0, 0.03, -0.01], "Ansamblu"], placa: [[0.0, 0.14, 0.26], [0.0, 0.0, 0.12], "Placa de test"], mega: [[-0.26, 0.17, 0.3], [-0.25, 0.0, 0.12], "Arduino Mega"], stm: [[0.26, 0.15, 0.3], [0.24, 0.0, 0.12], "Blue Pill"], aparate: [[-0.1, 0.32, 0.4], [-0.15, 0.08, -0.2], "Aparatele"] } }
+  },
   vehicul3d: {
     titluTab: "Pe autovehicul (3D)",
     titlu: "Microcontrolerele din autoturism – intrări analogice și ieșiri PWM",
@@ -871,3 +878,41 @@ Cadru.porneste({
     }
   }
 });
+
+/* ------------------------------------------------------------------ montajul real 3D (aceleași legături ca planșa) */
+function montaj3dL1(L) {
+  const { V3, mm } = L, G = L.generator([-0.44, 0, -0.17], { ecran: [56, 56, 170, 70], roty: 0.18 }), O = L.osciloscop([-0.13, 0, -0.21], { ecran: [406, 56, 404, 246] });
+  const DM = L.multimetru([0.15, 0, -0.2], { ecran: [888, 58, 132, 54], cul: 0x3b3f45, et: "Multimetru digital (V⎓)" }), PC = L.laptop([0.43, 0, -0.17], { roty: -0.35, cod: () => L.textCod(), titlu: () => `PlatformIO – ${(PROG[sim.editor] || {}).titlu || ""}.cpp` });
+  const MG = L.arduinoMega([-0.25, 0, 0.13]), BB = L.placaTest([0.0, 0, 0.13]), BS = L.placaTest([0.235, 0, 0.13], { coloane: 30, et: "Placa de test mică (400 de puncte)" });
+  const BP = L.bluePill(BS, 6), SL = L.stLink([0.27, 0, 0.0], { roty: 0 });
+  const g = (c, r) => BB.gaura(c, r), s = (c, r) => BS.gaura(c, r), R = 0xe53935, N = 0x222222;
+  // alimentarea plăcii de test din Mega și legăturile dintre șine
+  L.fir(MG.pin("5V"), g(2, "+j"), R); L.fir(MG.pin("GND"), g(3, "-j"), N); L.fir(g(49, "+j"), g(49, "+s"), R); L.fir(g(48, "-j"), g(48, "-s"), N);
+  // potențiometrul pe A0
+  const pot = L.potentiometru(g(5, "b"), g(9, "b"), { et: "Potențiometru 10 kΩ – cursorul la A0" }); L.fir(g(5, "e"), g(5, "+j"), R); L.fir(g(9, "e"), g(8, "-j"), N); L.fir(g(7, "e"), MG.pin("A0"), 0xf2c230);
+  // D13 → 220 Ω → LED → GND
+  L.fir(MG.pin("D13"), g(20, "j"), 0xff8a1f); L.rezistor(g(20, "h"), g(24, "h"), 220); const led = L.led(g(24, "f"), g(25, "f"), 0xff2a1a, { et: "LED roșu (D13)" }); L.fir(g(25, "j"), g(24, "-s"), N);
+  // butonul pe D2 cu rezistorul de 10 kΩ spre masă; generatorul pe același nod
+  const btn = L.buton(V3((g(33, "e").x + g(37, "f").x) / 2, BB.H, (g(33, "e").z + g(37, "f").z) / 2).sub(V3(0, BB.H, 0)).add(V3(0, BB.H, 0)), { et: "Butonul (D2)", cul: 0xd32f2f });
+  L.fir(MG.pin("D2"), g(33, "b"), 0x2fa84f); L.fir(g(37, "j"), g(37, "+s"), R); L.rezistor(g(33, "d"), g(29, "d"), 10000); L.fir(g(29, "a"), g(29, "-j"), N);
+  L.cablu(G.iesire, g(33, "a"), 0x2fa84f, { burta: 0.12, crocodil: true }); L.cablu(G.iesire.clone().add(V3(mm(12), 0, 0)), g(30, "-j"), N, { burta: 0.14, crocodil: true });
+  // Blue Pill: 3,3 V și masa, LED-ul pe PB12, potențiometrul pe PA0, ST-Link pe SWD
+  L.fir(BP.pin("3V3"), s(20, "+j"), R); L.fir(BP.pin("GND"), s(21, "-j"), N); L.fir(s(1, "-j"), s(1, "-s"), N);
+  L.rezistor(s(6, "i"), s(2, "i"), 220); const ledS = L.led(s(2, "g"), s(1, "g"), 0xff2a1a, { et: "LED roșu (PB12)" }); L.fir(s(1, "j"), s(2, "-s"), N);
+  const potS = L.potentiometru(s(26, "b"), s(30, "b"), { et: "Potențiometru 10 kΩ – cursorul la PA0" }); L.fir(s(26, "e"), s(24, "+j"), R); L.fir(s(30, "e"), s(25, "-j"), N); L.fir(s(28, "a"), BP.pin("PA0"), 0xf2c230);
+  [["3V3", R, 3], ["SWDIO", 0x6a1b9a, 1], ["SWCLK", 0x00897b, 0], ["GND", N, 2]].forEach(([n, c, i]) => L.fir(BP.swd(n), SL.pin(i), c, { capete: true, h: 14 }));
+  L.cabluUSB(MG.pin("D0").clone().set(-0.31, 0.009, 0.115), PC.usb); L.cabluUSB(SL.pin(0).clone().set(0.27 - 0.032, 0.0045, 0.0), PC.usb.clone().add(V3(0, 0, 0.03)));
+  // masele fixe ale aparatelor și sondele mobile
+  L.cablu(DM.com, g(45, "-s"), N, { burta: 0.05 }); O.ch.forEach((p, i) => L.cablu(p.clone().add(V3(0, mm(-8), 0)), g(40 + i * 2, "-s"), N, { r: 0.8, burta: 0.04, crocodil: true }));
+  const P3 = { pin11: MG.pin("D11"), pin9: MG.pin("D9"), pin13: MG.pin("D13"), pin2: MG.pin("D2"), A0: MG.pin("A0"), v5: MG.pin("5V"), PB12: BP.pin("PB12"), PA0: BP.pin("PA0", "b"), v33: BP.pin("3V3", "b"),
+    pot: g(7, "c"), ledA: g(24, "g"), rez: g(20, "i"), gndBB: g(40, "-j"), v5BB: g(40, "+j"), btnD2: g(33, "c"), gndS: s(10, "-j") };
+  const sd = [L.sonda(O.ch[0], 0xf2d600, V3(-0.05, 0.003, 0.0), { osc: true, et: "Sonda CH1 a osciloscopului" }), L.sonda(O.ch[1], 0x1fb6ff, V3(-0.02, 0.003, 0.02), { osc: true, et: "Sonda CH2 a osciloscopului" }), L.sonda(DM.v, 0xd32f2f, V3(0.12, 0.003, -0.05), { et: "Sonda V a multimetrului" })];
+  const at = (id, k) => { const v = $(id); return v ? Number(v.getAttribute(k)) || 0 : 0; };
+  return { actualizeaza() {
+    pot.set(sim.alfa); potS.set(sim.alfaS); btn.set(sim.buton); G.set(sim.gen);
+    led.set(Math.min(1, at("#ledR", "opacity") / 0.7)); ledS.set(at("#ledSG", "opacity"));
+    const f = id => ($(id) || { getAttribute: () => "" }).getAttribute("fill");
+    MG.led("L", f("#ledL") === "#ffc23a" ? 1 : 0); MG.led("TX", f("#ledTX") === "#ffd04a" ? 1 : 0); MG.led("ON", 1); BP.led(sim.run ? 0.6 : 0);
+    sd[0].muta(P3[sim.osc.ch[0].s] || null); sd[1].muta(P3[sim.osc.ch[1].s] || null); sd[2].muta(P3[sim.dmm.s] || null);
+  } };
+}

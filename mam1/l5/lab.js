@@ -158,14 +158,105 @@ function oledTxt() {
   const v = sim.pr && sim.pr.last, f = (x, d, w) => Number.isFinite(x) ? x.toFixed(d).padStart(w, " ") : "—";
   return { titlu: `MAP A=${sim.fw ? sim.fw.A : ""}${sim.rec ? " REC" : ""}`, linii: v ? [`U  ${f(v.u, 3, 6)} V`, `p  ${f(v.p, 1, 6)} kPa`, `rho${f(v.rho, 3, 6)}`, `pa ${f(v.pa, 2, 6)} T${v.T.toFixed(1)}`] : ["pornire..."] };
 }
+/* ------------------------------------------------------------------ planșa în stilul Tinkercad (schema de conectare a standului) */
+const TPL5 = { tU: [600, 640], t5V: [690, 640], tGND: [780, 640] };
+const SOND5 = { dmmR: { x0: 846, y0: 330, cul: "#d32f2f", rep: [880, 400] }, dmmB: { x0: 734, y0: 330, cul: "#222", rep: [700, 400] } };
+function planseSVG() {
+  const W = (pts, c, w, id) => `<path ${id ? `id="${id}" ` : ""}d="M${pts.map(p => p.join(",")).join(" L")}" fill="none" stroke="${c}" stroke-width="${w || 3}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const furt = (d, id) => `<path id="${id}" d="${d}" fill="none" stroke="#a9d6ea" stroke-width="11" stroke-linecap="round" opacity=".9"/><path d="${d}" fill="none" stroke="#e9f7fd" stroke-width="4" stroke-linecap="round" opacity=".8"/>`;
+  const colier = (i, x, y, rot) => `<g data-k="colier${i}" class="tk-comp" transform="translate(${x} ${y}) rotate(${rot})"><rect id="col${i}" x="-9" y="-10" width="18" height="20" rx="3" fill="#cfd5db" stroke="#7d858d" stroke-width="1.5"/><rect x="-3" y="-15" width="6" height="7" rx="1.5" fill="#9aa2aa"/></g>`;
+  let s = `<svg id="tk-svg" viewBox="0 -14 1300 814" role="img" aria-label="Planșa: pompa de vid / presiune, teul, manometrul etalon, senzorul MAP, placa de test cu BMP280, Arduino Mega cu OLED, multimetrul">
+<defs><filter id="umbra" x="-10%" y="-10%" width="125%" height="130%"><feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000" flood-opacity=".22"/></filter>
+ <pattern id="tk-gauri" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#f3f3f1"/><rect x="3.5" y="3.5" width="3" height="3" fill="#b9b9b5"/></pattern>
+ <linearGradient id="gAlu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3e7eb"/><stop offset="1" stop-color="#9aa2aa"/></linearGradient>
+ <linearGradient id="gAlama" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d77a"/><stop offset="1" stop-color="#a87c1c"/></linearGradient></defs>
+<rect x="-2000" y="-2000" width="5300" height="4800" fill="#fbfbfb" id="tk-fundal"/>`;
+  /* ---- pompa manuală de vid / presiune cu manometru */
+  s += `<g data-k="pompa" class="tk-comp" filter="url(#umbra)"><path d="M40,150 Q40,118 72,118 L250,118 Q282,118 282,150 L282,176 Q282,206 250,206 L72,206 Q40,206 40,176z" fill="#c62828"/>
+    <path d="M70,206 L120,330 Q126,346 142,340 L168,330 Q178,324 172,310 L140,206z" fill="#2b2f35"/><path d="M150,206 L210,318 Q216,332 230,326 L246,318 Q256,312 250,300 L200,206z" fill="#455a64"/>
+    <text x="70" y="146" font-size="12" fill="#fff" font-weight="700">POMPĂ DE VID / PRESIUNE</text><text x="70" y="162" font-size="10" fill="#ffd8d8">clic = o cursă</text></g>`;
+  s += `<g data-k="pompa" class="tk-comp" filter="url(#umbra)"><circle cx="205" cy="74" r="58" fill="#e9ecef" stroke="#555" stroke-width="3"/><circle cx="205" cy="74" r="50" fill="#fbfbf7"/>
+    ${Array.from({ length: 21 }, (_, i) => { const a = (-135 + i * 13.5) * Math.PI / 180, r1 = 48, r2 = i % 5 === 0 ? 38 : 43; return `<line x1="${205 + r1 * Math.sin(a)}" y1="${74 - r1 * Math.cos(a)}" x2="${205 + r2 * Math.sin(a)}" y2="${74 - r2 * Math.cos(a)}" stroke="#222" stroke-width="${i % 5 ? 1 : 2}"/>`; }).join("")}
+    ${[["−1", -135], ["−0,5", -67.5], ["0", 0], ["0,5", 67.5], ["1", 135]].map(([t, a]) => `<text x="${205 + 29 * Math.sin(a * Math.PI / 180)}" y="${78 - 29 * Math.cos(a * Math.PI / 180)}" font-size="9" text-anchor="middle" fill="#222">${t}</text>`).join("")}
+    <text x="205" y="104" font-size="8" text-anchor="middle" fill="#666">bar</text><line id="pm-ac" x1="205" y1="74" x2="205" y2="30" stroke="#c62828" stroke-width="3" stroke-linecap="round"/><circle cx="205" cy="74" r="5" fill="#222"/></g>`;
+  s += `<g data-k="selector" class="tk-comp"><rect x="96" y="96" width="62" height="22" rx="5" fill="#f2b705" stroke="#a37a00"/><text id="pm-sel" x="127" y="111" font-size="11" text-anchor="middle" fill="#222" font-weight="800">VID</text></g>
+    <g data-k="lent" class="tk-comp"><circle cx="300" cy="140" r="13" fill="url(#gAlu)" stroke="#666"/><circle id="pm-lent" cx="300" cy="140" r="5" fill="#666"/><text x="300" y="168" font-size="9" text-anchor="middle" fill="#444">supapă lentă</text></g>
+    <g data-k="rapid" class="tk-comp"><circle cx="300" cy="196" r="12" fill="#1e63d6" stroke="#0d3b8a"/><text x="300" y="222" font-size="9" text-anchor="middle" fill="#444">eliberare rapidă</text></g>`;
+  /* ---- furtunurile, teul, colierele */
+  s += furt("M282,162 C330,162 360,162 412,162", "fu0") + furt("M452,162 C500,162 520,150 548,150", "fu1") + furt("M432,182 C432,220 432,240 432,262", "fu2");
+  s += `<g data-k="tee" class="tk-comp" filter="url(#umbra)"><rect x="410" y="148" width="44" height="28" rx="4" fill="url(#gAlama)" stroke="#7a5a10"/><rect x="420" y="170" width="24" height="18" rx="3" fill="url(#gAlama)" stroke="#7a5a10"/><text x="432" y="140" font-size="10" text-anchor="middle" fill="#555">teu de alamă</text></g>`;
+  s += colier(0, 296, 162, 90) + colier(1, 540, 150, 90) + colier(2, 432, 256, 0);
+  /* ---- manometrul etalon digital */
+  s += `<g data-k="etalon" class="tk-comp" filter="url(#umbra)"><rect x="352" y="262" width="160" height="150" rx="12" fill="#2b2f35"/><rect x="368" y="284" width="128" height="52" rx="4" fill="#bfd0b0" stroke="#111"/><text id="et-v" x="488" y="320" font-size="24" fill="#1d2414" text-anchor="end" font-family="ui-monospace,monospace" font-weight="700">0.0</text><text x="374" y="296" font-size="8" fill="#1d2414">kPa rel.</text>
+    <text x="432" y="362" font-size="11" text-anchor="middle" fill="#e6ebf0" font-weight="700">Manometru etalon</text><text x="432" y="378" font-size="9" text-anchor="middle" fill="#aab4be">−100…+200 kPa · 0,1 kPa</text></g>`;
+  /* ---- senzorul MAP pe colțarul de aluminiu */
+  s += `<g data-k="map" class="tk-comp" filter="url(#umbra)"><rect x="540" y="80" width="150" height="14" rx="2" fill="url(#gAlu)" stroke="#7c848c"/><rect x="676" y="80" width="14" height="150" rx="2" fill="url(#gAlu)" stroke="#7c848c"/>
+    <rect x="548" y="118" width="110" height="64" rx="10" fill="#1f2226"/><rect x="540" y="140" width="14" height="20" rx="3" fill="#1f2226"/><circle cx="572" cy="132" r="5" fill="url(#gAlu)" stroke="#333"/><circle cx="636" cy="168" r="5" fill="url(#gAlu)" stroke="#333"/>
+    <rect x="610" y="182" width="40" height="26" rx="3" fill="#2b2f35"/>${[0, 1, 2].map(k => `<rect x="${617 + k * 10}" y="200" width="5" height="6" fill="#c9a227"/>`).join("")}
+    <text x="603" y="152" font-size="11" text-anchor="middle" fill="#e6ebf0" font-weight="800">MAP</text><text x="603" y="166" font-size="8" text-anchor="middle" fill="#9aa">2,5 bar abs.</text></g>`;
+  /* ---- multimetrul */
+  s += `<g data-k="dmm" class="tk-comp" filter="url(#umbra)"><rect x="700" y="36" width="190" height="300" rx="18" fill="#f2b705"/><rect x="712" y="48" width="166" height="276" rx="12" fill="#3b3f45"/>
+    <rect x="726" y="62" width="138" height="58" rx="5" fill="#bfd0b0" stroke="#222" stroke-width="2"/><text id="dmm5-v" x="856" y="102" font-size="26" fill="#1d2414" text-anchor="end" font-family="ui-monospace,monospace" font-weight="700"></text><text id="dmm5-u" x="858" y="115" font-size="9" fill="#1d2414" text-anchor="end"></text>
+    <text x="795" y="300" font-size="10" fill="#ddd" text-anchor="middle">Multimetru</text>
+    <circle cx="734" cy="322" r="8" fill="#111" stroke="#999"/><circle cx="846" cy="322" r="8" fill="#d32f2f" stroke="#999"/></g>
+    <g data-k="dmmKnob" class="tk-comp"><circle cx="795" cy="200" r="46" fill="#2a2d31" stroke="#666"/><g id="dmm5-k"><circle cx="795" cy="200" r="30" fill="#4a4f56" stroke="#111"/><rect x="791" y="164" width="8" height="30" rx="3" fill="#f2b705"/></g>
+    ${[["OFF", -60], ["V⎓", 0], ["Ω", 60]].map(([t, a]) => `<text x="${795 + 58 * Math.sin(a * Math.PI / 180)}" y="${204 - 58 * Math.cos(a * Math.PI / 180)}" font-size="11" text-anchor="middle" fill="#fff" font-weight="700">${t}</text>`).join("")}</g>`;
+  /* ---- OLED, cronometrul, ochelarii */
+  s += `<g data-k="oled" class="tk-comp" filter="url(#umbra)"><rect x="930" y="40" width="200" height="176" rx="6" fill="#16337a" stroke="#0b1d48"/>${["GND", "VCC", "SCL", "SDA"].map((t, i) => `<rect x="${992 + i * 14}" y="46" width="6" height="8" fill="#c9a227"/><text x="${995 + i * 14}" y="64" font-size="6" fill="#fff" text-anchor="middle">${t}</text>`).join("")}
+    <rect x="938" y="72" width="184" height="118" rx="3" fill="#050608" stroke="#333"/><g id="oled5" font-family="ui-monospace,Consolas,monospace"></g><text x="1030" y="206" font-size="8" fill="#cfd8ff" text-anchor="middle">OLED 0,96" SSD1306 · I²C</text></g>`;
+  s += `<g data-k="ceas" class="tk-comp" filter="url(#umbra)"><rect x="1150" y="40" width="130" height="82" rx="8" fill="#3b3f45"/><rect x="1160" y="50" width="110" height="40" rx="4" fill="#0f1a12"/><text id="ceas5" x="1215" y="78" font-size="20" text-anchor="middle" fill="#7dff8a" font-family="ui-monospace,monospace">00:00</text><text id="ceas5p" x="1215" y="110" font-size="8.5" text-anchor="middle" fill="#ddd"></text></g>
+    <g data-k="ochelari" class="tk-comp"><path d="M1160,170 q20,-26 44,0 q8,6 16,0 q24,-26 44,0 l0,14 q-22,26 -44,0 q-8,-6 -16,0 q-22,26 -44,0z" fill="#cfe8ff" stroke="#555" stroke-width="2" opacity=".9"/><text id="och5" x="1215" y="214" font-size="10" text-anchor="middle" fill="#444" font-weight="700">ochelari: nu</text></g>`;
+  /* ---- placa de test cu BMP280 și punctele de test */
+  s += `<g data-k="bb" class="tk-comp" filter="url(#umbra)"><rect x="440" y="440" width="460" height="230" rx="6" fill="url(#tk-gauri)" stroke="#d2d2cc"/><line x1="450" y1="448" x2="890" y2="448" stroke="#e53935" stroke-width="1.5"/><line x1="450" y1="470" x2="890" y2="470" stroke="#1e63d6" stroke-width="1.5"/><text x="452" y="663" font-size="8" fill="#999">placă de test</text></g>`;
+  s += `<g data-k="bmp" class="tk-comp" filter="url(#umbra)"><rect x="470" y="500" width="78" height="64" rx="4" fill="#5b2c8f"/><rect x="498" y="520" width="18" height="18" rx="2" fill="#c9cdd2"/><circle cx="507" cy="529" r="2" fill="#333"/><text x="509" y="556" font-size="8" fill="#fff" text-anchor="middle">BMP280</text>${[0, 1, 2, 3].map(k => `<rect x="${478 + k * 16}" y="494" width="6" height="8" fill="#c9a227"/>`).join("")}</g>`;
+  s += Object.entries(TPL5).map(([k, [x, y]]) => `<g data-k="${k}" class="tk-comp"><circle cx="${x}" cy="${y}" r="12" fill="${k === "tGND" ? "#111" : k === "t5V" ? "#c62828" : "#f2f2f2"}" stroke="#000"/><circle cx="${x}" cy="${y}" r="5" fill="url(#gAlama)"/><text x="${x}" y="${y - 18}" font-size="9.5" text-anchor="middle" fill="#333" font-weight="700">${{ tU: "TP U MAP", t5V: "TP 5V", tGND: "TP GND" }[k]}</text></g>`).join("");
+  /* ---- Arduino Mega 2560 */
+  const MX = 940, MY = 430, H = i => [MX + 64 + i * 11.2, MY + 222];
+  s += `<g data-k="mega" class="tk-comp" filter="url(#umbra)"><rect x="${MX}" y="${MY}" width="340" height="232" rx="8" fill="#00878f" stroke="#005a60"/>
+    <rect x="${MX - 14}" y="${MY + 30}" width="46" height="40" rx="3" fill="url(#gAlu)" stroke="#666"/><rect x="${MX - 8}" y="${MY + 150}" width="40" height="36" rx="4" fill="#1b1b1b"/>
+    <g transform="translate(${MX + 200} ${MY + 118}) rotate(45)"><rect x="-30" y="-30" width="60" height="60" rx="2" fill="#262626"/></g><text x="${MX + 200}" y="${MY + 121}" font-size="7" fill="#bbb" text-anchor="middle" font-family="monospace">ATMEGA2560</text>
+    <rect x="${MX + 60}" y="${MY + 6}" width="270" height="12" rx="1.5" fill="#202020"/><rect x="${MX + 58}" y="${MY + 216}" width="${26 * 11.2}" height="12" rx="1.5" fill="#202020"/>
+    ${["IOREF", "RESET", "3.3V", "5V", "GND", "GND", "Vin", "", "A0", "A1", "A2", "A3"].map((t, i) => t ? `<text x="${H(i)[0]}" y="${MY + 210}" font-size="5.5" fill="#fff" text-anchor="end" transform="rotate(-90 ${H(i)[0]} ${MY + 210})">${t}</text>` : "").join("")}
+    <text x="${MX + 250}" y="${MY + 70}" font-size="13" fill="#e8ffff" font-weight="800">ARDUINO</text><text x="${MX + 250}" y="${MY + 86}" font-size="11" fill="#e8ffff">MEGA 2560</text>
+    <rect id="ledL" x="${MX + 92}" y="${MY + 40}" width="8" height="5" fill="#5a4a1a"/><text x="${MX + 104}" y="${MY + 45}" font-size="6" fill="#fff">L</text><rect id="ledTX" x="${MX + 92}" y="${MY + 52}" width="8" height="5" fill="#5a4a1a"/><text x="${MX + 104}" y="${MY + 57}" font-size="6" fill="#fff">TX</text><rect id="ledON" x="${MX + 92}" y="${MY + 64}" width="8" height="5" fill="#1a3a1a"/><text x="${MX + 104}" y="${MY + 69}" font-size="6" fill="#fff">ON</text></g>
+    <g data-k="rst" class="tk-comp"><rect x="${MX + 46}" y="${MY + 92}" width="18" height="18" rx="2" fill="#ccc" stroke="#555"/><circle cx="${MX + 55}" cy="${MY + 101}" r="5.5" fill="#c62828"/><text x="${MX + 55}" y="${MY + 122}" font-size="7" text-anchor="middle" fill="#fff" font-weight="700">RESET</text></g>
+    <path id="usb5" d="M${MX - 14},${MY + 50} C${MX - 60},${MY + 50} ${MX - 50},${MY - 30} ${MX - 10},${MY - 50}" fill="none" stroke="#bbb" stroke-width="6"/>`;
+  /* ---- firele: senzorul MAP, BMP280, punctele de test, OLED */
+  const hx = k => MX + 64 + k * 9.5;
+  s += `<g style="pointer-events:none">
+    ${W([[619, 206], [619, 420], [520, 420], [520, 448]], "#e53935", 3)}${W([[629, 206], [629, 412], [540, 412], [540, 470]], "#222", 3)}${W([[639, 206], [639, 404], [600, 404], [600, 628]], "#2fa84f", 3)}
+    ${W([[H(3)[0], H(3)[1] + 6], [H(3)[0], 700], [470, 700], [470, 448], [460, 448]], "#e53935", 3)}${W([[H(4)[0], H(4)[1] + 6], [H(4)[0], 712], [458, 712], [458, 470], [450, 470]], "#222", 3)}
+    ${W([[600, 652], [600, 724], [H(8)[0], 724], [H(8)[0], H(8)[1] + 6]], "#f2c230", 3)}${W([[690, 652], [690, 664], [700, 664], [700, 448]], "#c62828", 1.6)}${W([[780, 652], [780, 664], [800, 664], [800, 470]], "#222", 1.6)}
+    ${W([[481, 494], [481, 448]], "#e53935", 2.4)}${W([[497, 494], [497, 470]], "#222", 2.4)}${W([[513, 494], [513, 482], [hx(26), 482], [hx(26), MY + 12]], "#1e88e5", 2.4)}${W([[529, 494], [529, 488], [hx(25), 488], [hx(25), MY + 12]], "#43a047", 2.4)}
+    ${[0, 1, 2, 3].map(k => W([[995 + k * 14, 54], [995 + k * 14, 26 - k * 4], [1138 + k * 5, 26 - k * 4], [1138 + k * 5, 400 + k * 5], [k < 2 ? H(4 - k)[0] : hx(26 - k + 2), 400 + k * 5], [k < 2 ? H(4 - k)[0] : hx(26 - k + 2), k < 2 ? MY + 216 : MY + 12]], ["#222", "#e53935", "#1e88e5", "#43a047"][k], 2)).join("")}</g>`;
+  s += `<g id="sonde5" style="pointer-events:none"></g><text id="tk-av" x="190" y="440" text-anchor="middle" font-size="12" fill="#c62828" font-weight="700"></text>`;
+  return s + `</svg>`;
+}
+function planseAfis() {
+  if (!$("#tk-svg")) return;
+  const a = Math.max(-135, Math.min(135, pRel() / 100 * 135)) * Math.PI / 180; $("#pm-ac").setAttribute("x2", (205 + 44 * Math.sin(a)).toFixed(1)); $("#pm-ac").setAttribute("y2", (74 - 44 * Math.cos(a)).toFixed(1));
+  $("#pm-sel").textContent = sim.mod === "vid" ? "VID" : "PRES."; $("#pm-lent").setAttribute("fill", sim.lent ? "#2e9e44" : "#666");
+  [0, 1, 2].forEach(i => { const c = $("#col" + i), ok = sim.coliere[i] && sim.desprins !== i; c.setAttribute("fill", sim.desprins === i ? "#ff5252" : ok ? "#cfd5db" : "#ffb74d"); const f = $("#fu" + i); if (f) f.setAttribute("stroke-dasharray", sim.desprins === i ? "6 8" : ""); });
+  $("#et-v").textContent = sim.desprins === 2 ? "0.0" : etalonTxt().toFixed(1);
+  $("#dmm5-v").textContent = sim.dmm.mod === "OFF" ? "" : sim.dmm.txt; $("#dmm5-u").textContent = sim.dmm.mod === "OFF" ? "" : sim.dmm.u;
+  $("#dmm5-k").setAttribute("transform", `rotate(${{ OFF: -60, V: 0, R: 60 }[sim.dmm.mod]} 795 200)`);
+  const o = sim.run ? oledTxt() : null; $("#oled5").innerHTML = o ? `<text x="944" y="90" font-size="12" fill="#ffd400">${esc(o.titlu)}</text>` + o.linii.map((l, i) => `<text x="944" y="${114 + i * 18}" font-size="13" fill="#5fd3ff">${esc(l)}</text>`).join("") : "";
+  const mm = t => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`; $("#ceas5").textContent = mm(sim.tS); $("#ceas5p").textContent = sim.viteza > 1 ? "timp ×" + sim.viteza : "timp real";
+  $("#och5").textContent = sim.ochelari ? "ochelari: purtați ✓" : "ochelari: nu";
+  $("#ledON").setAttribute("fill", sim.run ? "#3cff4a" : "#1a3a1a"); $("#ledTX").setAttribute("fill", sim.run && performance.now() - sim.tx < 80 ? "#ffd04a" : "#5a4a1a"); $("#ledL").setAttribute("fill", sim.rec ? "#ffd04a" : "#5a4a1a"); $("#usb5").setAttribute("stroke", sim.run ? "#222" : "#bbb");
+  $("#sonde5").innerHTML = Object.entries(SOND5).map(([k, d]) => { const t = TPL5[sim.dmm.s[k]] || d.rep, cy = Math.max(d.y0, t[1]) + 40;
+    return `<path d="M${d.x0},${d.y0} C${d.x0},${cy} ${t[0]},${cy} ${t[0]},${t[1] + 6}" fill="none" stroke="${d.cul}" stroke-width="3.2"/><rect x="${t[0] - 4}" y="${t[1] - 30}" width="8" height="30" rx="3" fill="${d.cul}"/><line x1="${t[0]}" y1="${t[1]}" x2="${t[0]}" y2="${t[1] + 8}" stroke="#aaa" stroke-width="2"/>`; }).join("");
+  $("#tk-av").textContent = sim.desprins >= 0 ? "⚠ furtun desprins – clic pe colierul lui" : !strans() ? "colier slăbit – strângeți-l înainte de presiune" : "";
+}
 function sincron3d() {
+  if (!SV3 && Cadru.anim && Cadru.anim.seteaza) SV3 = Cadru.anim;
   if (!SV3) return;
   const mm = t => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   SV3.seteaza({ prel: pRel(), etalon: etalonTxt().toFixed(1), mod: sim.mod, lent: sim.lent, coliere: sim.coliere.map((c, i) => c && sim.desprins !== i), desprins: sim.desprins, ochelari: sim.ochelari,
     run: sim.run, rec: !!sim.rec, tx: sim.run && performance.now() - sim.tx < 80, oled: sim.run ? oledTxt() : null,
     dmm: { mod: sim.dmm.mod, txt: sim.dmm.txt, u: sim.dmm.u, r: sim.dmm.s.dmmR, b: sim.dmm.s.dmmB }, ceas: mm(sim.tS), ceasP: sim.etans && !sim.etans.gata ? `test etanșeitate ${fx(sim.tS - sim.etans.t0, 0)} s` : (sim.viteza > 1 ? "timp ×" + sim.viteza : "timp real") });
 }
-function actualizeaza() { citesteDMM(); panou(); afisaje(); sincron3d(); actualizeazaPasi(); }
+function actualizeaza() { citesteDMM(); panou(); afisaje(); planseAfis(); sincron3d(); actualizeazaPasi(); }
 function laClic3d(k) {
   if (k === "pompa") return cursaPompa(sim.frac);
   if (k === "selector") { sim.mod = sim.mod === "vid" ? "pres" : "vid"; return actualizeaza(); }
@@ -493,7 +584,8 @@ const CSS = `<style>
 .tk-bara button.activ { background:#e8f1fb; border-color:#1477d1; color:#0d5ea8; }
 .tk-bara .tk-start { background:#2e9e44; border-color:#2e9e44; color:#fff; } .tk-bara .tk-start.ruleaza { background:#d6452f; border-color:#d6452f; }
 .tk-plansa { position:relative; background:#eef1f3; border-bottom:1px solid #e3e3e3; min-height:120px; }
-.m5-3d .m3d { height:clamp(400px, 58vh, 640px); }
+#tk-svg { width:100%; height:auto; aspect-ratio:1300/814; display:block; user-select:none; font-family:system-ui,sans-serif; background:#fbfbfb; }
+#tk-svg .tk-comp { cursor:pointer; } #tk-svg .tk-comp:hover { filter:brightness(1.06) drop-shadow(0 0 3px rgba(20,119,209,.6)); }
 .a3d-tip { position:absolute; background:rgba(20,24,30,.88); color:#fff; font:12px system-ui,sans-serif; padding:.2rem .45rem; border-radius:4px; pointer-events:none; white-space:nowrap; z-index:3; }
 .tk-dmm, .tk-vederi, .tk-pompa { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; padding:.35rem .6rem; font:12.5px system-ui,sans-serif; color:#333; border-bottom:1px solid #eee; }
 .tk-dmm button, .tk-vederi button, .tk-pompa button { border:1px solid #cfd4da; background:#fff; color:#333; border-radius:4px; padding:.2rem .55rem; font:600 12px system-ui; cursor:pointer; }
@@ -578,6 +670,12 @@ Cadru.porneste({
     return l;
   },
   exemplu(D) { const t = D.t; Object.assign(t.t51.p1, { prel: "-71.3", u: "0.580" }); Object.assign(t.t51.p4, { prel: "0.0", u: "1.900" }); t.t52.patm.v = "101.30"; },
+  animatie: {
+    titluTab: "Montajul real (3D)", titlu: "Montajul real al lucrării – aceleași legături ca în planșa Tinkercad",
+    intro: `<p>Standul de calibrare la scară reală: pompa manuală de vid / presiune cu manometru, furtunurile de 6 mm cu coliere, teul de alamă, manometrul etalon digital, senzorul MAP pe colțarul de aluminiu, placa de test cu BMP280 și punctele de test, Arduino Mega cu OLED, multimetrul, ochelarii de protecție și cronometrul. Montajul urmărește simulatorul; clic pe pompă = o cursă, clic pe selector, supape, coliere, ochelari, puncte de test și comutatorul multimetrului ca pe planșă. Rotiți, apropiați sau depărtați vederea.</p>`,
+    modul: "aparate3d.js?v=9", functie: "creeazaStandMAP", optiuni: { laClic: k => laClic3d(k) },
+    dupa: `<div class="tk-vederi" style="border:0;padding:.5rem 0 0"><span>Vedere:</span>${[["tot", "Ansamblu"], ["pneu", "Pompa, teul și etalonul"], ["placa", "Placa de test"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>`
+  },
   vehicul3d: {
     titluTab: "Pe autovehicul (3D)", titlu: "Senzorul MAP în autoturism",
     intro: `<p>Senzorul de presiune absolută din colector (MAP, adesea combinat cu temperatura aerului – TMAP) este montat pe colectorul de admisie. Selectați-l în machetă: amplasarea, mufa și semnalul.</p>`,
@@ -603,12 +701,11 @@ Cadru.porneste({
         <button type="button" id="tk-codb" class="activ">{ } Cod</button>
         <button type="button" id="tk-start" class="tk-start">▶ Pornește simularea</button>
       </div>
-      <div class="tk-plansa"><div id="st3d" class="m5-3d"><p class="nota" style="padding:1rem">Se încarcă standul 3D…</p></div><div class="tk-insp" id="tk-insp" hidden></div><div class="tk-pas-banda" id="tk-pas-banda"></div></div>
+      <div class="tk-plansa">${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div><div class="tk-pas-banda" id="tk-pas-banda"></div></div>
       <div class="tk-pompa" id="tk-pompa"></div>
       <div class="tk-dmm" id="tk-dmm"></div>
       <div class="tk-afis" id="afis"></div>
-      <div class="tk-vederi"><span>Vedere:</span>${[["tot", "Ansamblu"], ["pneu", "Pompa, teul și etalonul"], ["placa", "Placa de test"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>
-      <p class="tk-ajutor">Trageți = rotire · dreapta-trageți = deplasare · rotița = zoom · clic pe pompă = o cursă; clic pe selectorul galben (vid / presiune), pe supapa lentă (cromată), pe butonul albastru (eliberare rapidă), pe coliere, pe ochelari, pe punctele de test (sondele multimetrului) și pe comutatorul multimetrului</p>
+      <p class="tk-ajutor">Clic pe pompă = o cursă · clic pe selectorul galben (vid / presiune), pe supapa lentă, pe butonul albastru (eliberare rapidă), pe coliere, pe ochelari, pe punctele de test (sondele multimetrului: + pe TP U / TP 5V, − pe TP GND), pe comutatorul multimetrului și pe RESET · celelalte componente = detalii. Montajul real în 3D este în tabul „Montajul real (3D)”.</p>
       <div class="tk-jos">
         <div class="tk-cod" id="tk-codp">
           <div class="tk-cod-sus"><b>Cod – Arduino Mega 2560</b><span style="margin-left:auto">${PROG.titlu}.ino</span></div>
@@ -633,15 +730,15 @@ Cadru.porneste({
       sim.p = P().patm; afiseazaCod(); actualizeazaFw(); dmmCtl(); actualizeaza();
       $("#tk-start").addEventListener("click", pornesteSim);
       $("#tk-codb").addEventListener("click", () => { const p = $("#tk-codp"); p.hidden = !p.hidden; $("#tk-codb").classList.toggle("activ", !p.hidden); });
-      $("#tk-fit").addEventListener("click", () => vedere3d("tot"));
+      $("#tk-fit").addEventListener("click", () => { inspector(null); planseAfis(); });
       const tx = () => { const i = $("#ser-in"); if (i.value.trim()) trimiteSerial(i.value); i.value = ""; };
       $("#ser-tx").addEventListener("click", tx); $("#ser-in").addEventListener("keydown", e => { if (e.key === "Enter") tx(); });
       $$("[data-ved]").forEach(b => b.addEventListener("click", () => { if (b.dataset.ved === "rec" && !sim.inreg) return Cadru.mesajTemporar("Nu există încă o eliberare înregistrată.", "atentie"); sim.vedere = b.dataset.ved; comutaVedere(); }));
       $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
       construiestePasi();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
-      import(BAZA_COMUN + "aparate3d.js?v=9").then(m => { SV3 = m.creeazaStandMAP($("#st3d"), { laClic: laClic3d }); sincron3d(); })
-        .catch(e => { console.warn("Standul 3D nu s-a încărcat:", e); $("#st3d").innerHTML = `<p class="nota" style="padding:1rem">Standul 3D nu poate fi afișat pe acest dispozitiv (WebGL). Lucrați cu comenzile și afișajele de mai jos.</p>`; });
+      $$("#tk-svg [data-k]").forEach(g => g.addEventListener("click", e => { e.stopPropagation(); laClic3d(g.dataset.k); }));
+      planseAfis();
       C.mesaj("Pasul 1: ochelarii, colierele strânse, apoi porniți simularea și citiți presiunea atmosferică.", "");
     },
     reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.serial = []; sim.ist = []; sim.inreg = null; sim.tS = 0; if (Cadru.P) sim.p = P().patm; },
@@ -650,8 +747,8 @@ Cadru.porneste({
       let rest = h; while (rest > 1e-9) { const d = Math.min(0.01, rest); rest -= d; sim.tS += d; pasPneumatic(d); if (sim.run) pasProgram(); }
       if (sim.etans && !sim.etans.gata && sim.tS - sim.etans.t0 >= 60) { const dp = etalonTxt() - sim.etans.p0; sim.etans.gata = true; sim.etans.dp = dp; sim.etans.ok = strans() && Math.abs(dp) < 0.5;
         Cadru.mesajTemporar(sim.etans.ok ? `Etanșeitate bună: ${fx(dp, 2)} kPa în 60 s.` : `Montajul pierde ${fx(dp, 2)} kPa în 60 s: verificați colierele.`, sim.etans.ok ? "" : "atentie"); }
-      if (!vizibil) return;
-      if (acum - (this._to || 0) > 120) { this._to = acum; citesteDMM(); afisaje(); plotter(); sincron3d(); }
+      if (!vizibil) { if (C.tabActiv === "anim" && acum - (this._t3 || 0) > 120) { this._t3 = acum; citesteDMM(); planseAfis(); sincron3d(); } return; }
+      if (acum - (this._to || 0) > 120) { this._to = acum; citesteDMM(); afisaje(); planseAfis(); plotter(); sincron3d(); }
       if (acum - (this._ts || 0) > 400) { this._ts = acum; actualizeazaPasi(); if (pasActiv === 4) cursorAfis();
         C.stare(1, sim.run ? "placa alimentată" : "alimentare oprită", sim.run ? "inc" : ""); C.stare(2, `p = ${fx(pApp(), 1)} kPa abs. (${fx(pRel(), 1)} rel.)`); }
     },

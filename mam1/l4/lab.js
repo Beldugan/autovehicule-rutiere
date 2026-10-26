@@ -30,6 +30,7 @@ function linieOled() {
   return { titlu: sim.fw ? `TEMP[C] B=${sim.fw.B}${sim.rec ? " REC " + (sim.rec.k * 0.5).toFixed(0) + "s" : ""}` : "", linii: v ? [`NTC ${f(v.ntc, 2)}`, `LM35${f(v.lm, 2)}`, `DS  ${f(v.ds, 3)}`, `TK  ${f(v.tc, 2)}`] : ["pornire..."] };
 }
 function sincron3d(rapid) {
+  if (!SV3 && Cadru.anim && Cadru.anim.seteaza) { SV3 = Cadru.anim; rapid = true; }
   if (!SV3) return;
   const mm = t => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   SV3.seteaza({ poz: sim.poz, rapid, et: etalon().toFixed(1), oled: linieOled(), run: sim.run, rec: !!sim.rec, dec: sim.dec, manusi: sim.manusi, tx: sim.run && performance.now() - sim.tx < 80,
@@ -891,6 +892,12 @@ Cadru.porneste({
     return l;
   },
   exemplu(D) { const t = D.t; Object.assign(t.t43.apa, { us: "0.500", uref: "5.000", te: "47.5" }); Object.assign(t.t42.ntc, { t0: "22.00", tinf: "60.00", tau: "12.0" }); },
+  animatie: {
+    titluTab: "Montajul real (3D)", titlu: "Montajul real al lucrării – aceleași legături ca în planșa Tinkercad",
+    intro: `<p>Standul de lucru la scară reală: stativul cu mănunchiul de senzori (NTC, LM35, DS18B20, termocuplul K și termometrul etalon), vasul Dewar cu apă caldă și paharul cu apă la temperatura camerei, placa de test cu divizorul NTC, conectorul X2, rezistorul de 4,7 kΩ al magistralei 1-Wire și modulul MAX6675, Arduino Mega cu OLED, multimetrul cu sondele și cronometrul. Montajul urmărește simulatorul; clic pe pahar / vasul Dewar / stativ mută senzorii, clic pe punctele de test mută sondele. Rotiți, apropiați sau depărtați vederea.</p>`,
+    modul: "aparate3d.js?v=9", functie: "creeazaStandTemp", optiuni: { laClic: k => laClic3d(k) },
+    dupa: `<div class="tk-vederi" style="border:0;padding:.5rem 0 0"><span>Vedere:</span>${[["tot", "Ansamblu"], ["senzori", "Senzori și recipiente"], ["placa", "Placa de test"], ["dmm", "Multimetru"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>`
+  },
   vehicul3d: {
     titluTab: "Pe autovehicul (3D)",
     titlu: "Senzorul de temperatură a lichidului de răcire în autoturism",
@@ -917,7 +924,7 @@ Cadru.porneste({
         <button type="button" id="tk-codb" class="activ">{ } Cod</button>
         <button type="button" id="tk-start" class="tk-start">▶ Pornește simularea</button>
       </div>
-      <div class="tk-plansa"><div id="st3d" class="m4-3d"></div>${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div>
+      <div class="tk-plansa">${planseSVG()}<div class="tk-insp" id="tk-insp" hidden></div>
         <div class="tk-pas-banda" id="tk-pas-banda"></div></div>
       <div class="tk-dmm" id="tk-dmm"></div>
       <div class="tk-vederi" id="tk-vederi" hidden><span>Vedere:</span>${[["tot", "Ansamblu"], ["senzori", "Senzori și recipiente"], ["placa", "Placa de test"], ["dmm", "Multimetru"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>
@@ -955,8 +962,6 @@ Cadru.porneste({
       construiestePasi(); dmmCtl();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
-      import(BAZA_COMUN + "aparate3d.js?v=9").then(m => { SV3 = m.creeazaStandTemp($("#st3d"), { laClic: laClic3d }); $(".tk-plansa").classList.add("cu3d"); $("#tk-vederi").hidden = false; $("#aj-3d").hidden = false; $("#aj-svg").hidden = true; sincron3d(true); })
-        .catch(e => { console.warn("Standul 3D nu s-a încărcat:", e); $("#st3d").remove(); });
       C.mesaj("Pasul 1: porniți simularea și lăsați senzorii să se stabilizeze în aer (cel puțin 5 minute – accelerați timpul).", "");
     },
     reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.serial = []; sim.ist = []; sim.inreg = null; sim.tS = 0; if (Cadru.P) initTermic(); },
@@ -968,7 +973,7 @@ Cadru.porneste({
       while (rest > 1e-9) { const d = Math.min(0.05, rest); rest -= d; sim.tS += d; sim.tPoz += d;
         const T = Tm(), m = medTip(); ["ntc", "lm", "ds", "tc", "et"].forEach(k => { sim.Ts[k] += (T - sim.Ts[k]) * (1 - Math.exp(-d / MD.tau(p, k, m))); });
         if (sim.run) pasProgram(); }
-      if (!vizibil) return;
+      if (!vizibil) { if (C.tabActiv === "anim" && acum - (this._t3 || 0) > 120) { this._t3 = acum; citesteDMM(); oledAfis(); instrumenteAfis(); sincron3d(); } return; }
       if (acum - sim.dmm.tA > 300) { sim.dmm.tA = acum; citesteDMM(); const v = $(".tk-dmm-v"); if (v) v.textContent = sim.dmm.mod === "OFF" ? "" : sim.dmm.txt; }
       if (acum - (this._to || 0) > 120) { this._to = acum; oledAfis(); instrumenteAfis(); plotter(); sincron3d(); }
       $("#ledTX").setAttribute("fill", sim.run && acum - sim.tx < 60 ? "#ffd04a" : "#5a4a1a");

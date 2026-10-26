@@ -866,6 +866,13 @@ Cadru.porneste({
     return l;
   },
   exemplu(D) { const t = D.t; Object.assign(t.t21.d12, { R1: "27", R2: "10", Uin: "12.000", Um: "3.240" }); Object.assign(t.t22.f159, { Uin: "2.000", Uout: "1.414" }); Object.assign(t.t23.f900, { fap: "100.0" }); },
+  animatie: {
+    titluTab: "Montajul real (3D)", titlu: "Montajul real al lucrării – aceleași legături ca în planșa Tinkercad",
+    intro: `<p>Standul de lucru la scară reală: sursa dublă cu generatorul de funcții așezat deasupra, osciloscopul, multimetrul, placa de test cu divizoarele de 12 V și 5 V, filtrul RC, comutatorul S1 al intrării PA0, potențiometrul pe PA1 cu motorul de c.c. lângă cablu (sursa de zgomot) și comutatoarele S2, S3, STM32 „Blue Pill” cu ST-Link V2 și laptopul cu programul. Montajul urmărește simulatorul (comutatoarele, potențiometrul, motorul, ecranele, sondele). Rotiți, apropiați sau depărtați vederea.</p>`,
+    modul: "montaj3d.js?v=1", functie: "creeazaMontaj",
+    optiuni: { svgVB: [0, 0, 1300, 790], construieste: L => montaj3dL2(L), cam: [0.0, 0.6, 0.86], tinta: [0.0, 0.03, -0.01],
+      vederi: { tot: [[0.0, 0.6, 0.86], [0.0, 0.03, -0.01], "Ansamblu"], placa: [[-0.04, 0.15, 0.28], [-0.04, 0.0, 0.12], "Placa de test"], stm: [[0.22, 0.14, 0.28], [0.2, 0.0, 0.12], "Blue Pill"], aparate: [[-0.25, 0.33, 0.4], [-0.25, 0.1, -0.2], "Aparatele"] } }
+  },
   vehicul3d: {
     titluTab: "Pe autovehicul (3D)",
     titlu: "Condiționarea semnalelor în calculatorul motorului",
@@ -954,3 +961,45 @@ Cadru.porneste({
     }
   }
 });
+
+/* ------------------------------------------------------------------ montajul real 3D (aceleași legături ca planșa) */
+function montaj3dL2(L) {
+  const { V3, mm } = L, R = 0xe53935, N = 0x222222;
+  const PS = L.sursaDubla([-0.45, 0, -0.17], { ecrane: [[56, 46, 120, 44], [190, 46, 120, 44]], roty: 0.15 }), G = L.generator([-0.45, 0.142, -0.17], { ecran: [56, 231, 186, 64], roty: 0.15 });
+  const O = L.osciloscop([-0.12, 0, -0.21], { ecran: [406, 56, 404, 246] }), DM = L.multimetru([0.15, 0, -0.2], { ecran: [888, 58, 132, 54], cul: 0x3b3f45, et: "Multimetru digital (V⎓)" });
+  const PC = L.laptop([0.43, 0, -0.17], { roty: -0.35, cod: () => L.textCod(), titlu: () => `Arduino IDE – ${(PROG[sim.sketch] || {}).titlu || ""}.ino` });
+  const BB = L.placaTest([-0.04, 0, 0.13]), BS = L.placaTest([0.2, 0, 0.13], { coloane: 30, et: "Placa de test a plăcii STM32" });
+  const BP = L.bluePill(BS, 6), SL = L.stLink([0.235, 0, 0.0]);
+  const g = (c, r) => BB.gaura(c, r), s = (c, r) => BS.gaura(c, r);
+  // sursa: +12 V, +5 V, GND
+  L.cablu(PS.borne[0], g(3, "j"), R, { burta: 0.1, dupontB: true }); L.cablu(PS.borne[1], g(15, "j"), 0xff7043, { burta: 0.12, dupontB: true }); L.cablu(PS.borne[2], g(1, "-s"), N, { burta: 0.14, dupontB: true });
+  L.fir(g(15, "i"), g(12, "+s"), 0xff7043);
+  // divizorul de 12 V (PA2) și cel de 5 V (PA3)
+  L.rezistor(g(3, "h"), g(7, "h"), sim.R.R1a * 1000, { et: `R1 = ${sim.R.R1a} kΩ (divizorul de 12 V)` }); L.rezistor(g(7, "g"), g(11, "g"), sim.R.R2a * 1000, { et: `R2 = ${sim.R.R2a} kΩ (divizorul de 12 V)` }); L.fir(g(11, "j"), g(9, "-s"), N);
+  L.rezistor(g(15, "h"), g(19, "h"), sim.R.R1b * 1000, { et: `R1 = ${sim.R.R1b} kΩ (divizorul de 5 V)` }); L.rezistor(g(19, "g"), g(23, "g"), sim.R.R2b * 1000, { et: `R2 = ${sim.R.R2b} kΩ (divizorul de 5 V)` }); L.fir(g(23, "j"), g(19, "-s"), N);
+  // generatorul → filtrul RC (R 10 kΩ, C 100 nF)
+  L.cablu(G.iesire, g(30, "j"), 0x2fa84f, { burta: 0.16, crocodil: true }); L.cablu(G.iesire.clone().add(V3(mm(12), 0, 0)), g(24, "-s"), N, { burta: 0.18, crocodil: true });
+  L.rezistor(g(30, "h"), g(34, "h"), 10000, { et: "R = 10 kΩ (filtrul RC)" }); L.condCeramic(g(34, "g"), g(36, "g"), { et: "C = 100 nF (filtrul RC), f_c ≈ 159 Hz" }); L.fir(g(36, "j"), g(29, "-s"), N);
+  // comutatorul S1: GEN / RC → PA0
+  const s1 = L.comutator(g(40, "c"), g(42, "c"), { et: "S1: intrarea PA0 (GEN ↔ RC)" }); L.fir(g(30, "f"), g(40, "a"), 0x2fa84f); L.fir(g(34, "f"), g(42, "a"), 0x8e24aa);
+  // potențiometrul (PA1), motorul și comutatoarele S2, S3
+  const pot = L.potentiometru(g(47, "b"), g(51, "b"), { et: "Potențiometru 10 kΩ – cursorul la PA1" }); L.fir(g(47, "e"), g(45, "+j"), R); L.fir(g(51, "e"), g(46, "-j"), N);
+  const s2 = L.comutator(g(54, "c"), g(56, "c"), { et: "S2: motorul (oprit / pornit)" }), s3 = L.comutator(g(60, "c"), g(62, "c"), { et: "S3: treapta de +1 V pe PA1" });
+  L.fir(g(54, "e"), g(48, "+s"), 0xff7043); const MO = L.motorCC([0.06, 0, 0.245], { roty: Math.PI }); L.fir(g(56, "a"), MO.borne[0], R, { h: 10 }); L.fir(g(55, "-j"), MO.borne[1], N, { h: 10 });
+  L.fir(g(60, "a"), g(58, "+j"), R); L.rezistor(g(61, "d"), g(57, "d"), 22000, { et: "Rezistorul treptei (S3)" }); L.fir(g(57, "a"), g(49, "a"), 0xef6c00);
+  // STM32: alimentarea, intrările PA0…PA3, ST-Link
+  L.fir(BP.pin("3V3"), s(20, "+j"), R); L.fir(BP.pin("GND"), s(21, "-j"), N); L.fir(s(1, "+j"), g(59, "+j"), R); L.fir(s(2, "-j"), g(60, "-j"), N); L.fir(g(61, "-j"), g(61, "-s"), N);
+  L.fir(g(41, "e"), BP.pin("PA0"), 0xf2c230); L.fir(g(49, "c"), BP.pin("PA1"), 0xef6c00, { prin: [V3(0.09, mm(18), 0.215)] }); L.fir(g(7, "j"), BP.pin("PA2"), 0x00acc1); L.fir(g(19, "j"), BP.pin("PA3"), 0x26a69a);
+  [["3V3", R, 3], ["SWDIO", 0x6a1b9a, 1], ["SWCLK", 0x00897b, 0], ["GND", N, 2]].forEach(([n, c, i]) => L.fir(BP.swd(n), SL.pin(i), c, { h: 14 }));
+  L.cabluUSB(V3(0.235 - 0.032, 0.0045, 0.0), PC.usb);
+  // masele aparatelor și sondele mobile
+  L.cablu(DM.com, g(52, "-s"), N, { burta: 0.05 }); O.ch.forEach((p, i) => L.cablu(p.clone().add(V3(0, mm(-8), 0)), g(40 + i * 2, "-s"), N, { r: 0.8, burta: 0.04, crocodil: true }));
+  const P3 = { v12: PS.borne[0], v5: PS.borne[1], gndP: PS.borne[2], genO: G.iesire, div12: g(7, "i"), div5: g(19, "i"), genBB: g(30, "i"), rc: g(34, "i"), sw0o: g(41, "d"), pa1n: g(49, "d"), gndBB: g(40, "-j"),
+    PA0: BP.pin("PA0", "b"), PA1: BP.pin("PA1", "b"), PA2: BP.pin("PA2", "b"), PA3: BP.pin("PA3", "b"), v33: BP.pin("3V3", "b"), gndS: s(10, "-j") };
+  const sd = [L.sonda(O.ch[0], 0xf2d600, V3(-0.08, 0.003, -0.02), { osc: true, et: "Sonda CH1 a osciloscopului" }), L.sonda(O.ch[1], 0x1fb6ff, V3(-0.05, 0.003, 0.0), { osc: true, et: "Sonda CH2 a osciloscopului" }), L.sonda(DM.v, 0xd32f2f, V3(0.12, 0.003, -0.05), { et: "Sonda V a multimetrului" })];
+  return { actualizeaza() {
+    pot.set(sim.alfa); s1.set(sim.sw0 === "gen"); s2.set(!sim.motor); s3.set(!sim.step); MO.set(sim.motor); G.set(sim.gen);
+    BP.led(sim.run ? 0.6 : 0);
+    sd[0].muta(P3[sim.osc.ch[0].s] || null); sd[1].muta(P3[sim.osc.ch[1].s] || null); sd[2].muta(P3[sim.dmm.s] || null);
+  } };
+}
