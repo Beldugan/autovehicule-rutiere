@@ -12,7 +12,7 @@ const cl = (x, a, b) => Math.max(a, Math.min(b, x));
 
 /* ------------------------------------------------------------------ starea */
 const sim = {
-  t: 0, rapid: 1, defect: "none", ochelari: false, bijuterii: false, comp: {}, transparent: false,
+  t: 0, rapid: 1, defect: "none", ochelari: false, bijuterii: false, comp: {}, transparent: false, scena: "stand", tipH: "mh", masHib: {},
   tester: false, testT: null, testRez: null, sig: true, cleste: null, osc: false, dmm: null, cons: false,
   crank: false, tCrank: 0, tUltimaAntr: -1e9, merge: false, tRun: 0, consStart: false, capt: { antr: null, porn: null }, viz: "antr", cA: 0, cB: 0, live: null, oscVer: 0
 };
@@ -110,7 +110,15 @@ const PASI = [
     ver: () => [[sim.cleste === "inc", "cleștele pe cablul principal al bateriei"], [sim.sig, "siguranța pompei montată"], [sim.merge, sim.merge ? `motor pornit – t = ${fx(sim.tRun, 0)} s ${sim.consStart ? "(cu consumatori)" : "(fără consumatori)"}` : "motorul oprit"], [!sim.merge || sim.cons === sim.consStart, "consumatorii nemodificați de la pornire"]],
     prog: () => MD.MOM.filter(s => pe("t73", "f", "a" + s)).length + MD.MOM.filter(s => pe("t73", "c", "a" + s)).length, tot: 14,
     ctl: `<div class="rand-butoane"><button type="button" id="b-cl-inc">Cleștele pe cablul bateriei</button><button type="button" id="b-cons">Pornește consumatorii</button><button type="button" data-oprire>Oprește motorul</button></div>` + BTN_ANTR,
-    buton: ["● Citirea → Tabelul 7.3", e => inregInc(e)] }
+    buton: ["● Citirea → Tabelul 7.3", e => inregInc(e)] },
+  { t: "Motopropulsorul și bilanțul", tab: "Tabelul 7.5; bilanțul – Tabelul 7.4", vedere: "tot", panou: "hib",
+    instr: ["Treceți scena pe <b>Motopropulsorul</b> și alegeți tipul: start-stop, mild hybrid 48 V (BSG), full hybrid (e-CVT) sau plug-in hybrid (P2). Urmăriți pe autovehicul componentele (opac / transparent) și fluxurile de energie în ciclul urban.",
+      "La hibride: data loggerul de pe cablul bateriei de 48 V / HV măsoară energia unei reporniri (<b>Oprire → repornire</b>), curentul și tensiunea de încărcare la 10 s după repornire și puterea maximă recuperată la frânare (<b>Frânare recuperativă</b>); C<sub>n</sub>, U<sub>n</sub> și ΔSOC admis se citesc din BMS.",
+      "Înregistrați motopropulsorul și valorile în Tabelul 7.5: bilanțul din Tabelul 7.4 se calculează pentru motopropulsorul ales (la start-stop – cu valorile de pe standul de pornire)."],
+    ver: () => { const m = sim.masHib[sim.tipH] || {}; return [[sim.scena === "hib", "scena: motopropulsorul"], [true, `tipul: ${MD.TIPURI[sim.tipH]}`], [sim.tipH === "ss" || !!m.rep, sim.tipH === "ss" ? "start-stop: energia pornirii – din Tabelul 7.2" : m.rep ? "repornirea măsurată" : "repornirea – nemăsurată"], [sim.tipH === "ss" || !!m.rec, sim.tipH === "ss" ? "recuperarea – P<sub>BSG</sub> din scenariu" : m.rec ? "frânarea recuperativă măsurată" : "frânarea – nemăsurată"]]; },
+    prog: () => pe("t75", "p", "tip") ? 1 : 0, tot: 1,
+    ctl: `<div class="rand-butoane"><button type="button" data-scena="stand">Standul de pornire</button><button type="button" data-scena="hib">Motopropulsorul</button></div>`,
+    buton: ["● Motopropulsorul și valorile → Tabelul 7.5", e => inregHib(e)] }
 ];
 let pasActiv = 0;
 const VEDERI = { tot: [[1.6, 1.25, 1.8], [0.15, 0.55, 0.15]], dem: [[0.25, 0.75, 0.75], [-0.22, 0.52, 0.12]], bat: [[0.5, 0.95, 0.95], [0.78, 0.5, 0.22]], masa: [[-0.5, 1.3, 1.35], [-1.05, 0.86, 0.5]], aparate: [[1.6, 1.15, 1.5], [1.15, 0.65, 0.6]] };
@@ -127,6 +135,7 @@ function alegePas(i) {
   $$("#pasi .pas").forEach(el => el.classList.toggle("activ", +el.dataset.pas === i));
   $$(".instr[data-panou]").forEach(el => { el.hidden = el.dataset.panou !== p.panou; });
   if (i === 3 && sim.capt.antr) arataCapt("antr"); if (i === 5 && sim.capt.porn) arataCapt("porn");
+  if (p.panou === "hib") arataScena("hib"); else if (sim.scena === "hib") arataScena("stand");
   vedere3d(p.vedere); actualizeazaPasi(); deseneaza();
 }
 
@@ -134,6 +143,7 @@ function alegePas(i) {
 function on(sel, f) { $$(sel).forEach(b => b.addEventListener("click", f)); }
 function msg(t) { $("#msg-inreg").innerHTML = t; }
 function legaComenzi() {
+  $$("[data-scena]").forEach(b => b.addEventListener("click", () => arataScena(b.dataset.scena)));
   $("#ck-och").addEventListener("change", e => { sim.ochelari = e.target.checked; actualizeazaPasi(); }); $("#ck-bij").addEventListener("change", e => { sim.bijuterii = e.target.checked; actualizeazaPasi(); });
   $$(".ck-rapid").forEach(c => c.addEventListener("change", e => { sim.rapid = e.target.checked ? 10 : 1; $$(".ck-rapid").forEach(x => x.checked = e.target.checked); }));
   $$("#pasi [data-v]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v)));
@@ -294,7 +304,11 @@ function exportOsc() {
 }
 
 /* ------------------------------------------------------------------ afișaje */
+function citHib() { const el = $("#hib-cit"); if (!el) return; const t = sim.tipH, m = sim.masHib[t] || {};
+  el.innerHTML = t === "ss" ? `<b>${MD.TIPURI.ss}</b>: bilanțul folosește energia pornirii reale (Tabelul 7.2), curentul și tensiunea de încărcare la 10 s (Tabelul 7.3) și bateria de 12 V; înregistrați doar tipul.`
+    : `<b>${MD.TIPURI[t]}</b> – repornirea: ${m.rep ? `U<sub>n</sub> ${m.rep.Un} V, C<sub>n</sub> ${m.rep.Cn} Ah, ΔSOC ${fx(m.rep.dsoc, 2)}, E<sub>rep</sub> ${m.rep.Erep} J, U<sub>înc</sub> ${m.rep.Uinc} V, I<sub>înc</sub> ${m.rep.Iinc} A` : "nemăsurată"} · frânarea: ${m.rec ? `P<sub>rec</sub> ${m.rec.Prec} kW` : "nemăsurată"}`; }
 function actualizeazaPasi() {
+  citHib();
   if (!$("#pasi .pas")) return;
   PASI.forEach((p, i) => { const el = $(`#pasi [data-pas="${i}"]`), n = p.prog(); el.querySelector(".pas-prog").textContent = `${n}/${p.tot}`; el.classList.toggle("gata", n >= p.tot); });
   $(`#pasi [data-pas="${pasActiv}"] .pas-ver`).innerHTML = PASI[pasActiv].ver().map(([ok, t]) => `<li class="${ok ? "ok" : ""}">${t}</li>`).join("");
@@ -320,6 +334,24 @@ function deseneaza() {
 
 /* ------------------------------------------------------------------ 3D */
 const SV = { s3: null };
+/* ------------------------------------------------------------------ motopropulsorul (start-stop / mild / full / plug-in hybrid) pe autovehicul */
+function arataScena(k) {
+  sim.scena = k; $("#st3d").hidden = k !== "stand"; $("#vh3d").hidden = k !== "hib"; $$(".saa7-scena .stand-doar").forEach(e => e.style.display = k !== "stand" ? "none" : "");
+  $$("[data-scena]").forEach(b => b.classList.toggle("activ", b.dataset.scena === k));
+  if (k === "hib" && !SV.vh) { SV.vh = true;
+    import(BAZA_COMUN + "vehicul3d.js?v=28").then(m => { SV.vh = m.creeaza($("#vh3d"), { sistem: "hibrid", masurare: true, tip: sim.tipH, date: MD.tipuri(P()),
+      laTip: t => { sim.tipH = t; actualizeazaPasi(); }, laMasurare: r => { (sim.masHib[r.tip] = sim.masHib[r.tip] || {})[r.ev] = r; actualizeazaPasi(); } }); })
+      .catch(e => { $("#vh3d").innerHTML = `<p class="nota">Motopropulsorul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; }); }
+  actualizeazaPasi();
+}
+function inregHib(e) {
+  const t = sim.tipH, m = sim.masHib[t] || {};
+  if (t === "ss") { const ok = Cadru.inregistreaza(e, { log: { m: "hibss" }, celule: [{ t: "t75", r: "p", c: "tip", v: MD.TIPURI.ss }] }); if (ok) msg("Tabelul 7.5: start-stop – bilanțul se calculează cu energia pornirii (Tabelul 7.2), încărcarea (Tabelul 7.3) și bateria de 12 V."); return; }
+  if (!m.rep || !m.rec) return Cadru.mesajTemporar("Măsurați cu data loggerul repornirea și frânarea recuperativă pe motopropulsorul ales.", "atentie");
+  const r = m.rep, q = m.rec, cel = [["tip", MD.TIPURI[t]], ["Un", String(r.Un)], ["Cn", String(r.Cn)], ["dsoc", r.dsoc.toFixed(2)], ["Erep", String(r.Erep)], ["Uinc", String(r.Uinc)], ["Iinc", String(r.Iinc)], ["Prec", String(q.Prec)]].map(([c, v]) => ({ t: "t75", r: "p", c, v }));
+  const ok = Cadru.inregistreaza(e, { log: [{ m: "hib", tip: t, ev: "rep", Erep: r.Erep, Uinc: r.Uinc, Iinc: r.Iinc, Un: r.Un, Cn: r.Cn, dsoc: r.dsoc }, { m: "hib", tip: t, ev: "rec", Prec: q.Prec }], celule: cel });
+  if (ok) msg(`Tabelul 7.5: ${MD.TIPURI[t]} – U<sub>n</sub> ${r.Un} V, C<sub>n</sub> ${r.Cn} Ah, ΔSOC ${fx(r.dsoc, 2)}, E<sub>rep</sub> ${r.Erep} J, U<sub>înc</sub> ${r.Uinc} V, I<sub>înc</sub> ${r.Iinc} A, P<sub>rec</sub> ${q.Prec} kW.`);
+}
 function porneste3D() {
   const el = $("#st3d"); if (!el) return;
   const pr = P();
@@ -342,6 +374,7 @@ function calculeazaSAA7(D) {
     ["R<sub>circuit (+)</sub> = ΔU<sub>(+)</sub>/I (7.2)", F(o.Rp) ? `<span style="color:var(--accent)">${fx(o.Rp, 2)} mΩ</span>` : "—"],
     ["R<sub>circuit masă</sub> = ΔU<sub>masă</sub>/I (7.2)", F(o.Rm) ? `${fx(o.Rm, 2)} mΩ` : "—"],
     ["R<sub>i</sub> din oscilogramă = (U<sub>0</sub> − U<sub>min</sub>)/I<sub>vârf</sub>", F(o.RiOsc) ? `${fx(o.RiOsc, 2)} mΩ${F(o.Ri) ? ` (tester: ${fx(o.Ri, 2)} mΩ)` : ""}` : "—"],
+    ["Motopropulsorul pentru bilanț (Tabelul 7.5)", `${MD.TIPURI[o.tip]}${o.tip !== "ss" && F(o.bat.Un) ? ` – ${fx(o.bat.Un, 1)} V, ${fx(o.bat.Cn, 1)} Ah, E<sub>rep</sub> = ${fx(o.Ep, 0)} J` : ""}`],
     ["Pornirea reală: E<sub>p</sub> (7.3), Q<sub>p</sub> (7.4)", F(o.porn.E) ? `<span style="color:var(--accent)">${fx(o.porn.E, 0)} J</span>; ${fx(o.porn.Q, 1)} mAh` : "—"],
     ["Antrenarea împiedicată: E, Q", F(o.antr.E) ? `${fx(o.antr.E, 0)} J; ${fx(o.antr.Q, 1)} mAh` : "—"],
     ["Sarcina primită de baterie în 120 s (fără consumatori)", F(o.Qinc120) ? `${fx(o.Qinc120, 0)} mAh` : "—"],
@@ -392,9 +425,11 @@ ${EC("E<sub>rec</sub> ≤ η<sub>rec</sub> · P<sub>BSG</sub> · t<sub>fr</sub> 
 <figure><img src="img/fig7_2.jpg" alt="Fig. 7.2" loading="lazy"><figcaption>Fig. 7.2. Curentul de pornire și tensiunea bateriei (exemplu)</figcaption></figure>
 <figure><img src="img/fig7_3.jpg" alt="Fig. 7.3" loading="lazy"><figcaption>Fig. 7.3. Puterea și energia cumulată la o pornire (stânga); bilanțul energetic al unui ciclu stop-start (dreapta) – valori exemplificative</figcaption></figure>
 <figure><img src="img/fig7_4.jpg" alt="Fig. 7.4" loading="lazy"><figcaption>Fig. 7.4. Arhitectura mild-hybrid 48 V (schemă de principiu)</figcaption></figure>
+<p><b>Gradele de hibridizare.</b> <b>Start-stop</b> (micro-hibrid): demaror întărit (reductor planetar, pinion cu durabilitate de ≈ 250 000 de porniri), baterie EFB sau AGM cu senzorul IBS pe borna negativă, alternator comandat de ECU (încarcă preferențial la decelerare). <b>Mild hybrid 48 V</b> (P0): alternatorul-demaror BSG antrenat prin curea (10…15 kW) repornește motorul silențios, asistă la accelerare și recuperează la frânare în bateria Li-ion de 48 V (0,4…1 kWh); convertorul DC/DC alimentează rețeaua de 12 V. Nu se poate deplasa doar electric. <b>Full hybrid</b> (de exemplu cu divizarea puterii, e-CVT): un angrenaj planetar leagă motorul termic, MG1 (generator / demaror) și MG2 (motorul de tracțiune); bateria HV (≈ 200…300 V, 1…1,6 kWh) și invertoarele cu convertor ridicător permit mers electric la viteze mici și recuperare mare; nu există demaror și alternator clasice. <b>Plug-in hybrid</b> (de exemplu P2: motorul electric între motorul termic și cutie, cu ambreiajul K0): baterie HV mare (10…25 kWh), reîncărcabilă din rețea prin încărcătorul de bord, autonomie electrică de 40…80 km. Bilanțul din Tabelul 7.4 se poate întocmi pentru fiecare tip cu bateria lui (Tabelul 7.5).</p>
 <h2>7.3. Aparatură și echipamente</h2>
 <ul><li>Stand motor (1.4 MPI și/sau 1.5 dCi)</li><li>Clește ampermetric de curent continuu (min. 600 A) conectat la osciloscop</li><li>Osciloscop auto cu export al datelor (CSV), multimetru digital</li><li>Tester de baterie (conductanță)</li><li>Consumatori electrici ai standului (faruri, ventilator)</li><li>PC cu Excel sau Python pentru integrarea numerică</li><li>Panoplii cu demaror, alternator și componente stop-start / 48 V</li></ul>
 <div class="nota-indrumar"><h3>Completări față de îndrumarul tipărit</h3><ul>
+<li><b>Tabelul 7.5 și motopropulsorul.</b> În simulator, scena <b>Motopropulsorul</b> arată pe autovehicul motorul real cu sistemul start-stop, mild hybrid 48 V, full hybrid sau plug-in hybrid (carcase opace sau transparente); la hibride, energia repornirii, curentul și tensiunea de încărcare și puterea recuperată se măsoară cu data loggerul, iar bateria se citește din BMS. Bilanțul din Tabelul 7.4 se calculează pentru motopropulsorul ales.</li>
 <li><b>Tabelul 7.0</b> conține rezultatele testerului de baterie (pasul 2 din modul de lucru): tensiunea în gol, rezistența internă, CCA estimat și starea SOH; capacitatea C<sub>n</sub> și CCA nominal se citesc pe eticheta bateriei.</li>
 <li><b>Tabelul 7.1</b> are în plus tensiunea medie în timpul antrenării U<sub>antrenare</sub>, citită pe aceeași fereastră cu I<sub>antrenare</sub>, pentru relația (7.1). Mărimile se citesc pe oscilogramă cu cursoarele A și B (eșantionare Δt = 2 ms); I<sub>antrenare</sub> este media pe zona stabilizată, după vârf, pe cel puțin 0,5 s.</li>
 <li><b>Tabelul 7.2</b> are două rânduri: antrenarea cu pornirea împiedicată (3…5 s) și pornirea reală (motorul pornește după ≈ 1 s). În bilanțul stop-start (Tabelul 7.4) se folosește energia <b>pornirii reale</b>. Integrala se ia pe fereastra care cuprinde tot curentul; fișierul CSV exportat permite verificarea în Excel / Python.</li>
@@ -473,7 +508,7 @@ Cadru.porneste({
   disc: "SAA", nr: 7, cod: "saa-l7",
   titlu: "Sistemul de pornire și bilanțul energetic al sistemelor stop-start și mild-hybrid 48 V",
   scurt: "Sistemul de pornire și stop-start",
-  subtitlu: "Laborator virtual – standul 1.4 MPI: oscilograma curentului de pornire, căderile de tensiune, energia unei porniri, reîncărcarea bateriei, bilanțul stop-start și mild-hybrid 48 V",
+  subtitlu: "Laborator virtual – standul 1.4 MPI și motopropulsoarele start-stop / mild hybrid 48 V / full hybrid / plug-in hybrid: oscilograma curentului de pornire, căderile de tensiune, energia unei porniri, reîncărcarea bateriei, bilanțul stop-start și hibrid V",
   parametri: MD.parametri,
   parametriDemo() { return MD.parametri(20261026); },
   date: [{ k: "Cn", et: "C<sub>n</sub> baterie [Ah]", v: 70, fix: true }, { k: "CCAn", et: "CCA nominal (EN) [A]", v: 680, fix: true }, { k: "Un", et: "U<sub>n</sub> [V]", v: 12, fix: true },
@@ -490,7 +525,10 @@ Cadru.porneste({
       randuri: [{ k: "f", et: "I<sub>înc</sub> fără consumatori [A]" }, { k: "c", et: "I<sub>înc</sub> cu consumatori [A]" }, { k: "u", et: "U<sub>bat</sub> [V]" }], coloane: MOM.map(s => ({ k: "a" + s, t: String(s), intrare: true })) },
     { id: "t74", titlu: "Tabelul 7.4. Bilanțul energetic al unui ciclu stop-start", antetRand: "Mărime", nota: "Se calculează automat din Tabelele 7.2 și 7.3 și din scenariul individual (Date de lucru).",
       randuri: [{ k: "Ep", et: "Energia unei porniri E<sub>p</sub> [kJ]" }, { k: "Pc", et: "Puterea consumatorilor în oprire P<sub>c</sub>" }, { k: "ts", et: "Durata opririi t<sub>s</sub>" }, { k: "Ec", et: "Energia pe ciclu E<sub>ciclu</sub> [kJ]" }, { k: "ti", et: "Timpul de reîncărcare t<sub>înc</sub> [s]" },
-        { k: "N", et: "Numărul maxim de opriri N<sub>max</sub> [–]" }, { k: "Er", et: "Energia recuperabilă cu BSG 48 V E<sub>rec</sub> [kJ]" }, { k: "nc", et: "Cicluri stop-start acoperite de o frânare [–]" }], coloane: [{ k: "v", t: "Valoare" }] }
+        { k: "N", et: "Numărul maxim de opriri N<sub>max</sub> [–]" }, { k: "Er", et: "Energia recuperabilă la o frânare E<sub>rec</sub> [kJ]" }, { k: "nc", et: "Cicluri stop-start acoperite de o frânare [–]" }], coloane: [{ k: "v", t: "Valoare" }] },
+    { id: "t75", titlu: "Tabelul 7.5. Motopropulsorul pentru bilanț (completare)", antetRand: "", nota: "La start-stop se completează numai tipul (bilanțul folosește Tabelele 7.2 și 7.3 și bateria de 12 V). La hibride: U<sub>n</sub>, C<sub>n</sub>, ΔSOC admis – din BMS; E<sub>rep</sub>, U<sub>înc</sub>, I<sub>înc</sub> (la 10 s), P<sub>rec</sub> – cu data loggerul pe cablul bateriei.",
+      randuri: [{ k: "p", et: "Motopropulsorul" }], coloane: [{ k: "tip", t: "Tipul", intrare: true, tip: "select", optiuni: Object.values(MD.TIPURI) }, { k: "Un", t: "U<sub>n</sub> [V]", intrare: true }, { k: "Cn", t: "C<sub>n</sub> [Ah]", intrare: true }, { k: "dsoc", t: "ΔSOC [–]", intrare: true },
+        { k: "Erep", t: "E<sub>rep</sub> [J]", intrare: true }, { k: "Uinc", t: "U<sub>înc</sub> [V]", intrare: true }, { k: "Iinc", t: "I<sub>înc</sub> [A]", intrare: true }, { k: "Prec", t: "P<sub>rec</sub> [kW]", intrare: true }] }
   ],
   inaltimeGrafic: 320,
   calculeaza: calculeazaSAA7,
@@ -520,11 +558,11 @@ Cadru.porneste({
     const p = MD.oscilograma(pr, "porn", 0, ""), jx = MD.indiciCurent(p), wp = MD.fereastra(p, jx[0] - 10, jx[1] + 10); Object.assign(T.t72.porn, { E: String(wp.E), Q: wp.Q.toFixed(1), Pmax: String(wp.Pmax), Pmed: String(wp.Pmed) });
     MOM.forEach(s => { const f = MD.incarcare(pr, s, false, ""), c = MD.incarcare(pr, s, true, ""); T.t73.f["a" + s] = f.I.toFixed(1); T.t73.c["a" + s] = c.I.toFixed(1); T.t73.u["a" + s] = f.U.toFixed(2); });
   },
-  animatie: {
-    titluTab: "Animație: pornirea (3D)", titlu: "Demarorul – cuplarea și antrenarea; sistemul mild-hybrid 48 V",
-    intro: `<p>Alegeți varianta: demarorul clasic, demarorul cu reductor planetar (întărit pentru stop-start) – amândouă secționate – sau arhitectura mild-hybrid 48 V. Butonul <b>Pornire</b> parcurge secvența: releul trage plonjorul, furca împinge pinionul în coroană, contactele principale se închid (vârful de curent), antrenarea cu pulsații, pornirea motorului cu decuplarea roții libere și revenirea. La varianta 48 V urmăriți fluxurile de energie (verde – 48 V, galben – 12 V) la repornire, recuperare, asistare și oprire. Treceți cu mouse-ul peste componente.</p>`,
-    dupa: `<p class="nota">Rotațiile sunt mult încetinite (indusul se rotește în realitate cu 2000…10 000 rot/min). Curentul și puterea din grafic sunt calitative, pentru urmărirea fazelor.</p>`,
-    modul: "pornire3d.js?v=1", functie: "creeazaAnimatiePornire"
+  vehicul3d: {
+    titluTab: "Pe automobil (3D)", titlu: "Motopropulsorul pe autovehicul: start-stop, mild hybrid 48 V, full hybrid, plug-in hybrid",
+    intro: `<p>Alegeți tipul motopropulsorului și regimul (staționare, pornire, accelerare, croazieră, frânare, mod electric, încărcare la priză) sau <b>Ciclul urban automat</b>: urmăriți motorul termic, mașinile electrice, bateriile și fluxurile de energie (portocaliu – mecanic, albastru – electric spre roți, verde – recuperare / încărcare). Caroseria: <b>Vedere</b> (vopsit / raze X / doar sistemul); carcasele motorului, cutiei, mașinilor electrice și bateriilor: opace sau <b>transparente</b>.</p>`,
+    dupa: `<p class="nota">Motorul termic este aceeași machetă K7J ca la stand; dimensiunile componentelor hibride sunt orientative (BSG 10…15 kW, MG2 50…80 kW, modul P2 80…100 kW). Puterile și starea de încărcare sunt calitative.</p>`,
+    optiuni: () => ({ sistem: "hibrid", tip: "fh", date: MD.tipuri(P()) })
   },
   referat: {
     scop: "Determinarea curentului absorbit de demaror, a tensiunii bateriei și a căderilor de tensiune pe circuit la pornire; calculul energiei consumate la o pornire și al timpului de reîncărcare a bateriei; întocmirea bilanțului energetic al unui ciclu stop-start și compararea cu soluția mild-hybrid 48 V.",
@@ -537,11 +575,12 @@ Cadru.porneste({
   sim: {
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena saa7-scena">
-      <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
-      <div id="st3d"><p class="nota">Se încarcă standul 3D…</p></div>
-      <div class="rand-butoane"><label class="bifa"><input type="checkbox" id="ck-tr"> Carcasele demarorului transparente</label><button type="button" data-vv="tot">Vedere generală</button><button type="button" data-vv="dem">Demarorul</button><button type="button" data-vv="bat">Bateria</button><button type="button" data-vv="masa">Panopliile</button><button type="button" data-vv="aparate">Aparatele</button></div>
-      <p class="nota" id="comp-desc">Clic pe o componentă (pe stand sau pe panoplii). Particulele: roșu – curentul de pornire, albastru – întoarcerea prin masă, verde – încărcarea.</p>
-      <div class="saa7-afis"><div><span>Motor</span><b id="af-st">—</b></div><div><span>Cleștele</span><b id="af-i">—</b></div><div><span>U baterie</span><b id="af-u">—</b></div><div><span>Multimetru</span><b id="af-dmm">—</b></div><div><span>Siguranța pompei</span><b id="af-sig">—</b></div><div><span>t de la pornire</span><b id="af-t">—</b></div></div>
+      <button type="button" class="btn-ecran stand-doar" id="btn-ecran">⛶ Ecran complet</button>
+      <div class="rand-butoane"><span class="nota">Scena:</span><button type="button" data-scena="stand" class="activ">Standul de pornire</button><button type="button" data-scena="hib">Motopropulsorul (start-stop / hibrid) pe autovehicul</button></div>
+      <div id="st3d"><p class="nota">Se încarcă standul 3D…</p></div><div id="vh3d" hidden></div>
+      <div class="rand-butoane stand-doar"><span class="nota">Vizualizare:</span><button type="button" data-mod="opac" class="activ">Opac</button><button type="button" data-mod="transparent">Transparent</button><button type="button" data-vv="tot">Vedere generală</button><button type="button" data-vv="dem">Demarorul</button><button type="button" data-vv="bat">Bateria</button><button type="button" data-vv="masa">Panopliile</button><button type="button" data-vv="aparate">Aparatele</button></div>
+      <p class="nota stand-doar" id="comp-desc">Clic pe o componentă (pe stand sau pe panoplii). Particulele: roșu – curentul de pornire, albastru – întoarcerea prin masă, verde – încărcarea.</p>
+      <div class="saa7-afis stand-doar"><div><span>Motor</span><b id="af-st">—</b></div><div><span>Cleștele</span><b id="af-i">—</b></div><div><span>U baterie</span><b id="af-u">—</b></div><div><span>Multimetru</span><b id="af-dmm">—</b></div><div><span>Siguranța pompei</span><b id="af-sig">—</b></div><div><span>t de la pornire</span><b id="af-t">—</b></div></div>
       <div class="instr" data-panou="inst"><h3>Aparatele</h3><div class="lcd-g"><div class="lcd cl" id="lcd-cl"></div><div class="lcd dmm" id="lcd-dmm"></div><div class="lcd tb" id="lcd-tester"></div></div></div>
       <div class="instr" data-panou="osc" hidden><h3>Osciloscopul (CH1 – cleștele, CH2 – tensiunea bateriei)</h3>
         <div class="rand-butoane"><button type="button" data-capt="antr">Oscilograma antrenării</button><button type="button" data-capt="porn">Oscilograma pornirii</button><button type="button" id="b-csv-osc">Exportă CSV</button></div>
@@ -549,6 +588,7 @@ Cadru.porneste({
         <div class="cursoare"><b>A</b><input type="range" id="cur-a" min="0" max="100" step="1" value="0"><button type="button" data-fin="a-1">◀</button><button type="button" data-fin="a1">▶</button>
           <b>B</b><input type="range" id="cur-b" min="0" max="100" step="1" value="100"><button type="button" data-fin="b-1">◀</button><button type="button" data-fin="b1">▶</button></div>
         <div class="osc-cit" id="osc-cit"></div></div>
+      <div class="instr" data-panou="hib" hidden><h3>Tabelul 7.5 – valorile de înregistrat</h3><p class="nota" id="hib-cit">Alegeți motopropulsorul și efectuați măsurările cu butoanele de sub scenă (Oprire → repornire, Frânare recuperativă).</p></div>
     </div>
     <aside class="card sim-comenzi tk-pasi">
       <h2>Desfășurarea lucrării</h2>
@@ -562,7 +602,7 @@ Cadru.porneste({
       porneste3D(); construiestePasi();
       if (!MOD.eval) { const p = P(); Object.assign(C.D.date, { Cn: p.Cn, CCAn: p.CCAn, Pc: p.Pc, ts: p.ts, dsoc: p.dsoc, Pbsg: p.Pbsg, tfr: p.tfr }); C.construiesteDateLucru(); }
       $("#in-defect").addEventListener("change", e => { sim.defect = e.target.value; sim.capt = { antr: null, porn: null }; sim.testRez = null; sim.oscVer++; deseneaza(); });
-      $("#ck-tr").addEventListener("change", e => { sim.transparent = e.target.checked; });
+      $$(".saa7-scena [data-mod]").forEach(b => b.addEventListener("click", () => { sim.transparent = b.dataset.mod === "transparent"; $$(".saa7-scena [data-mod]").forEach(x => x.classList.toggle("activ", x === b)); }));
       $$(".saa7-scena [data-vv]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.vv)));
       $$("[data-capt]").forEach(b => b.addEventListener("click", () => { if (!sim.capt[b.dataset.capt]) return Cadru.mesajTemporar("Oscilograma nu a fost înregistrată încă.", "atentie"); arataCapt(b.dataset.capt); }));
       $("#b-csv-osc").addEventListener("click", exportOsc);

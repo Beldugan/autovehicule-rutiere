@@ -89,14 +89,30 @@ MODELE["saa-l7"] = (function () {
     var q = 0, ok = true; for (var k = 1; k < MOM.length; k++) { var a = n(f["a" + MOM[k - 1]]), b = n(f["a" + MOM[k]]); if (!isFinite(a) || !isFinite(b)) { ok = false; break; } q += (a + b) / 2 * (MOM[k] - MOM[k - 1]); }
     o.Qinc120 = ok ? q / 3.6 : NaN;                                                                   // sarcina primită în 120 s [mAh]
     var d = function (k) { return n(date[k]); };
-    o.Ep = o.porn.E; o.Pc = d("Pc"); o.ts = d("ts");
+    // motopropulsorul ales în Tabelul 7.5: la start-stop – mărimile de pe standul de pornire; la hibride – cele măsurate pe motopropulsor (data logger, BMS)
+    var R5 = (t.t75 || {}).p || {}; o.tip = cheieTip(R5.tip); var hib = o.tip !== "ss";
+    o.Ep = hib ? n(R5.Erep) : o.porn.E; o.Pc = d("Pc"); o.ts = d("ts");
+    var Ui = hib ? n(R5.Uinc) : o.Uinc, Ii = hib ? n(R5.Iinc) : o.Iinc, Cn = hib ? n(R5.Cn) : d("Cn"), Un = hib ? n(R5.Un) : d("Un"), ds = hib ? n(R5.dsoc) : d("dsoc"), Pr = hib ? n(R5.Prec) : d("Pbsg");
+    o.bat = { Un: Un, Cn: Cn, dsoc: ds, Prec: Pr, Uinc: Ui, Iinc: Ii };
     o.Eciclu = o.Ep + o.Pc * o.ts;                                                                     // (7.5) [J]
-    o.tinc = o.Eciclu / (d("etaInc") * o.Uinc * o.Iinc);                                               // (7.6) [s]
-    o.Nmax = d("dsoc") * d("Cn") * d("Un") * 3600 / o.Eciclu;                                          // (7.7)
-    o.Erec = d("etaRec") * d("Pbsg") * 1000 * d("tfr");                                                // (7.8) [J]
+    o.tinc = o.Eciclu / (d("etaInc") * Ui * Ii);                                                       // (7.6) [s]
+    o.Nmax = ds * Cn * Un * 3600 / o.Eciclu;                                                           // (7.7)
+    o.Erec = d("etaRec") * Pr * 1000 * d("tfr");                                                       // (7.8) [J]
     o.cicluri = o.Erec / o.Eciclu;
     return o;
   }
+  /** motopropulsoarele pentru bilanț: datele bateriei care alimentează pornirea / recuperarea (din datele vehiculului) */
+  var TIPURI = { ss: "Start-stop (12 V, demaror întărit, baterie EFB/AGM)", mh: "Mild hybrid 48 V (alternator-demaror BSG)", fh: "Full hybrid (e-CVT, MG1 + MG2, baterie HV)", phev: "Plug-in hybrid (modul P2, baterie HV reîncărcabilă din rețea)" };
+  function tipuri(pr) {
+    var r = mulberry32((pr.seed ^ 0x5eed) | 0), u = function (a, b) { return a + (b - a) * r(); };
+    return {
+      ss: { Un: UN, Cn: pr.Cn, dsoc: pr.dsoc, Prec: pr.Pbsg, Erep: null, Uinc: null, Iinc: null },
+      mh: { Un: 48, Cn: [8, 10][Math.floor(r() * 2) % 2], dsoc: r2(u(0.35, 0.5), 2), Prec: pr.Pbsg, Erep: Math.round(u(1300, 2200) / 10) * 10, Uinc: 50, Iinc: Math.round(u(100, 160)) },
+      fh: { Un: [201.6, 216, 259][Math.floor(r() * 3) % 3], Cn: r2(u(5.0, 6.5), 1), dsoc: r2(u(0.3, 0.4), 2), Prec: Math.round(u(45, 60)), Erep: Math.round(u(3500, 5500) / 10) * 10, Uinc: 230, Iinc: Math.round(u(40, 70)) },
+      phev: { Un: [345, 355, 360][Math.floor(r() * 3) % 3], Cn: Math.round(u(32, 50)), dsoc: r2(u(0.75, 0.85), 2), Prec: Math.round(u(70, 95)), Erep: Math.round(u(2800, 4500) / 10) * 10, Uinc: 360, Iinc: Math.round(u(60, 90)) }
+    };
+  }
+  function cheieTip(v) { if (TIPURI[v]) return v; for (var k in TIPURI) if (TIPURI[k] === v) return k; return "ss"; }
   function asteptate(o) { return { q1: o.Ep, q2: o.Rp, q3: o.tinc, q4: o.Nmax }; }
   function verifica(d, pr, U) {
     var out = { incompatibile: 0, faraCitire: 0, corecte: 0, total: 4, motive: [], detalii: {} };
@@ -114,6 +130,7 @@ MODELE["saa-l7"] = (function () {
           else if (l.k === "int") { ok = eq(l.E, w.E, 0.6) && eq(l.Q, w.Q, 0.051) && eq(l.Pmax, w.Pmax, 0.6) && eq(l.Pmed, w.Pmed, 0.6); var ix = indiciCurent(o); if (ok && (w.i0 > ix[0] || w.i1 < ix[1])) acop[l.f] = true; } }
       }
       else if (l.m === "du") ok = eq(l.v, cadere(pr, l.k, ""), 0.006);
+      else if (l.m === "hib") { var TT = tipuri(pr)[l.tip]; ok = !!TT && l.tip !== "ss" && (l.ev === "rep" ? eq(l.Erep, TT.Erep, 0.6) && eq(l.Uinc, TT.Uinc, 0.06) && eq(l.Iinc, TT.Iinc, 0.06) && eq(l.Un, TT.Un, 0.06) && eq(l.Cn, TT.Cn, 0.06) && eq(l.dsoc, TT.dsoc, 0.006) : eq(l.Prec, TT.Prec, 0.06)); }
       else if (l.m === "inc") { var z = incarcare(pr, Number(l.s), l.k === "c", ""); ok = MOM.indexOf(Number(l.s)) >= 0 && eq(l.I, z.I, 0.051) && eq(l.U, z.U, 0.006); }
       if (!ok) out.incompatibile++;
     });
@@ -125,6 +142,8 @@ MODELE["saa-l7"] = (function () {
     [["dup", "p"], ["dum", "m"]].forEach(function (z) { var x = U.num(T1[z[0]]); if (isFinite(x) && !are(function (l) { return l.m === "du" && l.k === z[1] && eq(l.v, x, 0.006); })) out.faraCitire++; });
     ["antr", "porn"].forEach(function (f) { var R = T2[f] || {}; ["E", "Q", "Pmax", "Pmed"].forEach(function (c) { var x = U.num(R[c]); if (isFinite(x) && !are(function (l) { return l.m === "osc" && l.f === f && l.k === "int" && eq(l[c], x, 0.006); })) out.faraCitire++; }); });
     MOM.forEach(function (s) { [["f", "I", "f"], ["c", "I", "c"], ["u", "U", "f"]].forEach(function (z) { var x = U.num((T3[z[0]] || {})["a" + s]); if (isFinite(x) && !are(function (l) { return l.m === "inc" && l.k === z[2] && Number(l.s) === s && eq(l[z[1]], x, 0.006); })) out.faraCitire++; }); });
+    var T5 = (t.t75 || {}).p || {}, tp5 = cheieTip(T5.tip);
+    if (tp5 !== "ss") [["Erep", "rep"], ["Uinc", "rep"], ["Iinc", "rep"], ["Un", "rep"], ["Cn", "rep"], ["dsoc", "rep"], ["Prec", "rec"]].forEach(function (z) { var x = U.num(T5[z[0]]); if (isFinite(x) && !are(function (l) { return l.m === "hib" && l.tip === tp5 && l.ev === z[1] && eq(l[z[0]], x, 0.006); })) out.faraCitire++; });
     var date = { Pc: pr.Pc, ts: pr.ts, dsoc: pr.dsoc, Cn: pr.Cn, Un: UN, etaInc: ETA_INC, etaRec: ETA_REC, Pbsg: pr.Pbsg, tfr: pr.tfr };
     var o2 = prelucreaza(t, date, U), a = asteptate(o2), rasp = d.raspunsuri || {}, tol = { q1: [0.01, 2], q2: [0.02, 0.02], q3: [0.02, 0.2], q4: [0.02, 0.2] };
     Object.keys(a).forEach(function (k) {
@@ -135,5 +154,5 @@ MODELE["saa-l7"] = (function () {
     return out;
   }
   return { DT: DT, PRE: PRE, MOM: MOM, ETA_INC: ETA_INC, ETA_REC: ETA_REC, UN: UN, PRAG: PRAG, parametri: parametri, efectiv: efectiv, tester: tester, curent: curent, oscilograma: oscilograma,
-    fereastra: fereastra, indiciCurent: indiciCurent, cadere: cadere, incarcare: incarcare, prelucreaza: prelucreaza, asteptate: asteptate, verifica: verifica };
+    TIPURI: TIPURI, tipuri: tipuri, cheieTip: cheieTip, fereastra: fereastra, indiciCurent: indiciCurent, cadere: cadere, incarcare: incarcare, prelucreaza: prelucreaza, asteptate: asteptate, verifica: verifica };
 })();
