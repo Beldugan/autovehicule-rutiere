@@ -7,7 +7,7 @@
 const D = PORTAL.discipline.MF, CC = D.colocviu, DISC = "MF";
 const amesteca = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 const fx = (v, n) => Number.isFinite(+v) && v !== "" ? (+v).toFixed(n).replace(".", ",") : "—";
-const MAXT = CC.lucrari * CC.grilaPeLucrare + CC.lucrari * CC.punctePeProblema;
+const NPROB = CC.probleme == null ? CC.lucrari : CC.probleme, MAXT = CC.lucrari * CC.grilaPeLucrare + NPROB * CC.punctePeProblema;
 async function api(params, corp) {
   if (!D.endpoint) throw new Error("Disciplina nu este conectată la registru.");
   const r = corp ? await fetch(D.endpoint, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ disc: DISC }, corp)) })
@@ -23,7 +23,7 @@ const HTML_REGULI = `
 <h3>Cum se calculează nota de colocviu</h3>
 <div class="ec"><span>Nota colocviu = ${CC.pondere.portofoliu * 100} % · nota portofoliu + ${CC.pondere.test * 100} % · nota test &nbsp;(rotunjită la întreg)</span></div>
 <ul><li><b>Portofoliul</b> – cadrul didactic verifică, pentru fiecare dintre lucrările 1–${CC.lucrari}: ${CC.itemi.map(t => t.charAt(0).toLowerCase() + t.slice(1)).join("; ")}. Nota portofoliu = 10 × bife / ${CC.lucrari * CC.itemi.length} (minimum 1).</li>
-<li><b>Testul recapitulativ</b> – ${CC.lucrari * CC.grilaPeLucrare} întrebări-grilă (câte ${CC.grilaPeLucrare} din fiecare lucrare, 1 punct) și ${CC.lucrari} probleme de calcul cu valori individuale (câte una pe lucrare, ${CC.punctePeProblema} puncte, toleranță ± 2 %), în ${CC.durataMin} de minute; nota test = 10 × puncte / ${MAXT} (minimum 1). Testul se susține o singură dată, în sală, cu codul de sesiune.</li>
+<li><b>Testul recapitulativ</b> – ${CC.lucrari * CC.grilaPeLucrare} întrebări-grilă (câte ${CC.grilaPeLucrare} din fiecare lucrare, 1 punct) și ${NPROB === 1 ? "o problemă de calcul aleasă la întâmplare dintr-una dintre lucrări" : NPROB + " probleme de calcul alese la întâmplare din lucrări"}, cu valori individuale (${CC.punctePeProblema} puncte, toleranță ± 2 %), în ${CC.durataMin} de minute; nota test = 10 × puncte / ${MAXT} (minimum 1). Testul se susține o singură dată, în sală, cu codul de sesiune.</li>
 <li>Promovarea: nota de colocviu cel puțin ${CC.notaMinimaPromovare}.</li></ul>
 <p class="nota">În timpul testului nu părăsiți pagina: ieșirile sunt înregistrate. Pentru probleme folosiți calculatorul și Anexa D (fila „Relații și anexe” – o puteți tipări înainte).</p>
 </div>`;
@@ -79,7 +79,7 @@ document.body.innerHTML = `
   <section id="tab-col" class="tab activ">${HTML_REGULI}<div class="card" id="col-st"></div><div id="col-test"></div></section>
   <section id="tab-prof" class="tab"><div class="card" id="prof"></div></section>
   <section id="tab-test" class="tab"><div class="card text-curs"><h2>Test de antrenament</h2>
-    <p class="nota">Nu se notează. Întrebările și variantele se amestecă la fiecare test; testul de colocviu conține, în plus, probleme de calcul cu valori individuale. Testele lucrărilor au ${LUCRARI_MF.reduce((s, l) => s + l.test.length, 0)} de întrebări în total.</p>
+    <p class="nota">Nu se notează. Întrebările și variantele se amestecă la fiecare test; testul de colocviu conține, în plus, o problemă de calcul cu valori individuale. Testele lucrărilor au ${LUCRARI_MF.reduce((s, l) => s + l.test.length, 0)} de întrebări în total.</p>
     <div class="l7-filtre">${LUCRARI_MF.map(l => `<label class="bifa"><input type="checkbox" data-fl="${l.nr}" checked> L${l.nr}</label>`).join("")}</div>
     <div class="rand-butoane"><label class="camp">Număr de întrebări <select id="sel-n"><option>10</option><option selected>15</option><option>20</option><option value="0">toate</option></select></label><button type="button" class="primar" id="b-test">Începe testul</button></div>
     <div id="test"></div><p id="test-scor" class="scor"></p><div id="test-rez"></div></div></section>
@@ -172,7 +172,7 @@ function randeazaTest(r) {
   el.innerHTML = `<div class="card text-curs"><div class="l7-ceas" id="ceas"><span>Timp rămas</span><b id="ceas-t">--:--</b><span id="ceas-r"></span></div>
     <h2>Partea I – întrebări-grilă (1 punct fiecare)</h2>
     ${TEST.grila.map((g, i) => `<div class="l7-q" data-id="${g.id}"><p>${i + 1}. ${g.q} <span class="l7-tag">(L${g.lab})</span></p>${g.o.map((o, j) => `<label class="opt-r"><input type="radio" name="${g.id}" value="${j}" ${String(r[g.id]) === String(j) ? "checked" : ""}> <span>${o}</span></label>`).join("")}</div>`).join("")}
-    <h2>Partea a II-a – probleme de calcul (${CC.punctePeProblema} puncte fiecare, toleranță ± 2 %)</h2>
+    <h2>Partea a II-a – ${TEST.probleme.length === 1 ? "problemă de calcul" : "probleme de calcul"} (${CC.punctePeProblema} puncte${TEST.probleme.length === 1 ? "" : " fiecare"}, toleranță ± 2 %)</h2>
     ${TEST.probleme.map((p, i) => `<div class="l7-q" data-id="${p.id}"><p>${nr + i + 1}. ${p.text} <span class="l7-tag">(L${p.lab})</span></p><label class="camp-inline">Rezultat: <input type="text" inputmode="decimal" autocomplete="off" id="in-${p.id}" maxlength="16" value="${esc(r[p.id] || "")}"> ${p.u}</label></div>`).join("")}
     <div class="rand-butoane" style="margin-top:1rem"><button type="button" class="primar l7-btn" id="b-trimite">Trimite testul</button><span class="nota" id="msg-trimite"></span></div></div>`;
   $$("#col-test input").forEach(i => i.addEventListener("change", salveazaRasp)); $$("#col-test input[type=text]").forEach(i => i.addEventListener("input", salveazaRasp));

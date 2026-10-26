@@ -39,7 +39,9 @@ function testColocviu_(seed) {
       grila.push({ id: "g" + l.nr + "_" + i, lab: l.nr, q: t.q, o: ord.map(j => t.o[j]), c: ord.indexOf(t.c), e: t.e });
     });
   });
-  P.slice(0, C.lucrari).forEach((gen, k) => { const p = gen((a, b) => a + (b - a) * r()); probleme.push({ id: "p" + (k + 1), lab: k + 1, text: p.text, u: p.u, rasp: p.rasp }); });
+  // problemele de calcul: C.probleme alese la întâmplare (din seed) dintre lucrări
+  amest(P.slice(0, C.lucrari).map((g, k) => k)).slice(0, C.probleme == null ? C.lucrari : C.probleme).sort((a, b) => a - b)
+    .forEach(k => { const p = P[k]((a, b) => a + (b - a) * r()); probleme.push({ id: "p" + (k + 1), lab: k + 1, text: p.text, u: p.u, rasp: p.rasp }); });
   return { grila: amest(grila), probleme, max: grila.length + probleme.length * C.punctePeProblema };
 }
 function testPublic_(T) { return { grila: T.grila.map(g => ({ id: g.id, lab: g.lab, q: g.q, o: g.o })), probleme: T.probleme.map(p => ({ id: p.id, lab: p.lab, text: p.text, u: p.u })), max: T.max }; }
@@ -73,7 +75,7 @@ function foaieColocviu_() {
   }
   return sh;
 }
-function testMax_() { const C = colConf_(); return C.lucrari * C.grilaPeLucrare + C.lucrari * C.punctePeProblema; }
+function testMax_() { const C = colConf_(); return C.lucrari * C.grilaPeLucrare + (C.probleme == null ? C.lucrari : C.probleme) * C.punctePeProblema; }
 function randColocviu_(email, nume, grupa) {
   const sh = foaieColocviu_(), X = colIdx_(), C = X.C, last = sh.getLastRow();
   const emails = last > 1 ? sh.getRange(2, 2, last - 1, 1).getValues().map(r => String(r[0]).toLowerCase().trim()) : [];
