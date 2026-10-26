@@ -27,7 +27,7 @@ const PORTAL = {
       ],
       /** colocviul de laborator (ultima ședință): portofoliul bifat de cadrul didactic + testul recapitulativ notat pe server */
       colocviu: {
-        lab: 7, lucrari: 6, durataMin: 30, grilaPeLucrare: 2, probleme: 1, punctePeProblema: 2,
+        lab: 7, lucrari: 6, durataMin: 30, grilaPeLucrare: 2, punctePeGrila: 0.5, probleme: 1, punctePeProblema: 3, oficiu: 1,
         itemi: ["Referat complet (tabele, calcule, grafice)", "Exemplul rezolvat recalculat cu valorile proprii", "Răspunsuri la întrebările de verificare", "Referat predat în Classroom"],
         pondere: { portofoliu: 0.5, test: 0.5 }, notaMinimaPromovare: 5
       }

@@ -7,7 +7,8 @@
 const D = PORTAL.discipline.MF, CC = D.colocviu, DISC = "MF";
 const amesteca = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 const fx = (v, n) => Number.isFinite(+v) && v !== "" ? (+v).toFixed(n).replace(".", ",") : "—";
-const NPROB = CC.probleme == null ? CC.lucrari : CC.probleme, MAXT = CC.lucrari * CC.grilaPeLucrare + NPROB * CC.punctePeProblema;
+const NPROB = CC.probleme == null ? CC.lucrari : CC.probleme, PG = CC.punctePeGrila || 1, OF = CC.oficiu || 0, MAXT = OF + CC.lucrari * CC.grilaPeLucrare * PG + NPROB * CC.punctePeProblema;
+const pct = v => String(v).replace(".", ",") + (v === 1 ? " punct" : " puncte");
 async function api(params, corp) {
   if (!D.endpoint) throw new Error("Disciplina nu este conectată la registru.");
   const r = corp ? await fetch(D.endpoint, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ disc: DISC }, corp)) })
@@ -23,7 +24,7 @@ const HTML_REGULI = `
 <h3>Cum se calculează nota de colocviu</h3>
 <div class="ec"><span>Nota colocviu = ${CC.pondere.portofoliu * 100} % · nota portofoliu + ${CC.pondere.test * 100} % · nota test &nbsp;(rotunjită la întreg)</span></div>
 <ul><li><b>Portofoliul</b> – cadrul didactic verifică, pentru fiecare dintre lucrările 1–${CC.lucrari}: ${CC.itemi.map(t => t.charAt(0).toLowerCase() + t.slice(1)).join("; ")}. Nota portofoliu = 10 × bife / ${CC.lucrari * CC.itemi.length} (minimum 1).</li>
-<li><b>Testul recapitulativ</b> – ${CC.lucrari * CC.grilaPeLucrare} întrebări-grilă (câte ${CC.grilaPeLucrare} din fiecare lucrare, 1 punct) și ${NPROB === 1 ? "o problemă de calcul aleasă la întâmplare dintr-una dintre lucrări" : NPROB + " probleme de calcul alese la întâmplare din lucrări"}, cu valori individuale (${CC.punctePeProblema} puncte, toleranță ± 2 %), în ${CC.durataMin} de minute; nota test = 10 × puncte / ${MAXT} (minimum 1). Testul se susține o singură dată, în sală, cu codul de sesiune.</li>
+<li><b>Testul recapitulativ</b> – ${CC.lucrari * CC.grilaPeLucrare} întrebări-grilă (câte ${CC.grilaPeLucrare} din fiecare lucrare, ${pct(PG)} fiecare) și ${NPROB === 1 ? "o problemă de calcul aleasă la întâmplare dintr-una dintre lucrări" : NPROB + " probleme de calcul alese la întâmplare din lucrări"}, cu valori individuale (${pct(CC.punctePeProblema)}, toleranță ± 2 %)${OF ? `, plus ${pct(OF)} din oficiu` : ""}, în ${CC.durataMin} de minute. ${MAXT === 10 ? "Nota testului este punctajul obținut (maximum 10)." : `Nota test = 10 × puncte / ${MAXT} (minimum 1).`} Testul se susține o singură dată, în sală, cu codul de sesiune.</li>
 <li>Promovarea: nota de colocviu cel puțin ${CC.notaMinimaPromovare}.</li></ul>
 <p class="nota">În timpul testului nu părăsiți pagina: ieșirile sunt înregistrate. Pentru probleme folosiți calculatorul și Anexa D (fila „Relații și anexe” – o puteți tipări înainte).</p>
 </div>`;
@@ -170,9 +171,10 @@ async function incarcaTest() {
 function randeazaTest(r) {
   const nr = (TEST.grila.length), el = $("#col-test");
   el.innerHTML = `<div class="card text-curs"><div class="l7-ceas" id="ceas"><span>Timp rămas</span><b id="ceas-t">--:--</b><span id="ceas-r"></span></div>
-    <h2>Partea I – întrebări-grilă (1 punct fiecare)</h2>
+    <p class="nota">Barem: ${OF ? pct(OF) + " din oficiu · " : ""}grile ${TEST.grila.length} × ${String(PG).replace(".", ",")} = ${String(TEST.grila.length * PG).replace(".", ",")} · ${TEST.probleme.length === 1 ? "problema" : "problemele"} ${String(TEST.probleme.length * CC.punctePeProblema).replace(".", ",")} · total ${String(TEST.max).replace(".", ",")}.</p>
+    <h2>Partea I – întrebări-grilă (${pct(PG)} fiecare)</h2>
     ${TEST.grila.map((g, i) => `<div class="l7-q" data-id="${g.id}"><p>${i + 1}. ${g.q} <span class="l7-tag">(L${g.lab})</span></p>${g.o.map((o, j) => `<label class="opt-r"><input type="radio" name="${g.id}" value="${j}" ${String(r[g.id]) === String(j) ? "checked" : ""}> <span>${o}</span></label>`).join("")}</div>`).join("")}
-    <h2>Partea a II-a – ${TEST.probleme.length === 1 ? "problemă de calcul" : "probleme de calcul"} (${CC.punctePeProblema} puncte${TEST.probleme.length === 1 ? "" : " fiecare"}, toleranță ± 2 %)</h2>
+    <h2>Partea a II-a – ${TEST.probleme.length === 1 ? "problemă de calcul" : "probleme de calcul"} (${pct(CC.punctePeProblema)}${TEST.probleme.length === 1 ? "" : " fiecare"}, toleranță ± 2 %)</h2>
     ${TEST.probleme.map((p, i) => `<div class="l7-q" data-id="${p.id}"><p>${nr + i + 1}. ${p.text} <span class="l7-tag">(L${p.lab})</span></p><label class="camp-inline">Rezultat: <input type="text" inputmode="decimal" autocomplete="off" id="in-${p.id}" maxlength="16" value="${esc(r[p.id] || "")}"> ${p.u}</label></div>`).join("")}
     <div class="rand-butoane" style="margin-top:1rem"><button type="button" class="primar l7-btn" id="b-trimite">Trimite testul</button><span class="nota" id="msg-trimite"></span></div></div>`;
   $$("#col-test input").forEach(i => i.addEventListener("change", salveazaRasp)); $$("#col-test input[type=text]").forEach(i => i.addEventListener("input", salveazaRasp));
@@ -201,7 +203,7 @@ async function trimite(automat) {
 function arataRezultat(j) {
   const det = {}; (j.detalii || []).forEach(d => det[d.id] = d);
   const el = $("#col-test");
-  el.innerHTML = `<div class="card text-curs"><h2>Rezultatul testului</h2><div class="l7-rez"><div><span>Puncte</span><b>${j.puncte} / ${j.max}</b></div><div><span>Nota test</span><b>${fx(j.nota, 2)}</b></div><div><span>Nota de colocviu</span><b style="font-size:1rem">${j.pondere.portofoliu * 100} % portofoliu + ${j.pondere.test * 100} % test</b></div></div>
+  el.innerHTML = `<div class="card text-curs"><h2>Rezultatul testului</h2><div class="l7-rez"><div><span>Puncte${OF ? " (cu " + pct(OF) + " din oficiu)" : ""}</span><b>${fx(j.puncte, j.puncte % 1 ? 1 : 0)} / ${j.max}</b></div><div><span>Nota test</span><b>${fx(j.nota, 2)}</b></div><div><span>Nota de colocviu</span><b style="font-size:1rem">${j.pondere.portofoliu * 100} % portofoliu + ${j.pondere.test * 100} % test</b></div></div>
     <p class="nota">Testul a fost înregistrat în registrul disciplinei. Nota portofoliului o stabilește cadrul didactic la verificarea lucrărilor; nota de colocviu se calculează automat.</p>
     <h3>Corectura</h3>${(j.detalii || []).map((d, i) => `<div class="l7-q ${d.ok ? "ok" : "gresit"}"><p>${i + 1}. <span class="l7-tag">(L${d.lab}, ${d.id.startsWith("p") ? "problemă" : "grilă"})</span> ${d.ok ? "✓ corect" : "✗ greșit"}</p><p class="nota">Răspunsul vostru: ${esc(d.raspuns)} · corect: ${d.corect}${d.e ? " – " + d.e : ""}</p></div>`).join("")}</div>`;
 }
@@ -240,7 +242,7 @@ function randeazaProf() {
     ${vis.map(s => { const fn = finala(s), si = PF.studenti.indexOf(s);
       return `<tr data-s="${si}"><td class="n"><b>${esc(s.nume)}</b><br><span class="l7-tag">${esc(s.grupa)} · ${esc(s.email)}</span></td>
       ${Array.from({ length: nl }, (_, l) => `<td><span class="l7-cel">${PF.itemi.map((t, k) => `<input type="checkbox" data-i="${l * ni + k}" title="L${l + 1} – ${esc(t)}" ${s.b[l * ni + k] ? "checked" : ""}>`).join("")}<span class="l7-ref ${/R/.test(s.ref[l] || "") ? "r" : ""}">${esc(s.ref[l] || "–")}</span></span></td>`).join("")}
-      <td>${fx(notaPort(s.b), 2)}</td><td>${s.puncte === "" ? "—" : s.puncte + "/" + PF.max}</td><td>${s.notaT === "" ? "—" : fx(s.notaT, 2)}${s.verdict && s.verdict !== "OK" ? `<br><span class="l7-dv" title="${esc(s.obs)}">${esc(s.verdict)}</span>` : ""}</td>
+      <td>${fx(notaPort(s.b), 2)}</td><td>${s.puncte === "" ? "—" : fx(s.puncte, s.puncte % 1 ? 1 : 0) + "/" + PF.max}</td><td>${s.notaT === "" ? "—" : fx(s.notaT, 2)}${s.verdict && s.verdict !== "OK" ? `<br><span class="l7-dv" title="${esc(s.obs)}">${esc(s.verdict)}</span>` : ""}</td>
       <td>${fn.f === "" ? "—" : fx(fn.f, 2)}</td><td class="l7-nota-f ${fn.n !== "" && fn.n < PF.minim ? "picat" : ""}">${fn.n === "" ? "—" : fn.n}</td>
       <td><button type="button" class="mic" data-toate="${si}" title="Bifează tot portofoliul">✓ tot</button></td></tr>`; }).join("")}
     </tbody></table></div>`;

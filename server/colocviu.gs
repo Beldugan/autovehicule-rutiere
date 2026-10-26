@@ -42,15 +42,15 @@ function testColocviu_(seed) {
   // problemele de calcul: C.probleme alese la întâmplare (din seed) dintre lucrări
   amest(P.slice(0, C.lucrari).map((g, k) => k)).slice(0, C.probleme == null ? C.lucrari : C.probleme).sort((a, b) => a - b)
     .forEach(k => { const p = P[k]((a, b) => a + (b - a) * r()); probleme.push({ id: "p" + (k + 1), lab: k + 1, text: p.text, u: p.u, rasp: p.rasp }); });
-  return { grila: amest(grila), probleme, max: grila.length + probleme.length * C.punctePeProblema };
+  return { grila: amest(grila), probleme, max: (C.oficiu || 0) + grila.length * (C.punctePeGrila || 1) + probleme.length * C.punctePeProblema };
 }
 function testPublic_(T) { return { grila: T.grila.map(g => ({ id: g.id, lab: g.lab, q: g.q, o: g.o })), probleme: T.probleme.map(p => ({ id: p.id, lab: p.lab, text: p.text, u: p.u })), max: T.max }; }
 function noteazaTest_(T, rasp) {
-  const C = infoDisc_().colocviu; let p = 0; const det = [];
-  T.grila.forEach(g => { const v = rasp[g.id], ok = v !== undefined && v !== "" && Number(v) === g.c; if (ok) p++; det.push({ id: g.id, lab: g.lab, ok, corect: g.o[g.c], raspuns: v === undefined || v === "" ? "—" : g.o[Number(v)], e: g.e }); });
+  const C = infoDisc_().colocviu; let p = C.oficiu || 0; const det = [];
+  T.grila.forEach(g => { const v = rasp[g.id], ok = v !== undefined && v !== "" && Number(v) === g.c; if (ok) p += C.punctePeGrila || 1; det.push({ id: g.id, lab: g.lab, ok, corect: g.o[g.c], raspuns: v === undefined || v === "" ? "—" : g.o[Number(v)], e: g.e }); });
   T.probleme.forEach(q => { const v = U.num(rasp[q.id]), ok = isFinite(v) && Math.abs(v - q.rasp) <= Math.abs(q.rasp) * 0.02; if (ok) p += C.punctePeProblema;
     det.push({ id: q.id, lab: q.lab, ok, corect: (Math.abs(q.rasp) >= 1000 ? String(Math.round(q.rasp)) : f_(q.rasp, Math.abs(q.rasp) >= 10 ? 1 : 3)) + (q.u ? " " + q.u : ""), raspuns: isFinite(v) ? String(rasp[q.id]) : "—", puncte: C.punctePeProblema }); });
-  return { puncte: p, max: T.max, nota: rot_(Math.max(1, 10 * p / T.max), 2), detalii: det };
+  p = rot_(p, 2); return { puncte: p, max: T.max, nota: rot_(Math.max(1, 10 * p / T.max), 2), detalii: det };
 }
 
 /* ------------------------------------------------------------------ foaia „Colocviu” */
@@ -73,9 +73,17 @@ function foaieColocviu_() {
     for (let c = X.b0; c < X.bife; c++) sh.setColumnWidth(c, 42);
     sh.getRange(1, X.port, 1, 5).setBackground("#d7ebdd");
   }
+  // baremul s-a schimbat (punctajul maxim): antetul și formula notei test se actualizează pe toate rândurile
+  const mx = String(testMax_());
+  if (props_().getProperty("COL_MAX") !== mx) {
+    sh.getRange(1, X.puncte).setValue("Puncte test (din " + mx + ")");
+    const n = sh.getLastRow() - 1;
+    if (n > 0) sh.getRange(2, X.notaT, n, 1).setFormulas(Array.from({ length: n }, (_, i) => { const r = i + 2; return [`=IF(${col_(X.puncte)}${r}="","",ROUND(MAX(1,10*${col_(X.puncte)}${r}/${mx}),2))`]; }));
+    props_().setProperty("COL_MAX", mx);
+  }
   return sh;
 }
-function testMax_() { const C = colConf_(); return C.lucrari * C.grilaPeLucrare + (C.probleme == null ? C.lucrari : C.probleme) * C.punctePeProblema; }
+function testMax_() { const C = colConf_(); return (C.oficiu || 0) + C.lucrari * C.grilaPeLucrare * (C.punctePeGrila || 1) + (C.probleme == null ? C.lucrari : C.probleme) * C.punctePeProblema; }
 function randColocviu_(email, nume, grupa) {
   const sh = foaieColocviu_(), X = colIdx_(), C = X.C, last = sh.getLastRow();
   const emails = last > 1 ? sh.getRange(2, 2, last - 1, 1).getValues().map(r => String(r[0]).toLowerCase().trim()) : [];
