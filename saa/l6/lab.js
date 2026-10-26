@@ -230,7 +230,7 @@ function deseneazaDL() {
 const SV = { s3: null };
 function porneste3D() {
   const el = $("#st3d"); if (!el) return;
-  import(BAZA_COMUN + "turbo3d.js?v=1").then(m => { SV.s3 = m.creeazaStandTurbo(el, { laClic: (k, et) => alegeComp(k, et) }); vedere3d(PASI[pasActiv].vedere); })
+  import(BAZA_COMUN + "turbo3d.js?v=2").then(m => { SV.s3 = m.creeazaStandTurbo(el, { laClic: (k, et) => alegeComp(k, et) }); vedere3d(PASI[pasActiv].vedere); })
     .catch(e => { el.innerHTML = `<p class="nota">Standul 3D nu a putut fi încărcat (${esc(e.message)}): este necesar un browser cu WebGL. Componentele se pot alege din listă:</p><div class="rand-butoane">${Object.keys(COMP).map(k => `<button type="button" data-c3="${k}">${COMP[k][0]}</button>`).join("")}</div>`; $$("#st3d [data-c3]").forEach(b => b.addEventListener("click", () => alegeComp(b.dataset.c3))); });
 }
 function actualizeaza3D() {
@@ -401,7 +401,7 @@ Cadru.porneste({
     titluTab: "Animație: turbosuflanta (3D)", titlu: "Funcționarea turbosuflantei și variantele constructive",
     intro: `<p>Alegeți varianta constructivă și modificați turația și pedala: urmăriți aerul (albastru) și gazele (portocaliu), rotorul, organul de reglare (clapeta wastegate sau paletele VGT) și actuatorul, presiunea reală față de cea cerută de ECU. Butonul <b>Accelerare bruscă</b> arată turbo-lag-ul fiecărei variante. Secțiunea (sfert decupat) și modul transparent arată interiorul; treceți cu mouse-ul peste componente.</p>`,
     dupa: `<p class="nota">Rotația rotorului este afișată mult încetinită (în realitate 100 000…200 000 rot/min). Dinamica este calitativă, pentru comparația variantelor.</p>`,
-    modul: "turbo3d.js?v=1", functie: "creeazaAnimatieTurbo"
+    modul: "turbo3d.js?v=2", functie: "creeazaAnimatieTurbo"
   },
   referat: {
     scop: "Determinarea presiunii de supraalimentare în funcție de turație, verificarea actuatorului VGT și evaluarea eficienței intercoolerului și a compresorului pe baza temperaturilor și presiunilor măsurate.",

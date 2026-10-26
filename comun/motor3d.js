@@ -264,9 +264,9 @@ function sistemRacire(M, opt) {
     rbox(0.022, 0.03, 0.022, 0.004, mAl, inCond.x, inCond.y, inCond.z, g);
     const VE = V3(0.27, 0.32, 0.545); rbox(0.05, 0.05, 0.03, 0.006, mAl, VE.x, VE.y, VE.z, g); box(0.07, 0.07, 0.006, mP, VE.x, VE.y, VE.z + 0.02, g);
     // conducta de refulare (gaz fierbinte, înaltă presiune): compresor → condensator
-    if (pa) linie([pa.ref.clone().add(V3(0, 0.02, 0)), V3(0.17, 0.06, 0.27), V3(0.2, -0.1, 0.3), V3(0.27, -0.2, 0.15), V3(0.26, -0.2, -0.1), V3(0.26, -0.17, -0.38), V3(0.37, -0.12, -0.45), V3(0.37, 0.05, -0.58), V3(inCond.x + 0.02, inCond.y - 0.01, inCond.z - 0.02), inCond], 0.0065);   // pe sub fulii, ocolind bazinul radiatorului
+    const cRef = pa ? linie([pa.ref.clone().add(V3(0, 0.02, 0)), V3(0.17, 0.06, 0.27), V3(0.2, -0.1, 0.3), V3(0.27, -0.2, 0.15), V3(0.26, -0.2, -0.1), V3(0.26, -0.17, -0.38), V3(0.37, -0.12, -0.45), V3(0.37, 0.05, -0.58), V3(inCond.x + 0.02, inCond.y - 0.01, inCond.z - 0.02), inCond], 0.0065) : null;   // pe sub fulii, ocolind bazinul radiatorului
     // conducta de aspirație (vapori reci, joasă presiune, Ø mare): ventilul de expansiune → compresor
-    if (pa) linie([V3(VE.x - 0.012, VE.y - 0.02, VE.z - 0.016), V3(0.25, 0.27, 0.48), V3(0.2, 0.17, 0.4), V3(0.17, 0.11, 0.31), pa.asp.clone().add(V3(0, 0.03, 0)), pa.asp], 0.009);
+    const cAsp = pa ? linie([V3(VE.x - 0.012, VE.y - 0.02, VE.z - 0.016), V3(0.25, 0.27, 0.48), V3(0.2, 0.17, 0.4), V3(0.17, 0.11, 0.31), pa.asp.clone().add(V3(0, 0.03, 0)), pa.asp], 0.009) : null;
     // conducta de lichid (înaltă presiune): filtrul deshidrator → ventilul de expansiune, cu senzorul de presiune
     const top = wp([W / 2 + 0.07, 0.125, -0.035]);
     const cL = linie([top, top.clone().add(V3(0, 0.06, 0.02)), V3(0.39, 0.32, -0.42), V3(0.31, 0.475, -0.12), V3(0.31, 0.47, 0.25), V3(0.29, 0.38, 0.46), V3(VE.x + 0.012, VE.y + 0.01, VE.z - 0.016)], 0.005);   // pe deasupra carcasei distribuției
@@ -290,6 +290,7 @@ function sistemRacire(M, opt) {
     box(0.16, 0.012, 0.18, M.otel, -0.06, 0.38, 0.72, g).rotation.x = 0.5;                                                              // clapeta de amestec
     [[-0.25, 0.47, 0.8], [0.0, 0.47, 0.82], [0.25, 0.47, 0.8]].forEach(([x, y, z]) => rbox(0.12, 0.08, 0.08, 0.02, mHV, x, y, z, g));   // gurile de distribuție (parbriz, centru, picioare)
     out.ac = sAC; ancore.ac = ps.clone().add(new THREE.Vector3(0, 0.06, 0));
+    out.acAnc = { H: ph.clone().add(V3(0, 0.034, 0)), L: pa ? V3(0.2, 0.17 + 0.037, 0.4) : null, VE, cLic: cL, cAsp, cRef, inCond, evap: ev.position.clone() };
   }
   if (!opt.ac && opt.portAC) [[opt.portAC.ref, 0xc62828, 0.011], [opt.portAC.asp, 0x1f5fd0, 0.013]].forEach(([p, c, r]) => cyl(r, r, 0.012, new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }), p.x, p.y + 0.004, p.z, "y"));   // capacele de protecție ale racordurilor (stand fără circuit A/C)
   // furtunul superior: termostat → bazinul din stânga (sus); furtunul inferior: bazinul din dreapta (jos) → pompa de apă
@@ -1145,7 +1146,7 @@ export function construiesteMotor(opt = {}) {
   const carcT = rbox(0.07, 0.07, 0.08, 0.012, M.alu, -0.27, 0.31, 0.04);
   { const c = grupC("ect", "Senzorul de temperatură CTS"); cyl(0.012, 0.012, 0.03, M.alama, -0.27, 0.355, 0.06, "y", c); conectori.ect = rbox(0.022, 0.02, 0.024, 0.004, M.verde, -0.27, 0.38, 0.06, c); ancore.ect = new THREE.Vector3(-0.27, 0.39, 0.06); }
   const rac = sistemRacire(M, opt.stand !== false
-    ? { xc: -0.02, yR: 0.05, zR: -0.85, vas: [0.2, 0.33, -0.79], suportVas: true, incalzire: [-0.3, 0.2, 0.5], portAC: acc.portAC }
+    ? { xc: -0.02, yR: 0.05, zR: -0.85, vas: [0.2, 0.33, -0.79], suportVas: true, incalzire: [-0.3, 0.2, 0.5], portAC: acc.portAC, ac: !!opt.ac }
     : { xc: -0.02, yR: -0.02, zR: -0.52, vas: [-0.47, 0.3, -0.25], suportVas: true, incalzire: [-0.15, 0.29, 0.68], ac: true, portAC: acc.portAC });
   g.add(rac.grup); rot.vent = rac.rot.vent;
   const actRacire = opt.racire ? interiorRacire(g, M, rac, grupC, ancore, rot, carcT) : null;
@@ -1177,7 +1178,7 @@ export function construiesteMotor(opt = {}) {
       o.material = cache[mod]; o.castShadow = o.userData.carcasa && mod === "sectionat";
     });
   }
-  return { grup: g, comp, ancore, conectori, rot, M, XC, matCald, modCarcasa, mod: () => modCurent, interior: !!actInterior, racire: !!actRacire,
+  return { grup: g, comp, ancore, conectori, rot, M, XC, matCald, modCarcasa, mod: () => modCurent, interior: !!actInterior, racire: !!actRacire, acAnc: rac.acAnc,
     /** actualizarea animației: st = { rpm, tps (0…100), ect, selectat, decuplat{}, timp } */
     actualizeaza(st, dt) {
       const w = (st.rpm || 0) / 60 * 2 * Math.PI;
@@ -1231,7 +1232,7 @@ export function creeazaStand(gazda, optiuni = {}) {
   pod.rotation.x = -Math.PI / 2; pod.position.y = -0.82; pod.receiveShadow = true; scene.add(pod);
   const linii = new THREE.Mesh(new THREE.PlaneGeometry(14, 0.06), new THREE.MeshStandardMaterial({ color: 0xe8c234, roughness: 0.6 })); linii.rotation.x = -Math.PI / 2; linii.position.set(0, -0.818, -1.1); scene.add(linii);
   // motorul
-  const mot = construiesteMotor({ stand: true, interior: optiuni.interior !== false, varianta: optiuni.varianta, racire: optiuni.racire !== false, postTratare: !!optiuni.postTratare }); scene.add(mot.grup);
+  const mot = construiesteMotor({ stand: true, interior: optiuni.interior !== false, varianta: optiuni.varianta, racire: optiuni.racire !== false, postTratare: !!optiuni.postTratare, ac: !!optiuni.ac }); scene.add(mot.grup);
   const M = mot.M;
   // aparatele sistemului de ungere (numai cu interiorul): manometrul de control pe furtun și termometrul cu sonda în tubul jojei
   const ap = {};
@@ -1490,7 +1491,7 @@ export function creeazaStand(gazda, optiuni = {}) {
   temaFundal(); window.addEventListener("schimbare-tema", temaFundal);
   raf = requestAnimationFrame(bucla);
   return {
-    stare,
+    stare, scene, mot, camera, ctl, cont, canvas,
     seteaza(s) { Object.assign(stare, s); },
     modCarcasa: m => mot.interior && setMod(m),
     vedere(pz, tg) { zboara(pz, tg); },

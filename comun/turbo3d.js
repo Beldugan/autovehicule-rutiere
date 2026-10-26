@@ -538,3 +538,5 @@ export function creeazaStandTurbo(gazda, opt = {}) {
   });
   return { seteaza(o) { Object.assign(V, o); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
 }
+/* utilitarele comune (folosite și de clima3d.js) */
+export { scena, interactiune, particule, aplicaTransparent, materiale, mat, RB, texCanvas, ecran, V3 };
