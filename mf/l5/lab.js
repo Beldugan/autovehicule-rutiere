@@ -320,7 +320,7 @@ Cadru.porneste({
     init(C) {
       construiestePasi(); ecranComplet($(".sim-grila"), $("#btn-ecran")); afisaje();
       $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
-      import(BAZA_COMUN + "aparate3d.js?v=7").then(m => { SV3 = m.creeazaReynolds($("#st3d"), { laClic: laClic3d }); sincron3d(); })
+      import(BAZA_COMUN + "aparate3d.js?v=8").then(m => { SV3 = m.creeazaReynolds($("#st3d"), { laClic: laClic3d }); sincron3d(); })
         .catch(e => { console.warn(e); $("#st3d").innerHTML = `<p class="nota">Aparatul 3D nu poate fi afișat (WebGL). Urmăriți descrierea firului de colorant de mai jos.</p>`; });
       C.mesaj("Pasul 1: mănuși, alimentarea deschisă, repaus 5–10 minute, apoi temperatura apei.", "");
     },
