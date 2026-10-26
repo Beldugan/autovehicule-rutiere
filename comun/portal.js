@@ -46,7 +46,7 @@ function paginaDisciplina(k) {
     <div class="lista-lucrari">
       ${d.lucrari.map((t, i) => {
         const cale = realizata(k, i + 1);
-        return cale ? `<a class="lucrare" href="../${cale}index.html"><span class="nr">${i + 1}</span><span><span class="titlu">${esc(t)}</span><br><span class="desc">laborator virtual · determinări individuale · referat</span></span><span class="insigna gata">disponibilă</span></a>`
+        return cale ? `<a class="lucrare" href="../${cale}index.html"><span class="nr">${i + 1}</span><span><span class="titlu">${esc(t)}</span><br><span class="desc">${(PORTAL.descrieri || {})[`${d.dosar}-l${i + 1}`] || "laborator virtual · determinări individuale · referat"}</span></span><span class="insigna gata">disponibilă</span></a>`
           : `<div class="lucrare"><span class="nr">${i + 1}</span><span><span class="titlu">${esc(t)}</span><br><span class="desc">simulatorul este în lucru</span></span><span class="insigna lucru">în pregătire</span></div>`;
       }).join("")}
     </div>
