@@ -926,3 +926,189 @@ export function creeazaPierderi(gazda, opt = {}) {
   });
   return { seteaza(o) { Object.assign(V, o); if (o.h) V.h = o.h.slice(); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
 }
+
+/* ===================================================================== DA L6: standul didactic ABS/ESC și ADAS
+   Cadru de laborator pe roți cu platformă: patru colțuri de roată (butuc, disc, etrier; față – roată dințată cu z = 48 și senzor pasiv,
+   spate – inel multipolar în rulment și senzor activ, etriere cu frână de parcare electrică), motorul de antrenare cu curele pe cele
+   două punți, direcția cu cremalieră și volanul (senzorul de unghi pe coloană), pedala cu servofrâna, pompa centrală și rezervorul,
+   unitatea hidraulică ABS/ESC cu pompa, electrovalvele și modulul cu conectorul, conductele de frână, blocul senzorilor ESC (girație,
+   accelerație laterală), lămpile de frână, panoul cu cheia de contact, priza OBD cu interfața testerului, lămpile ABS/ESC și
+   reglajul turației, bateria; partea ADAS: parbrizul cu camera frontală, radarul și panoul-țintă de calibrare pe stativ. */
+export function creeazaStandABS(gazda, opt = {}) {
+  const S = scena(gazda, [1.6, 2.3, 3.6], [0.7, 0.85, 0.0]), sc = S.scene; S.ctl.maxDistance = 7; S.ctl.minDistance = 0.12; S.ctl.maxPolarAngle = Math.PI * 0.56;
+  const [blat, perete] = sc.children.filter(o => o.isMesh); blat.visible = false;
+  perete.geometry = new THREE.PlaneGeometry(9, 3.4); perete.position.set(0.5, 1.7, -1.6);
+  const pod = add(sc, new THREE.Mesh(new THREE.PlaneGeometry(9, 6), mat({ color: 0x8e979c, roughness: 0.85 }))); pod.rotation.x = -Math.PI / 2; pod.position.set(0.5, 0, 0.8); pod.castShadow = false;
+  { const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d"); x.fillStyle = "#8e979c"; x.fillRect(0, 0, 64, 64); x.strokeStyle = "rgba(0,0,0,.18)"; x.lineWidth = 2; x.strokeRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(9, 6); t.colorSpace = THREE.SRGBColorSpace; pod.material.map = t; pod.material.needsUpdate = true; }
+  const sun = sc.children.find(o => o.isDirectionalLight); sun.position.set(1.5, 3.5, 2.5); Object.assign(sun.shadow.camera, { left: -2.5, right: 3.5, top: 2.5, bottom: -2, near: 0.5, far: 9 }); sun.shadow.camera.updateProjectionMatrix(); sun.shadow.bias = -0.0006;
+  const M = materialeMAM(), clic = [], k_ = (o, k, et) => { o.userData.k = k; o.userData.et = et; clic.push(o); return o; };
+  const RB = (a, b, c, r = 0.006) => new RoundedBoxGeometry(a, b, c, 2, r);
+  const albastru = mat({ color: 0x24518f, roughness: 0.45, metalness: 0.35 }), otel = mat({ color: 0x9aa0a6, roughness: 0.35, metalness: 0.85 }), fonta = mat({ color: 0x5b6066, roughness: 0.55, metalness: 0.7 });
+  const rosu = mat({ color: 0xc8202a, roughness: 0.35, metalness: 0.3 }), plastic = mat({ color: 0x1c1e21, roughness: 0.6 }), cupru = mat({ color: 0xb87333, roughness: 0.35, metalness: 0.9 });
+  const V3 = (...a) => new THREE.Vector3(...a);
+  const tev = (pts, r, m, seg = 40) => { const o = tubM(pts, r, m, seg); sc.add(o); return o; };
+  /* ---- cadrul pe roți și platforma */
+  const XL = 1.15, ZL = 0.62, YD = 0.74;
+  [[-XL, -ZL], [-XL, ZL], [XL, -ZL], [XL, ZL]].forEach(([x, z]) => { add(sc, new THREE.Mesh(RB(0.05, YD - 0.1, 0.05), albastru)).position.set(x, (YD - 0.1) / 2 + 0.08, z);
+    const rc = cyl(sc, 0.04, 0.04, 0.03, plastic, x, 0.04, z, 20); rc.rotation.x = Math.PI / 2; add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.05), otel)).position.set(x, 0.09, z); });
+  [-ZL, ZL].forEach(z => { add(sc, new THREE.Mesh(RB(2 * XL + 0.05, 0.05, 0.05), albastru)).position.set(0, YD - 0.03, z); add(sc, new THREE.Mesh(RB(2 * XL + 0.05, 0.04, 0.04), albastru)).position.set(0, 0.2, z); });
+  [-XL, XL].forEach(x => add(sc, new THREE.Mesh(RB(0.05, 0.05, 2 * ZL), albastru)).position.set(x, YD - 0.03, 0));
+  const placa = add(sc, new THREE.Mesh(RB(2 * XL, 0.012, 2 * ZL, 0.004), mat({ color: 0x3e444b, roughness: 0.75, metalness: 0.4 }))); placa.position.set(0, YD, 0);
+  add(sc, new THREE.Mesh(RB(2 * XL - 0.1, 0.012, 2 * ZL - 0.1, 0.004), mat({ color: 0x50575f, roughness: 0.8, metalness: 0.3 }))).position.set(0, 0.21, 0);
+  // bateria sub platformă
+  const bat = add(sc, new THREE.Mesh(RB(0.28, 0.19, 0.17, 0.01), plastic)); bat.position.set(-0.75, 0.32, 0.25); k_(bat, "baterie", "Bateria 12 V a standului");
+  [[-0.83, 0xc62828], [-0.67, 0x111111]].forEach(([x, c]) => cyl(sc, 0.012, 0.012, 0.02, mat({ color: c, roughness: 0.4 }), x, 0.425, 0.25, 14));
+  /* ---- colțurile de roată */
+  const YH = YD + 0.24, XF = 0.72, XS = -0.62, ZH = 0.4, roti = [];
+  const dinte = new THREE.BoxGeometry(0.008, 0.012, 0.014);
+  function colt(i, x, z) {
+    const fata = i < 2, sg = Math.sign(z), G = new THREE.Group(); G.position.set(x, YH, z); sc.add(G);
+    // suportul fusului (placă verticală pe platformă) – la față se rotește cu direcția
+    add(sc, new THREE.Mesh(RB(0.12, YH - YD - 0.03, 0.04), fonta)).position.set(x, (YH + YD) / 2 - 0.02, z - sg * 0.1);
+    const piv = new THREE.Group(); G.add(piv);
+    add(piv, new THREE.Mesh(RB(0.1, 0.16, 0.05, 0.01), fonta)).position.set(0, 0, -sg * 0.06);
+    const rot = new THREE.Group(); piv.add(rot);
+    // butucul, prezoanele, discul (ventilat la față), clopotul
+    const disc = cyl(rot, fata ? 0.13 : 0.12, fata ? 0.13 : 0.12, fata ? 0.022 : 0.01, mat({ color: 0x8d9298, roughness: 0.38, metalness: 0.9 }), 0, 0, sg * 0.02, 56); disc.rotation.x = Math.PI / 2;
+    if (fata) for (let k = 0; k < 30; k++) { const a = k / 30 * Math.PI * 2, g = add(rot, new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.03, 0.012), plastic)); g.position.set(Math.cos(a) * 0.115, Math.sin(a) * 0.115, sg * 0.02); g.rotation.z = a; }
+    const clopot = cyl(rot, 0.07, 0.07, 0.045, fonta, 0, 0, sg * 0.045, 36); clopot.rotation.x = Math.PI / 2;
+    for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + 0.4, p = cyl(rot, 0.006, 0.006, 0.035, otel, Math.cos(a) * 0.05, Math.sin(a) * 0.05, sg * 0.08, 10); p.rotation.x = Math.PI / 2; }
+    // roata-generator: față – coroana dințată (z = 48); spate – inelul multipolar (segmente N/S alternate)
+    const rg = new THREE.Group(); rg.position.z = -sg * 0.015; rot.add(rg);
+    if (fata) { cyl(rg, 0.052, 0.052, 0.012, otel, 0, 0, 0, 48).rotation.x = Math.PI / 2; for (let k = 0; k < 48; k++) { const a = k / 48 * Math.PI * 2, d = add(rg, new THREE.Mesh(dinte, otel)); d.position.set(Math.cos(a) * 0.057, Math.sin(a) * 0.057, 0); d.rotation.z = a; } }
+    else { const e = ecran(512, 16); for (let k = 0; k < 96; k++) { e.x.fillStyle = k % 2 ? "#5b2f1f" : "#2a2c30"; e.x.fillRect(k * 512 / 96, 0, 512 / 96 + 1, 16); } e.t.needsUpdate = true; e.t.wrapS = THREE.RepeatWrapping;
+      const inel = add(rg, new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.014, 96, 1, true), mat({ map: e.t, roughness: 0.6 }))); inel.rotation.x = Math.PI / 2;
+      cyl(rg, 0.045, 0.045, 0.012, otel, 0, 0, 0, 36).rotation.x = Math.PI / 2; }
+    // senzorul de turație (corp negru, cablu, conector) – deasupra roții-generator, radial
+    const SG = new THREE.Group(); SG.position.set(0, 0.075, -sg * 0.015); piv.add(SG);
+    const corp = cyl(SG, 0.009, 0.009, 0.045, plastic, 0, 0.012, 0, 16); k_(corp, "senzor" + i, `Senzorul de turație ${["față stânga (pasiv, inductiv)", "față dreapta (pasiv, inductiv)", "spate stânga (activ, 2 fire)", "spate dreapta (activ, 2 fire)"][i]}`);
+    add(SG, new THREE.Mesh(RB(0.03, 0.012, 0.024, 0.003), plastic)).position.set(0, 0.03, 0);
+    const hl = cyl(SG, 0.013, 0.013, 0.05, new THREE.MeshBasicMaterial({ color: 0xffd400, transparent: true, opacity: 0, depthWrite: false }), 0, 0.012, 0, 16); hl.castShadow = false;
+    // cablul până la conectorul de pe platformă (conectorul se poate decupla)
+    const cx = x + (fata ? -0.12 : 0.12), cz = z - sg * 0.18;
+    tev([[x, YH + 0.11, z - sg * 0.015], [x, YH + 0.16, z - sg * 0.06], [x + (cx - x) * 0.5, YH + 0.05, z - sg * 0.14], [cx, YD + 0.05, cz]], 0.004, plastic, 30);
+    const conA = add(sc, new THREE.Mesh(RB(0.03, 0.022, 0.02, 0.003), mat({ color: 0x2a2d31, roughness: 0.5 }))); conA.position.set(cx, YD + 0.04, cz);
+    const conB = add(sc, new THREE.Mesh(RB(0.032, 0.024, 0.022, 0.003), mat({ color: fata ? 0x7b5a2e : 0x3c5f8e, roughness: 0.5 }))); conB.position.set(cx, YD + 0.04, cz - sg * 0.024); k_(conB, "conector" + i, `Conectorul senzorului ${["FS", "FD", "SS", "SD"][i]} (clic = cuplează / decuplează)`);
+    // etrierul: față roșu (flotant), spate gri cu motorul frânei de parcare electrice
+    const E = new THREE.Group(); const a0 = fata ? Math.PI * 0.85 : Math.PI * 0.15; E.position.set(Math.cos(a0) * 0.105, Math.sin(a0) * 0.105, sg * 0.02); E.rotation.z = a0; piv.add(E);
+    k_(add(E, new THREE.Mesh(RB(0.06, 0.1, 0.075, 0.01), fata ? rosu : mat({ color: 0x8a8f95, roughness: 0.45, metalness: 0.6 }))), "etrier" + i, fata ? "Etrierul față" : "Etrierul spate cu frâna de parcare electrică");
+    const piston = cyl(E, fata ? 0.022 : 0.018, fata ? 0.022 : 0.018, 0.02, otel, -0.005, 0, -sg * 0.045, 20); piston.rotation.x = Math.PI / 2;
+    let epb = null; if (!fata) { epb = new THREE.Group(); epb.position.set(0.0, 0, -sg * 0.075); E.add(epb); cyl(epb, 0.022, 0.022, 0.07, plastic, 0, 0, -sg * 0.02, 24).rotation.x = Math.PI / 2; add(epb, new THREE.Mesh(RB(0.035, 0.03, 0.025, 0.004), plastic)).position.set(0.03, 0, -sg * 0.03);
+      k_(epb.children[0], "epb" + i, "Motorul frânei de parcare electrice"); }
+    roti.push({ G, piv, rot, hl, conB, piston, epb, sg, fata, x, z });
+  }
+  colt(0, XF, ZH); colt(1, XF, -ZH); colt(2, XS, ZH); colt(3, XS, -ZH);
+  // arborii punților (fiecare roată are lagăr propriu; arbore spre motorul de antrenare)
+  const arbori = [XF, XS].map(x => { const g = new THREE.Group(); g.position.set(x, YH, 0); sc.add(g); cyl(g, 0.012, 0.012, 2 * ZH - 0.25, otel, 0, 0, 0, 16).rotation.x = Math.PI / 2;
+    const f = cyl(g, 0.05, 0.05, 0.03, fonta, 0, 0, 0.15, 32); f.rotation.x = Math.PI / 2; for (let k = 0; k < 6; k++) { const s = add(g, new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.09, 0.034), otel)); s.position.z = 0.15; s.rotation.z = k * Math.PI / 6; } return g; });
+  // motorul de antrenare (cu reductor) și curelele dințate
+  const MA = new THREE.Group(); MA.position.set(0.05, YD + 0.09, 0); sc.add(MA);
+  k_(cyl(MA, 0.07, 0.07, 0.22, mat({ color: 0x2f6aa8, roughness: 0.45, metalness: 0.3 }), 0, 0, 0, 36), "antrenare", "Motorul de antrenare a roților (viteza se reglează din panou)").rotation.x = Math.PI / 2;
+  add(MA, new THREE.Mesh(RB(0.16, 0.03, 0.2), fonta)).position.set(0, -0.07, 0);
+  const fulM = new THREE.Group(); fulM.position.set(0, 0, 0.15); MA.add(fulM); { const f = cyl(fulM, 0.035, 0.035, 0.03, fonta, 0, 0, 0, 24); f.rotation.x = Math.PI / 2; for (let k = 0; k < 3; k++) { const s = add(fulM, new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.06, 0.034), otel)); s.rotation.z = k * Math.PI / 3; } }
+  const curea = mat({ color: 0x111214, roughness: 0.8 }), yM = YD + 0.09;
+  [XF, XS].forEach(x => { const s = Math.sign(x);
+    [[0.035, 0.05], [-0.035, -0.05]].forEach(([a, b]) => { const A = V3(0.05 + s * 0.0, yM + a, 0.15), B = V3(x, YH + b, 0.15), L = A.distanceTo(B), o = add(sc, new THREE.Mesh(new THREE.BoxGeometry(L, 0.005, 0.026), curea)); o.position.copy(A).lerp(B, 0.5); o.rotation.z = Math.atan2(B.y - A.y, B.x - A.x); }); });
+  // apărătoarea curelelor (plasă) – deschisă pentru vizibilitate
+  /* ---- direcția: cremaliera, bieletele, coloana și volanul (senzorul de unghi pe coloană) */
+  const XC = XF + 0.13;
+  cyl(sc, 0.022, 0.022, 0.55, mat({ color: 0x6b7178, roughness: 0.4, metalness: 0.7 }), XC, YH - 0.03, 0, 24).rotation.x = Math.PI / 2;
+  const biel = [ZH, -ZH].map(z => { const b = cyl(sc, 0.008, 0.008, 0.16, otel, XC - 0.05, YH - 0.03, z * 0.8, 10); b.rotation.x = Math.PI / 2; return b; });
+  const COL = new THREE.Group(); COL.position.set(XC + 0.02, YH - 0.03, -0.32); sc.add(COL);
+  const pts = [V3(0, 0, 0), V3(0.1, 0.12, -0.2), V3(0.25, 0.42, -0.42)];
+  sc.add(Object.assign(tubM(pts.map(p => p.clone().add(COL.position)), 0.016, otel, 20)));
+  const VOL = new THREE.Group(); VOL.position.copy(COL.position.clone().add(V3(0.27, 0.46, -0.45))); VOL.lookAt(VOL.position.clone().add(V3(0.35, 0.45, -0.8))); sc.add(VOL);
+  const volan = new THREE.Group(); VOL.add(volan);
+  k_(add(volan, new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.017, 14, 48), mat({ color: 0x1e1f22, roughness: 0.7 }))), "volan", "Volanul (clic = rotire ±; butonul din pași îl centrează)");
+  [0, 1, 2].forEach(k => { const s = add(volan, new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.012), mat({ color: 0x2a2c30, roughness: 0.6 }))); s.position.set(Math.cos(k * 2.1 - 1.57) * 0.08, Math.sin(k * 2.1 - 1.57) * 0.08, 0); s.rotation.z = k * 2.1 - 1.57; });
+  cyl(volan, 0.06, 0.06, 0.05, mat({ color: 0x2a2c30, roughness: 0.6 }), 0, 0, -0.02, 30).rotation.x = Math.PI / 2;
+  const marc = add(volan, new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.02), mat({ color: 0xf2b705, roughness: 0.5 }))); marc.position.set(0, 0.18, 0.005);
+  const sas = cyl(VOL, 0.05, 0.05, 0.03, mat({ color: 0x3a3f46, roughness: 0.5 }), 0, 0, -0.08, 30); sas.rotation.x = Math.PI / 2; k_(sas, "sas", "Senzorul de unghi al volanului (pe coloana de direcție)");
+  /* ---- pedala, servofrâna, pompa centrală, rezervorul */
+  const PB = new THREE.Group(); PB.position.set(XL - 0.02, YD - 0.02, -0.25); sc.add(PB);
+  add(PB, new THREE.Mesh(RB(0.06, 0.2, 0.12), fonta)).position.set(0.03, -0.08, 0);
+  const pedala = new THREE.Group(); pedala.position.set(0.06, -0.02, 0); PB.add(pedala);
+  add(pedala, new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.36, 0.02), otel)).position.set(0.03, -0.18, 0);
+  k_(add(pedala, new THREE.Mesh(RB(0.02, 0.07, 0.09, 0.004), mat({ color: 0x111111, roughness: 0.95 }))), "pedala", "Pedala de frână (clic = apasă / eliberează)").position.set(0.045, -0.36, 0);
+  const contactS = add(PB, new THREE.Mesh(RB(0.025, 0.025, 0.03, 0.004), mat({ color: 0x2b2e33, roughness: 0.5 }))); contactS.position.set(0.075, 0.03, 0.04); k_(contactS, "contactStop", "Contactul lămpilor de frână (pe pedalier)");
+  const servo = cyl(sc, 0.11, 0.11, 0.16, plastic, XL - 0.12, YD + 0.13, -0.25, 40); servo.rotation.z = Math.PI / 2; k_(servo, "servo", "Servofrâna cu vacuum");
+  const pc = cyl(sc, 0.028, 0.028, 0.2, mat({ color: 0xa0a5aa, roughness: 0.35, metalness: 0.8 }), XL - 0.3, YD + 0.13, -0.25, 24); pc.rotation.z = Math.PI / 2; k_(pc, "pompaC", "Pompa centrală tandem");
+  const rez = add(sc, new THREE.Mesh(RB(0.12, 0.06, 0.08, 0.008), new THREE.MeshPhysicalMaterial({ color: 0xf6f0d8, roughness: 0.3, transmission: 0.4, transparent: true, opacity: 0.75 }))); rez.position.set(XL - 0.3, YD + 0.2, -0.25); k_(rez, "rezervor", "Rezervorul lichidului de frână (nivel între MIN și MAX)");
+  add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.035, 0.075), mat({ color: 0xd9a63a, roughness: 0.3, transparent: true, opacity: 0.85 }))).position.set(XL - 0.3, YD + 0.19, -0.25);
+  cyl(sc, 0.022, 0.022, 0.02, mat({ color: 0xe8c23a, roughness: 0.6 }), XL - 0.3, YD + 0.24, -0.25, 20);
+  /* ---- unitatea hidraulică ABS/ESC: blocul de aluminiu, pompa, modulul cu conectorul */
+  const HU = new THREE.Group(); HU.position.set(0.2, YD + 0.1, -0.33); sc.add(HU);
+  k_(add(HU, new THREE.Mesh(RB(0.13, 0.11, 0.12, 0.006), mat({ color: 0xc9ced3, roughness: 0.3, metalness: 0.85 }))), "hcu", "Unitatea hidraulică ABS/ESC (electrovalve de admisie / evacuare, acumulatoare)");
+  const pompaM = cyl(HU, 0.035, 0.035, 0.08, plastic, 0, 0, 0.1, 24); pompaM.rotation.x = Math.PI / 2; k_(pompaM, "pompaABS", "Motorul pompei de retur ABS");
+  const ecuC = add(HU, new THREE.Mesh(RB(0.03, 0.12, 0.13, 0.006), mat({ color: 0x1b1e22, roughness: 0.6 }))); ecuC.position.set(-0.08, 0, 0); k_(ecuC, "modul", "Modulul electronic ABS/ESC (bobinele electrovalvelor sub capac)");
+  const conM = add(HU, new THREE.Mesh(RB(0.02, 0.06, 0.07, 0.004), mat({ color: 0x2a2d31, roughness: 0.5 }))); conM.position.set(-0.105, 0.01, 0); k_(conM, "conModul", "Conectorul modulului ABS/ESC (alimentare, masă, senzori, CAN)");
+  const ledV = add(HU, new THREE.Mesh(new THREE.SphereGeometry(0.006, 10, 8), new THREE.MeshBasicMaterial({ color: 0x223322 }))); ledV.position.set(-0.096, 0.05, 0.05);
+  [[-0.04, 0.03], [0, 0.03], [0.04, 0.03], [-0.04, -0.03], [0, -0.03], [0.04, -0.03]].forEach(([a, b]) => cyl(HU, 0.008, 0.008, 0.012, M.alama, a, 0.06, b, 10));
+  const masa = add(sc, new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.004, 0.03), M.alama)); masa.position.set(0.05, YD + 0.012, -0.5); k_(masa, "masa", "Punctul de masă al modulului pe caroserie (platformă)");
+  tev([[0.12, YD + 0.13, -0.33], [0.08, YD + 0.05, -0.45], [0.05, YD + 0.014, -0.5]], 0.004, mat({ color: 0x5a3b1c, roughness: 0.6 }), 16);
+  // conductele de frână (cupru): pompa centrală → HCU, HCU → etriere
+  tev([[XL - 0.4, YD + 0.13, -0.25], [0.6, YD + 0.2, -0.3], [0.2, YD + 0.16, -0.33]], 0.003, cupru, 30);
+  tev([[XL - 0.4, YD + 0.13, -0.24], [0.6, YD + 0.18, -0.28], [0.2, YD + 0.16, -0.31]], 0.003, cupru, 30);
+  roti.forEach((r, i) => tev([[0.2 + (i % 2 ? 0.03 : -0.03), YD + 0.16, -0.33 + (i < 2 ? 0.02 : -0.02)], [(0.2 + r.x) / 2, YD + 0.06 + i * 0.01, (r.z - 0.33) / 2], [r.x, YD + 0.07, r.z - r.sg * 0.12], [r.x - 0.06 * (r.fata ? 1 : -1), YH + 0.08, r.z]], 0.003, cupru, 40));
+  /* ---- blocul senzorilor ESC (girație, accelerație laterală) */
+  const ESC = add(sc, new THREE.Mesh(RB(0.08, 0.035, 0.06, 0.005), mat({ color: 0x23262a, roughness: 0.6 }))); ESC.position.set(-0.15, YD + 0.025, 0.05); k_(ESC, "escS", "Senzorul de viteză de girație și accelerație laterală (în centrul de greutate)");
+  { const e = ecran(128, 96); e.x.fillStyle = "#23262a"; e.x.fillRect(0, 0, 128, 96); e.x.strokeStyle = "#ddd"; e.x.lineWidth = 6; e.x.beginPath(); e.x.arc(64, 48, 26, 0.3, 5.6); e.x.stroke(); e.x.beginPath(); e.x.moveTo(98, 40); e.x.lineTo(90, 26); e.x.lineTo(104, 30); e.x.fill(); e.t.needsUpdate = true;
+    add(sc, new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.045), new THREE.MeshBasicMaterial({ map: e.t }))).position.set(-0.15, YD + 0.0435, 0.05); sc.children[sc.children.length - 1].rotation.x = -Math.PI / 2; }
+  /* ---- lămpile de frână pe stâlp, panoul de comandă (cheie, OBD, lămpi, turație) */
+  const lamp = [0.3, -0.3].map(z => { cyl(sc, 0.012, 0.012, 0.5, otel, -XL - 0.02, YD + 0.25, z, 12); const l = add(sc, new THREE.Mesh(RB(0.04, 0.07, 0.12, 0.01), mat({ color: 0x5a0d0d, roughness: 0.3, emissive: 0xff1a1a, emissiveIntensity: 0 }))); l.position.set(-XL - 0.04, YD + 0.5, z); k_(l, "lampaStop", "Lampa de frână"); return l; });
+  const PN = new THREE.Group(); PN.position.set(-XL + 0.02, YD + 0.28, -ZL + 0.02); PN.rotation.y = 0; sc.add(PN);
+  add(PN, new THREE.Mesh(RB(0.5, 0.42, 0.03, 0.01), mat({ color: 0xe3e5e0, roughness: 0.55 }))).position.set(0.27, 0, 0);
+  [0.05, 0.49].forEach(x => add(PN, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.03), albastru)).position.set(x, -0.33, 0.0));
+  const eP = ecran(512, 430); { const x = eP.x; x.fillStyle = "#e3e5e0"; x.fillRect(0, 0, 512, 430); x.fillStyle = "#1b2733"; x.font = "bold 28px system-ui"; x.fillText("STAND ABS / ESC", 24, 44); x.font = "20px system-ui"; x.fillText("CONTACT", 40, 352); x.fillText("OBD", 200, 352); x.fillText("TURAȚIE ROȚI", 320, 352); x.fillText("ABS", 60, 150); x.fillText("ESC", 160, 150); x.fillText("FRÂNĂ", 252, 150); x.fillText("P", 372, 150); eP.t.needsUpdate = true; }
+  add(PN, new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.42), new THREE.MeshBasicMaterial({ map: eP.t }))).position.set(0.27, 0, 0.0155);
+  const lampi = [["abs", 0.08, 0xffa000], ["esc", 0.17, 0xffa000], ["frana", 0.26, 0xff2020], ["p", 0.36, 0xff2020]].map(([k, x, c]) => { const l = cyl(PN, 0.018, 0.018, 0.01, mat({ color: 0x332211, roughness: 0.4, emissive: c, emissiveIntensity: 0 }), x, 0.11, 0.02, 20); l.rotation.x = Math.PI / 2; return l; });
+  const cheie = new THREE.Group(); cheie.position.set(0.1, -0.08, 0.02); PN.add(cheie); cyl(cheie, 0.03, 0.03, 0.015, otel, 0, 0, 0, 24).rotation.x = Math.PI / 2;
+  const cap = add(cheie, new THREE.Mesh(RB(0.012, 0.05, 0.012, 0.003), plastic)); cap.position.z = 0.015; k_(cap, "contact", "Cheia de contact (clic = pune / ia contactul)");
+  const obd = add(PN, new THREE.Mesh(RB(0.05, 0.03, 0.02, 0.004), plastic)); obd.position.set(0.22, -0.08, 0.02); k_(obd, "obd", "Priza de diagnoză OBD (interfața testerului X431)");
+  const vci = new THREE.Group(); vci.position.set(0.22, -0.08, 0.05); PN.add(vci); add(vci, new THREE.Mesh(RB(0.06, 0.04, 0.05, 0.006), mat({ color: 0xc62828, roughness: 0.5 }))); const ledVci = add(vci, new THREE.Mesh(new THREE.SphereGeometry(0.004, 8, 6), new THREE.MeshBasicMaterial({ color: 0x113311 }))); ledVci.position.set(0.02, 0.022, 0.0);
+  const buton = new THREE.Group(); buton.position.set(0.39, -0.08, 0.02); PN.add(buton); cyl(buton, 0.035, 0.035, 0.02, plastic, 0, 0, 0, 30).rotation.x = Math.PI / 2;
+  const indic = add(buton, new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.03, 0.006), new THREE.MeshBasicMaterial({ color: 0xffffff }))); indic.position.set(0, 0.015, 0.014); k_(buton.children[0], "turatie", "Reglajul turației roților (motorul de antrenare)");
+  /* ---- ADAS: parbrizul cu camera, radarul, panoul-țintă pe stativ */
+  const XW = 0.35;
+  [-0.52, 0.52].forEach(z => add(sc, new THREE.Mesh(RB(0.035, 0.48, 0.035), albastru)).position.set(XW + 0.05, YD + 0.24, z));
+  const PW = new THREE.Group(); PW.position.set(XW + 0.05, YD + 0.5, 0); PW.rotation.z = 0.5; sc.add(PW);
+  const parbriz = add(PW, new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.55), new THREE.MeshPhysicalMaterial({ color: 0xbfe0ee, roughness: 0.05, transmission: 0.85, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false })));
+  parbriz.rotation.y = Math.PI / 2; parbriz.castShadow = false; k_(parbriz, "parbriz", "Parbrizul (după înlocuire camera trebuie recalibrată)");
+  { const ram = mat({ color: 0x15171a, roughness: 0.8 }); [0.285, -0.285].forEach(y => add(PW, new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.022, 1.04), ram)).position.set(0, y, 0)); [0.51, -0.51].forEach(z => add(PW, new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.59, 0.022), ram)).position.set(0, 0, z)); }
+  const cam = add(PW, new THREE.Mesh(RB(0.05, 0.07, 0.1, 0.008), plastic)); cam.position.set(-0.04, 0.22, 0); k_(cam, "camera", "Camera frontală (menținerea benzii, recunoașterea indicatoarelor, AEB)");
+  const ob = cyl(PW, 0.012, 0.012, 0.02, mat({ color: 0x0b2a4a, roughness: 0.1, metalness: 0.6 }), -0.01, 0.2, 0, 16); ob.rotation.z = Math.PI / 2 - 0.5;
+  const radar = add(sc, new THREE.Mesh(RB(0.03, 0.09, 0.11, 0.008), mat({ color: 0x2b2e33, roughness: 0.5 }))); radar.position.set(XL + 0.04, YD - 0.05, 0.0); k_(radar, "radar", "Radarul frontal (ACC / AEB)");
+  const T = new THREE.Group(); T.position.set(XW + 2.2, 0, 0); sc.add(T);
+  [[0, 0.25], [0.2, -0.13], [-0.2, -0.13]].forEach(([dx, dz]) => T.add(tubM([[0, 0.9, 0], [dx * 0.5, 0.45, dz * 0.5], [dx, 0.0, dz]], 0.012, plastic, 6)));
+  cyl(T, 0.016, 0.016, 1.4, otel, 0.035, 0.85, 0, 12);
+  const TB = new THREE.Group(); T.add(TB); TB.position.y = 1.25;
+  const eT = ecran(512, 340); { const x = eT.x; x.fillStyle = "#fff"; x.fillRect(0, 0, 512, 340); const q = 40; for (let i = 0; i < 9; i++) for (let j = 0; j < 6; j++) if ((i + j) % 2) { x.fillStyle = "#111"; x.fillRect(76 + i * q, 50 + j * q, q, q); } x.strokeStyle = "#c62828"; x.lineWidth = 4; x.beginPath(); x.moveTo(256, 30); x.lineTo(256, 310); x.moveTo(60, 170); x.lineTo(452, 170); x.stroke(); x.fillStyle = "#1b2733"; x.font = "bold 18px system-ui"; x.fillText("ȚINTĂ CAMERĂ FRONTALĂ", 150, 330); eT.t.needsUpdate = true; }
+  const tinta = add(TB, new THREE.Mesh(RB(0.02, 0.62, 0.92, 0.01), mat({ color: 0xe9e9e4, roughness: 0.6 }))); k_(tinta, "tinta", "Panoul-țintă de calibrare (distanța și înălțimea din documentația constructorului)");
+  const ft = add(TB, new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), new THREE.MeshBasicMaterial({ map: eT.t }))); ft.position.x = -0.0105; ft.rotation.y = -Math.PI / 2;
+  // laserul de aliniere (linia pe pardoseală între axa standului și țintă)
+  const laser = add(sc, new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.006), new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.8 }))); laser.rotation.x = -Math.PI / 2; laser.position.set(XW + 1.1, 0.003, 0); laser.castShadow = false;
+  interactiune(S, clic, opt.laClic);
+  const V = { contact: false, v: [0, 0, 0, 0], volan: 0, pedala: 0, pompa: false, valve: false, epb: 0, stop: false, lampi: { abs: false, esc: false, frana: false, p: false }, sel: -1, cuplat: [true, true, true, true],
+    vci: false, turatie: 0, tinta: { vizibil: false, dist: 2.2, h: 1.25, laser: false }, unghiFata: 0 };
+  let tt = 0, ultTint = "";
+  S.porneste(dt => {
+    tt += dt;
+    roti.forEach((r, i) => { r.rot.rotation.z -= (V.v[i] / 3.6) / 0.297 * dt * r.sg * -1;
+      r.hl.material.opacity = V.sel === i ? 0.35 + 0.25 * Math.sin(tt * 6) : 0;
+      r.conB.position.y = YD + 0.04 + (V.cuplat[i] ? 0 : 0.035); r.conB.rotation.z = V.cuplat[i] ? 0 : 0.5;
+      r.piston.position.z = -r.sg * (0.045 + (V.pedala > 0.3 ? 0.004 : 0));
+      if (r.epb) r.epb.position.z = -r.sg * (0.075 + V.epb * 0.02); });
+    const af = V.volan / 15 * Math.PI / 180; roti[0].piv.rotation.y = af; roti[1].piv.rotation.y = af; biel.forEach(b => b.position.x = XC - 0.05 - af * 0.05);
+    volan.rotation.z = -V.volan * Math.PI / 180;
+    pedala.rotation.z = V.pedala * 0.35;
+    pompaM.rotation.y = V.pompa ? tt * 40 : 0; HU.position.y = YD + 0.1 + (V.pompa ? Math.sin(tt * 90) * 0.0008 : 0);
+    ledV.material.color.set(V.valve ? (Math.sin(tt * 30) > 0 ? 0x44ff44 : 0x113311) : (V.contact ? 0x225522 : 0x112211));
+    lamp.forEach(l => l.material.emissiveIntensity = V.stop ? 2.2 : 0);
+    lampi.forEach((l, j) => { const on = V.lampi[["abs", "esc", "frana", "p"][j]]; l.material.emissiveIntensity = on ? 2.5 : 0; });
+    cheie.rotation.z = V.contact ? -0.8 : 0; vci.visible = V.vci; ledVci.material.color.set(V.vci && V.contact ? (Math.sin(tt * 8) > 0 ? 0x33ff55 : 0x116622) : 0x113311);
+    buton.rotation.z = -V.turatie / 30 * 4.2; fulM.rotation.z -= (V.turatie / 3.6 / 0.297) * dt * 1.43; arbori.forEach(a => a.rotation.z -= (V.turatie / 3.6 / 0.297) * dt);
+    T.visible = V.tinta.vizibil; T.position.x = XW + 0.1 + V.tinta.dist; TB.position.y = V.tinta.h; laser.visible = V.tinta.vizibil && V.tinta.laser; laser.scale.x = V.tinta.dist / 2.2; laser.position.x = XW + 0.1 + V.tinta.dist / 2;
+  });
+  return { seteaza(o) { Object.keys(o).forEach(k => { if (k === "tinta" || k === "lampi") Object.assign(V[k], o[k]); else V[k] = o[k]; }); if (o.v) V.v = o.v.slice(); if (o.cuplat) V.cuplat = o.cuplat.slice(); },
+    vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
+}
