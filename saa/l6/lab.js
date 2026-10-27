@@ -290,11 +290,6 @@ const HTML_TEORIE = `
 <figure><img src="img/fig6_2.jpg" alt="Fig. 6.2" loading="lazy"><figcaption>Fig. 6.2. Presiunea de supraalimentare și caracteristica actuatorului (exemplu)</figcaption></figure>
 <h2>6.3. Aparatură și echipamente</h2>
 <ul><li>Stand motor supraalimentat (1.5 dCi), cu sistem de exhaustare</li><li>Tester OBD (presiune de supraalimentare cerută / reală, poziția actuatorului, temperatura aerului)</li><li>Termocupluri sau senzori de temperatură montați înainte și după intercooler</li><li>Pompă de vacuum manuală cu manometru, comparator cu suport magnetic</li><li>Turbosuflante secționate (wastegate și VGT)</li></ul>
-<div class="nota-indrumar"><h3>Completări față de îndrumarul tipărit</h3><ul>
-<li><b>Presiunea p<sub>1</sub></b> se ia egală cu presiunea atmosferică citită de tester (BARO) minus pierderea din filtru, Δp<sub>filtru</sub> ≈ 0,02 bar; presiunea p<sub>2</sub> se aproximează cu presiunea reală citită de senzorul MAP (pierderea din intercooler se neglijează).</li>
-<li><b>Rândul „sarcină plină”</b> al Tabelului 6.1 se ia din datalogul probei de drum (treapta a 3-a, pedala la fund), la ≈ 2500 rot/min: pe standul fără frână diferențele de temperatură sunt prea mici pentru un randament precis.</li>
-<li><b>Tabelul 6.3</b> conține etanșeitatea membranei actuatorului (depresiunea la început și după 1 minut) și răspunsul la accelerarea liberă: presiunea maximă și timpul de răspuns t<sub>90</sub>.</li>
-<li>Fiecare student are propriul stand: presiunea atmosferică, temperatura mediului, caracteristica actuatorului, randamentul compresorului și eficiența intercoolerului.</li></ul></div>
 <h2>6.4. Modul de lucru (în simulator)</h2>
 <ol><li>Turbosuflantele secționate și sistemul de supraalimentare pe stand: identificarea componentelor.</li><li>Caracteristica actuatorului pneumatic (pompa de vacuum, comparatorul) și etanșeitatea membranei.</li><li>Presiunea cerută / reală, poziția actuatorului și T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub> la turațiile din Tabelul 6.1.</li><li>Accelerarea liberă înregistrată cu testerul (turbo-lag).</li><li>Datalogul de drum la sarcină plină.</li></ol>
 <h2>6.6. Prelucrarea datelor</h2>

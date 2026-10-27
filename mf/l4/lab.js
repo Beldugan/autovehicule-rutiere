@@ -343,7 +343,7 @@ function calculeazaL4(D) {
     else if (R.Cd < 0.95) verdicte.push({ tip: "atentie", text: `${NUME_RAND[k]}: C<sub>d</sub> = ${fmt(R.Cd, 3)} este prea mic: aer în piezometrul gâtului (nivel h<sub>3</sub> fals coborât), citire greșită sau volum pierdut din vasul volumetric.` });
     else verdicte.push({ tip: "atentie", text: `${NUME_RAND[k]}: C<sub>d</sub> = ${fmt(R.Cd, 3)} este prea mare (≥ 1 nu este posibil fizic): Δh<sub>1−3</sub> citit prea mic sau timpul cronometrat prea scurt.` });
   });
-  if (R1.ok) verdicte.push(R1.dh13 >= 150 && R1.dh13 <= 260 ? { tip: "ok", text: `Debitul mare Q<sub>1</sub>: Δh<sub>1−3</sub> = ${fmt(R1.dh13, 0)} mm (≈ 20 cm, cum cere îndrumarul).` } : { tip: "atentie", text: `Q<sub>1</sub> trebuie să fie debitul mare, cu Δh<sub>1−3</sub> ≈ 200 mm (citit: ${fmt(R1.dh13, 0)} mm).` });
+  if (R1.ok) verdicte.push(R1.dh13 >= 150 && R1.dh13 <= 260 ? { tip: "ok", text: `Debitul mare Q<sub>1</sub>: Δh<sub>1−3</sub> = ${fmt(R1.dh13, 0)} mm (≈ 20 cm).` } : { tip: "atentie", text: `Q<sub>1</sub> trebuie să fie debitul mare, cu Δh<sub>1−3</sub> ≈ 200 mm (citit: ${fmt(R1.dh13, 0)} mm).` });
   const dhs = RANDURI.map(k => o.r[k].ok ? o.r[k].dh13 : NaN);
   if (dhs.every(Number.isFinite)) verdicte.push(dhs[0] > dhs[1] && dhs[1] > dhs[2] ? { tip: "ok", text: "Cele trei debite sunt descrescătoare (Q<sub>1</sub> > Q<sub>2</sub> > Q<sub>3</sub>)." } : { tip: "atentie", text: "Debitele Q<sub>2</sub> și Q<sub>3</sub> trebuie să fie, în ordine, mai mici decât Q<sub>1</sub>." });
   RANDURI.forEach(k => {

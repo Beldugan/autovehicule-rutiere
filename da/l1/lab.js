@@ -571,14 +571,6 @@ const HTML_TEORIE = `
 <div class="ec"><span>ΔU = U<sub>0</sub> − U<sub>s</sub></span><span class="nr">(1.5)</span></div>
 <div class="ec"><span>R<sub>c</sub> = ΔU/I [Ω]</span><span class="nr">(1.6)</span></div>
 <p>Exemplu clasic (Smart Fortwo): macaraua geamului pasagerului nu funcționează. Dacă geamul poate fi acționat de pe partea șoferului, modulele ușilor, magistrala și motorul sunt în stare bună, iar defectul este probabil la comutatorul pasagerului. Abia după acest raționament se măsoară.</p>
-<div class="nota-indrumar"><h3>Completări și corecturi față de îndrumarul tipărit</h3><ul>
-<li><b>Căderea de tensiune (1.5):</b> în exemplul din îndrumar U<sub>0</sub> este citită „fără sarcină”, iar U<sub>s</sub> „cu ventilatorul pornit”; diferența include astfel și căderea de tensiune internă a bateriei și pe cablaj. Corect: U<sub>0</sub> și U<sub>s</sub> se măsoară amândouă cu ventilatorul pornit (sau direct pe siguranță). În simulator se procedează așa.</li>
-<li><b>Valoarea normală:</b> o siguranță-lamelă în bună stare are ≈ 3…8 mΩ, deci la 8 A căderea totală pe siguranță și contacte este sub ≈ 0,08 V (R<sub>c</sub> &lt; 0,01 Ω). La R<sub>c</sub> = 0,1 Ω și 8 A se disipă 6,4 W în suportul siguranței – contactul se încălzește și se degradează rapid.</li>
-<li><b>Încărcarea magistralei:</b> constructorii proiectează de regulă rețelele sub ≈ 50…60 %; peste ≈ 70…80 % cresc întârzierile mesajelor cu prioritate mică. Valoarea de 75 % din exemplu este deci la limită.</li>
-<li><b>Stările codurilor:</b> s-au adăugat definițiile complete (în așteptare / confirmat / permanent / istoric) și serviciile OBD 01, 02, 03, 07, 0A, folosite de cititorul generic.</li>
-<li><b>Pragurile receptorului CAN</b> (dominant peste 0,9 V, recesiv sub 0,5 V) și U<sub>diff</sub> recesiv ≈ 0 V au fost adăugate pentru interpretarea oscilogramei.</li>
-<li><b>Tensiunile medii CAN</b> citite cu multimetrul depind de încărcarea magistralei (proporția biților dominanți): la trafic intens CAN-H medie crește spre 2,7 V și CAN-L medie scade spre 2,3 V. La priza OBD a unui autoturism cu gateway, CAN-ul de diagnoză are trafic numai cât testerul comunică, deci mediile sunt foarte apropiate de 2,5 V; valorile din îndrumar (2,6…2,7 / 2,3…2,4 V) corespund unei magistrale încărcate, de exemplu CAN motor măsurat la gateway.</li>
-<li><b>Arhitectura cu gateway</b> (autoturismele actuale) a fost adăugată la noțiunile teoretice: priza OBD este legată la CAN-ul de diagnoză, iar celelalte magistrale se verifică la conectorii gateway-ului.</li></ul></div>
 <h2>1.4. Modul de lucru (în simulator)</h2>
 <ol><li>Citiți fișa „client” cu simptomul și faceți inspecția vizuală: tensiunea bateriei în repaus (≥ 12,4 V, pinul 16 față de pinul 4). Identificați pe machetă gateway-ul, magistralele și priza de diagnoză.</li>
 <li>Cu contactul decuplat conectați interfața X431; puneți contactul (vehiculul este identificat automat după VIN).</li>
@@ -600,7 +592,7 @@ const HTML_TEORIE = `
 <h2>1.8. Relevanță practică</h2>
 <p>Diagnoza computerizată și verificarea rețelelor de date sunt primele operații din orice service. Pe măsură ce vehiculele trec la arhitecturi zonale, CAN FD și Ethernet, capacitatea de a verifica fizic o magistrală și de a interpreta harta modulelor devine o competență cerută tehnicienilor și inginerilor de validare.</p>`;
 function htmlProbleme() {
-  return `<h2>Exemplu rezolvat (din îndrumar, corectat)</h2>
+  return `<h2>Exemplu rezolvat</h2>
 <p>Pe oscilogramă un bit durează 2 µs, iar magistrala motorului transmite 20 de mesaje cu perioada de 10 ms și 20 de mesaje cu perioada de 20 ms, cu ≈ 125 biți fiecare (100 și, respectiv, 50 de apariții pe secundă):</p>
 <div class="ec"><span>f<sub>bit</sub> = 1/(2·10<sup>−6</sup>) = 500 000 bit/s</span><span class="nr">(1.7)</span></div>
 <div class="ec"><span>S = 125·(20·100 + 20·50)/500 000·100 = 75 %</span><span class="nr">(1.8)</span></div>

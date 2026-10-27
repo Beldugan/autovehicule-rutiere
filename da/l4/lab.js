@@ -513,7 +513,7 @@ const TEST = [
   { q: "Corecții negative mari și λ < 1 indică:", o: ["aer fals", "amestec bogat (presiune mare, injector care picură)", "rateuri", "evacuare spartă"], c: 1, e: "ECU scade durata injecției pentru că sonda indică bogat." },
   { q: "HC foarte mare cu O₂ ridicat și λ calculat > 1 indică:", o: ["amestec sărac", "rateuri (combustibil nears)", "presiune mare", "catalizator nou"], c: 1, e: "λ calculat este „fals”: oxigenul provine din cilindrul fără ardere." },
   { q: "Sonda λ amonte îmbătrânită se recunoaște prin:", o: ["tensiune constantă 0,45 V", "comutare lentă, amplitudine mică", "tensiune > 1 V", "comutare de 10 Hz"], c: 1, e: "Sonda bună comută 0,1…0,8 V la ≈ 1 Hz (Fig. 4.4)." },
-  { q: "Debitul minim al pompei (K7J, retur) este:", o: ["0,5 l/min", "≥ 1,45 l/min", "10 l/min", "nu se verifică"], c: 1, e: "Valoarea din îndrumar; un debit mic indică filtru colmatat sau pompă uzată." }
+  { q: "Debitul minim al pompei (K7J, retur) este:", o: ["0,5 l/min", "≥ 1,45 l/min", "10 l/min", "nu se verifică"], c: 1, e: "Valoarea minimă admisă; un debit mic indică filtru colmatat sau pompă uzată." }
 ];
 
 /* ------------------------------------------------------------------ 3D și stil */

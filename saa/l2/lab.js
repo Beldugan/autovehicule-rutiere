@@ -339,15 +339,6 @@ const HTML_TEORIE = `
 <figure><img src="img/fig2_2.jpg" alt="Fig. 2.2 Compararea duratei de injecție calculate cu valorile măsurate" loading="lazy"><figcaption>Fig. 2.2. Compararea duratei de injecție calculate cu valorile măsurate (exemplu; curbele de 60 și 95 kPa se obțin numai cu motorul în sarcină)</figcaption></figure>
 <h2>Instrumentul virtual (aplicația LabVIEW)</h2>
 <p>Un instrument virtual (VI) are un <b>panou frontal</b> – comenzile (intrările: p, n, V<sub>s</sub>, T<sub>a</sub>, η<sub>v</sub>, λ, L<sub>0</sub>, q<sub>s</sub>, t<sub>mort</sub>, U<sub>bat</sub>) și indicatoarele (ieșirile: m<sub>a</sub>, m<sub>c</sub>, t<sub>i</sub>, factorul de umplere, eroarea față de măsurare) – și o <b>diagramă bloc</b>, în care datele circulă pe fire între funcții (înmulțire, împărțire, ridicare la putere, adunare). Un nod se execută numai când toate intrările lui au primit date (programare de tip <i>flux de date</i>). Butonul <b>Run</b> execută o dată diagrama, <b>Run Continuously</b> o execută repetat, astfel încât indicatoarele urmăresc imediat orice modificare a comenzilor; <b>Highlight Execution</b> arată circulația datelor pe fire, iar sondele (<i>probes</i>) afișează valoarea de pe fiecare fir.</p>
-<div class="nota-indrumar"><h3>Completări și corecturi față de îndrumarul tipărit</h3><ul>
-<li><b>Fișa postului.</b> Fiecare student primește o fișă individuală cu citirile din Tabelul 1.2 și cu q<sub>s</sub> și t<sub>mort</sub> ale injectoarelor standului său (echivalentul datelor măsurate la lucrarea 1). Modelul se calibrează pe aceste date; cine are propriile date de la lucrarea 1 le poate compara cu fișa.</li>
-<li><b>Turația în Fig. 2.1.</b> Turația nu apare explicit în relația (2.1): ea intră prin eficiența volumetrică, η<sub>v</sub> = f(n, p). În aplicație turația este folosită pentru alegerea punctului din hartă și pentru factorul de umplere DC = t<sub>i</sub>/(120 000/n).</li>
-<li><b>Ajustarea lui η<sub>v</sub>.</b> Îndrumarul cere ajustarea prin încercări până la o eroare sub 5 %. Valoarea care anulează eroarea se obține și direct, inversând relațiile (2.1)–(2.3): η<sub>v</sub> = (t<sub>i,măs</sub> − t<sub>mort</sub>)·q<sub>s</sub>·λ·L<sub>0</sub>·R·T<sub>a</sub>/(p·V<sub>s</sub>). Aplicația acceptă orice valoare cu |ε| &lt; 5 % în Tabelul 2.1; întrebările 1 și 2 cer valoarea exactă.</li>
-<li><b>Temperatura aerului.</b> T<sub>a</sub> este temperatura din colector (senzorul IAT), nu temperatura mediului; pe standul din laborator ≈ 300 K, în compartimentul motor cald 310…330 K (exemplul cu 313 K). ECU-urile moderne folosesc o temperatură a încărcăturii calculată din IAT și temperatura motorului.</li>
-<li><b>Timpul mort.</b> Pe lângă tensiunea bateriei, t<sub>mort</sub> depinde și de diferența de presiune pe injector. În aplicație se folosește caracteristica injectorului de pe stand, t<sub>mort</sub>(U) = t<sub>mort,14</sub>·(14/U)<sup>1,5</sup>; în ECU ea este un tabel t<sub>mort</sub> = f(U<sub>bat</sub>).</li>
-<li><b>Presiunile din Fig. 2.2.</b> Pe standul fără sarcină presiunea din colector rămâne între ≈ 20 și 40 kPa; valorile de 60 și 95 kPa (sarcină parțială și plină) se obțin numai pe banc de încercări sau pe drum.</li>
-<li><b>Întrebarea 4 (E85).</b> La același debit de aer crește numai partea de injecție propriu-zisă, de 14,7/9,8 = 1,5 ori; timpul mort rămâne același, deci t<sub>i</sub> total crește cu mai puțin de 50 %. În practică se folosesc injectoare cu debit mai mare și corecții de pornire la rece mult mai mari.</li>
-<li><b>Bucla închisă λ.</b> Erorile rămase ale hărții η<sub>v</sub> sunt corectate în funcționare de sonda λ (corecțiile pe termen scurt și lung, STFT/LTFT); o corecție pe termen lung mare și constantă arată tocmai o hartă η<sub>v</sub> greșită sau o neetanșeitate a admisiei.</li></ul></div>
 <h2>2.4. Modul de lucru (în aplicație)</h2>
 <ol><li>Deschideți instrumentul virtual: identificați pe panoul frontal comenzile (p, n, T<sub>a</sub>, η<sub>v</sub>, λ, U<sub>bat</sub>, q<sub>s</sub>, t<sub>mort</sub>) și indicatoarele (m<sub>a</sub>, m<sub>c</sub>, t<sub>i</sub>); comutați pe diagrama bloc și urmăriți cu <i>Highlight Execution</i> circulația datelor.</li>
 <li>Verificați modelul pe exemplul din îndrumar (valorile inițiale ale comenzilor): trebuie să obțineți m<sub>a</sub> ≈ 89 mg și t<sub>i</sub> ≈ 3,2 ms. Introduceți apoi caracteristicile motorului de pe stand (V<sub>s</sub> = 347,5 cm³, q<sub>s</sub> și t<sub>mort</sub> din fișă) – butonul <i>Încarcă regimul</i> le introduce automat.</li>
@@ -448,7 +439,7 @@ Cadru.porneste({
     varianta: () => "Fișa postului cu citirile din Tabelul 1.2 și cu q<sub>s</sub> și t<sub>mort</sub> ale injectoarelor standului, individuale pentru fiecare student.",
     indicatii: "Comentați eroarea modelului cu η_v constant, forma hărții η_v = f(n), influența tensiunii bateriei (numai prin timpul mort) și a temperaturii aerului, limitele modelului…"
   },
-  subsol: "Instrument virtual după modelul aplicației LabVIEW din îndrumar: model speed-density cu V<sub>s</sub> = 347,5 cm³, R = 287 J/(kg·K), injector cu timp mort dependent de tensiune. Fișa postului este individuală.",
+  subsol: "Instrument virtual după modelul aplicației LabVIEW: model speed-density cu V<sub>s</sub> = 347,5 cm³, R = 287 J/(kg·K), injector cu timp mort dependent de tensiune. Fișa postului este individuală.",
   continut: { teorie: HTML_TEORIE, probleme: htmlProbleme, intrebari: INTREBARI, test: TEST },
   sim: {
     html: `${CSS}<div class="sim-grila lv">
@@ -465,7 +456,7 @@ Cadru.porneste({
     <aside class="card sim-comenzi">
       <h2>Fișa postului (lucrarea 1)</h2>
       <div class="fisa" id="fisa"></div>
-      <div class="rand-butoane" style="margin-top:.5rem"><button type="button" class="primar" id="btn-inc">Încarcă regimul în VI</button><button type="button" id="btn-ex">Exemplul din îndrumar</button></div>
+      <div class="rand-butoane" style="margin-top:.5rem"><button type="button" class="primar" id="btn-inc">Încarcă regimul în VI</button><button type="button" id="btn-ex">Exemplul rezolvat</button></div>
       <h2>Tabelul 2.1</h2>
       <button type="button" class="primar lat" id="btn-08">● t<sub>i</sub> model (η<sub>v</sub> = 0,8) → Tabelul 2.1</button>
       <button type="button" class="primar lat" id="btn-adj">● η<sub>v</sub> ajustat și t<sub>i</sub> → Tabelul 2.1</button>

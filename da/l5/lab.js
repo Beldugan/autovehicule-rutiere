@@ -337,11 +337,6 @@ const HTML_TEORIE = `
 <p>Sistemul SCR injectează soluție de uree 32,5 % (AdBlue), care se transformă în amoniac și reduce NOₓ la azot și apă. ECU dozează soluția după senzorii NOₓ din amonte și aval. Opacitatea gazelor la accelerare liberă se exprimă prin coeficientul de absorbție k; opacimetrul măsoară opacitatea N [%] pe lungimea efectivă L<sub>A</sub> (0,43 m la opacimetrele standard). Limita pentru vehiculele Euro 6 este 0,7 m⁻¹; un DPF funcțional dă valori apropiate de zero.</p>
 <div class="ec"><span>η<sub>SCR</sub> = (c<sub>NOx,am</sub> − c<sub>NOx,av</sub>) / c<sub>NOx,am</sub> · 100 &nbsp; [%]</span><span class="nr">(5.5)</span></div>
 <div class="ec"><span>k = −(1/L<sub>A</sub>) · ln(1 − N/100) &nbsp; [m⁻¹]</span><span class="nr">(5.6)</span></div>
-<div class="nota-indrumar"><h3>Completări față de îndrumarul tipărit</h3><ul>
-<li><b>Standul.</b> Lucrarea se face pe macheta 3D a motorului 1.5 dCi (varianta common rail a machetei folosite la toate lucrările), cu turbosuflanta VGT, EGR electric și linia de post-tratare DOC + DPF + SCR montată pe stand; partea de post-tratare nu mai depinde de un vehicul de la service.</li>
-<li><b>Tabelul 5.0.</b> S-a adăugat Tabelul 5.0 pentru codurile citite la scanarea inițială și Tabelul 5.6 pentru diagnosticul defectului ascuns al motorului vostru.</li>
-<li><b>Presiunea la pornire.</b> Se citește în timpul antrenării (≈ 2 s), când ECU cere ≈ 250…320 bar; sub ≈ 150 bar motorul nu pornește.</li>
-<li><b>Coduri care blochează regenerarea.</b> ECU refuză regenerarea de service dacă senzorul de presiune diferențială nu este plauzibil (P2453) sau dacă există defecte de injecție / temperatură – exact cazurile în care regenerarea nu ar rezolva problema.</li></ul></div>
 <h2>5.4. Modul de lucru (în simulator)</h2>
 <ol><li>Scanarea completă cu X431, codurile.</li><li>Presiunea cerută / reală la pornire, ralanti, 2500 rot/min.</li><li>Corecțiile pe cilindri; testul de retur 2 min.</li><li>EGR: debitul de aer cu supapa închisă și deschisă (test activ).</li><li>DPF: Δp, funingine, regenerarea de service cu osciloscopul în modul roll.</li><li>SCR: NOₓ, testul de dozare, concentrația AdBlue.</li><li>Opacitatea – trei accelerări libere.</li><li>Diagnosticul, ștergerea codurilor, ciclul de confirmare.</li></ol>
 <h2>5.7. Interpretarea rezultatelor</h2>
@@ -380,7 +375,7 @@ const TEST = [
   { q: "Retururi 11 / 12 / 25 / 10,5 ml: injectorul defect este:", o: ["1", "2", "3", "4"], c: 2, e: "r<sub>3</sub> = 1,71." },
   { q: "Debitul de aer nu scade la testul activ EGR – cauza probabilă:", o: ["EGR blocată închisă", "DPF colmatat", "AdBlue diluat", "injector cu retur mare"], c: 0, e: "Fără gaze recirculate aerul proaspăt rămâne același." },
   { q: "Funingine mare în ECU, dar Δp ≈ 0 la ralanti indică:", o: ["filtru colmatat", "senzor de presiune diferențială / conducte defecte", "regenerare reușită", "EGR blocat"], c: 1, e: "Măsurarea Δp nu funcționează." },
-  { q: "k = −ln(1 − 0,26)/0,43 este:", o: ["0,26 m⁻¹", "0,70 m⁻¹", "1,2 m⁻¹", "0,43 m⁻¹"], c: 1, e: "Exemplul din îndrumar." },
+  { q: "k = −ln(1 − 0,26)/0,43 este:", o: ["0,26 m⁻¹", "0,70 m⁻¹", "1,2 m⁻¹", "0,43 m⁻¹"], c: 1, e: "Exemplul rezolvat al lucrării." },
   { q: "Concentrația corectă a AdBlue este:", o: ["20 %", "32,5 %", "40 %", "50 %"], c: 1, e: "Soluție de uree 32,5 %." }
 ];
 const SV = { m3d: null };

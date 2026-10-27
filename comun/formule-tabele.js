@@ -25,11 +25,11 @@ const FORMULE_TABELE = {
     t31: { dI: "ΔI = I<sub>max</sub> − I<sub>0</sub>  (vârful curentului de antrenare pe cilindru față de curentul de bază)", crel: "c<sub>rel</sub> = ΔI<sub>i</sub> / ΔI<sub>max</sub> · 100 %;  sub 90 % → compresie scăzută la cilindrul respectiv" },
     t32: { d: "δ<sub>i</sub> = (p<sub>max</sub> − p<sub>i</sub>) / p<sub>max</sub> · 100 %  (test uscat); admis ≤ 10 %", cr: "Creștere = (p<sub>umed</sub> − p<sub>uscat</sub>) / p<sub>uscat</sub> · 100 %;  > 10 % → etanșare slabă la segmenți" },
     t33: { L: "L = (p<sub>intrare</sub> − p<sub>cilindru</sub>) / p<sub>intrare</sub> · 100 %  (pierderea de aer)", ev: "L < 10 % foarte bine · 10…20 % acceptabil · 20…30 % uzură avansată · > 30 % defect" },
-    t34: { dp: "Δp = (p<sub>atm</sub> − p) / 100  [bar], cu p în kPa (depresiunea din colectorul de admisie)", int: "Interpretarea comportării acului vacuummetrului (stabil, oscilant, căderi periodice) după îndrumar" }
+    t34: { dp: "Δp = (p<sub>atm</sub> − p) / 100  [bar], cu p în kPa (depresiunea din colectorul de admisie)", int: "Interpretarea comportării acului vacuummetrului (stabil, oscilant, căderi periodice)" }
   },
   "da-l4": {
     t41: { dif: { contact: "p<sub>r</sub> − p<sub>col</sub>/100  [bar] (p<sub>col</sub> în kPa): presiunea relativă față de colector", ralanti: "p<sub>r</sub> − p<sub>col</sub>/100  [bar]: regulatorul menține diferența constantă", faravac: "p<sub>r</sub> − p<sub>col</sub>/100  [bar] cu furtunul de vacuum scos", debit: "Q<sub>p</sub> = V / t  [l/min] (volum colectat în timp de 1 min)" },
-      presc: "Valoarea prescrisă de constructor pentru sistemul MPI cu regulator pe rampă (îndrumar)", concl: "Comparația valorii măsurate cu cea prescrisă" },
+      presc: "Valoarea prescrisă de constructor pentru sistemul MPI cu regulator pe rampă", concl: "Comparația valorii măsurate cu cea prescrisă" },
     t42: { lamC: "Relația Brettschneider (4.4): λ = [CO<sub>2</sub> + CO/2 + O<sub>2</sub> + (H<sub>cv</sub>/4 · 3,5/(3,5 + CO/CO<sub>2</sub>) − O<sub>cv</sub>/2)·(CO<sub>2</sub> + CO)] / [(1 + H<sub>cv</sub>/4 − O<sub>cv</sub>/2)·(CO<sub>2</sub> + CO + K<sub>1</sub>·HC)];  H<sub>cv</sub> = 1,7261, O<sub>cv</sub> = 0,0176, K<sub>1</sub> = 6·10<sup>−4</sup> (HC în ppm, restul în % vol)" },
     t43: { lamC: "Relația Brettschneider (4.4), cu valorile CO, CO<sub>2</sub>, HC, O<sub>2</sub> măsurate la proba provocată" }
   },
@@ -44,7 +44,7 @@ const FORMULE_TABELE = {
     t61: { ref: "Valorile de referință ale alimentării modulului ABS/ESP", concl: "Comparația valorii măsurate cu referința" },
     t62: { vr: "v<sub>r</sub> = 3,6 · π · d<sub>d</sub> · f / z  [km/h];  d<sub>d</sub> = 0,594 m, z = 48 (dinți / perechi de poli ai inelului)", concl: "Rezistența bobinei (700…1400 Ω la senzorii pasivi), diferența v<sub>r</sub> − v<sub>tester</sub> ≤ 0,6 km/h și roata afișată la rotire" },
     t63: { ref: "Valorile în repaus ale senzorilor ESP (vehicul oprit, pe orizontală)" },
-    t64: { obs: { "*": "Condiția sau procedura de calibrare din îndrumar", alfa: "y(50 m) = 50 · tan α  [m] – abaterea laterală a fasciculului camerei la 50 m" } }
+    t64: { obs: { "*": "Condiția sau procedura de calibrare", alfa: "y(50 m) = 50 · tan α  [m] – abaterea laterală a fasciculului camerei la 50 m" } }
   },
   "da-l7": {
     t72: { u: "Unitatea de măsură a mărimii afișate de BMS", obs: { "*": "Interpretarea valorii citite cu testerul din BMS", energU: "SOH = E<sub>utilă</sub> / E<sub>nominală</sub> · 100 %", umin: "ΔU = (U<sub>max</sub> − U<sub>min</sub>) · 1000  [mV]; > 40 mV → dispersie mare între grupurile de celule", tmax: "ΔT = T<sub>max</sub> − T<sub>min</sub>; > 8 °C → răcire neuniformă", riso: "Se compară cu R<sub>iso,min</sub> = 100 Ω/V · U<sub>n</sub>", u12: "U<sub>12 V</sub> < 11,8 V → bateria de 12 V descărcată" } },

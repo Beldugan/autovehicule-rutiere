@@ -325,11 +325,6 @@ const HTML_TEORIE = `
 <figure><img src="img/fig7_4.jpg" alt="Fig. 7.4" loading="lazy"><figcaption>Fig. 7.4. Detectarea anomaliilor în corecția de amestec STFT la ralanti (fișierul de date al lucrării)</figcaption></figure>
 <p>Metoda se aplică pe regimuri comparabile (de exemplu ralanti cald); altfel variațiile normale de sarcină apar drept anomalii, ca accelerarea din Fig. 7.4. Același semnal STFT poate fi urmărit în timp real pe osciloscop în modul roll, cu pragurile ±3σ afișate ca linii de referință (Fig. 7.5).</p>
 <figure><img src="img/fig7_5.jpg" alt="Fig. 7.5" loading="lazy"><figcaption>Fig. 7.5. Corecția STFT la ralanti afișată pe osciloscop în modul roll, cu pragurile |z| = 3 (60 s/div, 5 %/div)</figcaption></figure>
-<div class="nota-indrumar"><h3>Completări față de îndrumarul tipărit</h3><ul>
-<li><b>Vehiculul.</b> Partea HV se face pe vehiculul electric demonstrativ 3D (platforma cu bateria fără capac); fiecare student are alt vehicul (400 V sau 800 V), altă vechime și alt rulaj, alte date BMS și un defect HV ascuns. Comutatorul „Componente transparente” arată celulele din module, contactoarele și siguranța din cutia de joncțiune, statorul și rotorul motorului, modulul IGBT și condensatorul invertorului.</li>
-<li><b>Deconectarea</b> pe care în laborator o face persoana calificată o faceți voi în simulator, în ordinea corectă: zona, EPI, contactul luat, cheia la distanță, conectorul de service scos și asigurat, așteptarea, verificarea detectorului înainte și după, apoi izolația cu megohmmetrul.</li>
-<li><b>Fișierul de date.</b> Fiecare student descarcă propriul fișier „Diagnoza_L7_date_OBD_ralanti.csv” (600 s, 1 Hz: STFT, MAP, tensiunea bateriei), cu momentele proprii ale accelerării, ale aerului fals provocat și ale unei erori de achiziție. Valorile μ, σ și numărul de anomalii din Tabelul 7.4 se verifică pe fișierul vostru și pe porțiunea de referință declarată.</li>
-<li><b>Tabelul 7.5</b> conține diagnosticul defectului HV ascuns.</li></ul></div>
 <h2>7.4. Modul de lucru (în simulator)</h2>
 <ol><li>Instruirea HV, zona de lucru, EPI, P și frâna de parcare.</li><li>Scanarea tuturor modulelor, încercarea READY, codurile HV.</li><li>Datele BMS, tensiunile celulelor, izolația, 12 V, informațiile vehiculului.</li><li>Deconectarea, verificarea lipsei tensiunii, rezistența de izolație.</li><li>Diagnoza pe date: fișierul CSV, μ, σ, z, anomaliile.</li><li>Evaluarea bateriei și diagnosticul.</li></ol>
 <h2>7.7. Interpretarea rezultatelor</h2>
@@ -365,7 +360,7 @@ const INTREBARI = [
 const TEST = [
   { q: "Înaltă tensiune la autovehicule înseamnă:", o: ["peste 12 V", "peste 60 V c.c. sau 30 V c.a.", "peste 400 V", "peste 1000 V"], c: 1, e: "Clasa de tensiune B." },
   { q: "R<sub>iso,min</sub> pentru o baterie de 400 V (c.c.) este:", o: ["4 kΩ", "40 kΩ", "400 kΩ", "4 MΩ"], c: 1, e: "100 Ω/V · 400 V." },
-  { q: "SOH = 41,5/50 este:", o: ["41,5 %", "83 %", "72 %", "120 %"], c: 1, e: "Exemplul din îndrumar." },
+  { q: "SOH = 41,5/50 este:", o: ["41,5 %", "83 %", "72 %", "120 %"], c: 1, e: "Exemplul rezolvat al lucrării." },
   { q: "Un conector HV desfăcut este detectat prin:", o: ["monitorul de izolație", "bucla HVIL", "senzorul de curent", "DC/DC"], c: 1, e: "Interblocarea deschide contactoarele." },
   { q: "Vehiculul nu intră în READY, contactoarele „clicăie”. Cauza cea mai probabilă:", o: ["celulă slabă", "bateria de 12 V descărcată", "SOH mic", "aer fals"], c: 1, e: "Bobinele contactoarelor nu au tensiune suficientă." },
   { q: "z = (11 − 0,07)/1,55 ≈ 7,1 înseamnă:", o: ["valoare normală", "anomalie (|z| > 3)", "eroare de calcul", "σ prea mare"], c: 1, e: "Aerul fals provocat." }

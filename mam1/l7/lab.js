@@ -613,13 +613,6 @@ const HTML_TEORIE = `
   unsigned long t = pulseIn(ECHO,HIGH,30000); float c = 331.3+0.606*tempC;
   return c*t*1e-6/2*100; } // cm
 // zone: &gt;100 cm liber; 50…100 ton rar; 25…50 ton des; &lt;25 continuu</pre>
-<div class="nota-indrumar"><h3>Completări și corecturi față de îndrumarul tipărit</h3><ul>
-<li><b>Rigla.</b> Pentru distanța de 200 cm din Tabelul 7.1 se folosesc două rigle de 1 m puse cap la cap (sau o ruletă); originea este fața traductoarelor.</li>
-<li><b>Durata ECHO și distanța reală.</b> Impulsul ECHO nu începe exact la emisie și nu se termină exact la sosirea ecoului: detecția ecoului (amplificare, prag, câteva perioade de 40 kHz) adaugă o întârziere proprie de câteva zeci de µs. De aceea distanța calculată cu (7.2) iese de regulă cu 0,5…1 cm mai mare decât pe riglă, aproape constant – eroarea relativă este mare la distanțe mici. Valoarea de ≈ 2,9 ms la 50 cm din fișa de montaj este cea așteptată.</li>
-<li><b>Programul din simulator</b> măsoară alternativ cu cele două module la 60 ms (pentru ca ecoul unuia să nu fie recepționat de celălalt), face media pe 0,5 s și afișează distanța cu viteza de la 20 °C (d20) și cu viteza la temperatura DS18B20 (dT); constanta COMP alege valoarea folosită pentru zone și OLED. Funcția <code>pulseIn</code> are rezoluția de 1 µs (≈ 0,17 mm) și timeout de 30 ms (≈ 5 m).</li>
-<li><b>Ecoul de fundal.</b> Când ținta nu întoarce ecoul spre modul (înclinată la 60°, buretele), modulul măsoară peretele din spatele riglei (≈ 3 m) sau nu are ecou (afișează 0 / „—”). Tabelul 7.3 (nou) consemnează acest comportament și distanța minimă a JSN-SR04T.</li>
-<li><b>Temperatura.</b> DS18B20 are o inerție termică de câteva secunde, iar aerul încălzit de aerotermă ajunge la regim în ≈ 1 minut: valorile din Tabelul 7.2 se citesc după stabilizare. Pentru a scurta așteptarea în simulator există butonul „Timp termic ×10”. Diferența de temperatură față de 20 °C (nu față de temperatura camerei) dă ε<sub>d</sub>, ca în exemplul din îndrumar.</li>
-<li><b>Tabelul 7.4 (nou)</b> verifică zonele de avertizare programate (sunetul buzzerului și LED-ul) față de distanța măsurată.</li></ul></div>
 <h2>7.3. Aparatură și echipamente</h2>
 <ul><li>Module ultrasonice HC-SR04 (laborator) și JSN-SR04T (traductor etanș, de tip auto); senzor de temperatură DS18B20</li>
 <li>Riglă de 1 m (două, pentru 2 m); ținte: cub de lemn 100 mm, panou de carton, panou metalic, țintă înclinabilă la 30° și 60°, țintă moale (burete)</li>
@@ -752,7 +745,7 @@ Cadru.porneste({
   intrebari() {
     return [
       { id: "q1", u: "%", text: "Eroarea relativă ε<sub>d</sub> (în valoare absolută) a unui senzor necompensat, calibrat la 20 °C, când aerul are −10 °C (Întrebarea 2):", textSimplu: "εd la −10 °C" },
-      { id: "q2", u: "cm", text: "Distanța pentru t<sub>ecou</sub> = 2,92 ms la 20 °C (exemplul din îndrumar):", textSimplu: "d pentru 2,92 ms" },
+      { id: "q2", u: "cm", text: "Distanța pentru t<sub>ecou</sub> = 2,92 ms la 20 °C (exemplul rezolvat):", textSimplu: "d pentru 2,92 ms" },
       { id: "q3", u: "%", text: "ε<sub>d</sub> față de 20 °C pentru aerul încălzit, din temperatura măsurată (Tabelul 7.2):", textSimplu: "εd aer încălzit" },
       { id: "q4", u: "%", text: "Eroarea medie (în valoare absolută) a HC-SR04 între 25 și 200 cm (Tabelul 7.1):", textSimplu: "eroarea medie HC" }
     ];

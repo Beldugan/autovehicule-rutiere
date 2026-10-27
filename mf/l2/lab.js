@@ -955,7 +955,7 @@ function calcAuto() {
     <div class="rezultat"><span>Timpul de parcurs t = L/a</span><b>${fmt(u.L / a * 1000, 2)} ms</b></div>
     <div class="rezultat"><span>Perioada oscilației în conductă 4L/a</span><b>${fmt(4 * u.L / a * 1000, 2)} ms</b></div>
     <div class="rezultat"><span>Suprapresiunea Joukowski Δp = ρ·a·Δv</span><b>${fmt(u.rho * a * u.dv / 1e5, 1)} bar</b></div>
-    <p class="nota">Cu K = 1,5 GPa și ρ = 830 kg/m³ (motorină) obțineți ≈ 1340 m/s, valoarea din îndrumar.</p>`;
+    <p class="nota">Cu K = 1,5 GPa și ρ = 830 kg/m³ (motorină) obțineți ≈ 1340 m/s.</p>`;
 
   const c = val($("#cr-in"));
   const cLin = c.p * 1e5 / (c.K0 * 1e9) * 100, cVar = comprimareRelativa(c.K0, c.Kp, c.p) * 100;
@@ -1145,7 +1145,7 @@ ${EC(`n<sub>a</sub> = ${FR("0,476", "0,0785")} = 6,1 rotații suplimentare`, "2.
 <div class="problema"><h3>Problema 5. Motorina la 2000 bar</h3>
 <p>Pentru motorină K<sub>0</sub> = 1,5 GPa. Calculați micșorarea relativă a volumului la 2000 bar: (a) liniar, ΔV/V = p/K; (b) cu K constant, integrat; (c) cu K = K<sub>0</sub> + K′·p, K′ = 5.</p>
 <details class="sol"><summary>Rezolvare</summary>
-<p>(a) 200·10<sup>6</sup>/1,5·10<sup>9</sup> = ${fmt(c6lin, 1)} %. (b) 1 − e<sup>−p/K</sup> = ${fmt(c6exp, 1)} %. (c) 1 − (1 + K′p/K<sub>0</sub>)<sup>−1/K′</sup> = <b>${fmt(c6var, 1)} %</b> – „aproape 10 %”, cum arată îndrumarul. Modulul crește cu presiunea, deci relația liniară supraestimează comprimarea.</p>
+<p>(a) 200·10<sup>6</sup>/1,5·10<sup>9</sup> = ${fmt(c6lin, 1)} %. (b) 1 − e<sup>−p/K</sup> = ${fmt(c6exp, 1)} %. (c) 1 − (1 + K′p/K<sub>0</sub>)<sup>−1/K′</sup> = <b>${fmt(c6var, 1)} %</b> – „aproape 10 %”. Modulul crește cu presiunea, deci relația liniară supraestimează comprimarea.</p>
 </details></div>
 
 <div class="problema"><h3>Problema 6. Modulul echivalent al unui circuit cu furtunuri</h3>
@@ -1312,7 +1312,7 @@ Cadru.porneste({
     TINTE_A.forEach(p => { const n = (volumAbsorbit(c, p) / ar).toFixed(2); D.t.t22[p].inc = n; D.t.t22[p].desc = n; });
     D.t.t22["100"].inc = "3.90"; D.t.t22["100"].desc = "3.90";
     TINTE_B.forEach(p => { D.t.t23[p].n = (volumAbsorbit({ ...c, Vaer: 0.5 }, p) / ar).toFixed(2); });
-    Object.assign(D.date, { V0: 50, d: 10, s: 1, D: 20, e: 5, E: 210, rho: 1050, Va0: 0.5, lichid: "Lichid de frână DOT 4 (exemplul din îndrumar)" });
+    Object.assign(D.date, { V0: 50, d: 10, s: 1, D: 20, e: 5, E: 210, rho: 1050, Va0: 0.5, lichid: "Lichid de frână DOT 4 (exemplul rezolvat)" });
   },
   scenariu(id, C) {
     $("#ck-ochelari").checked = true; $("#ck-ecran").checked = true;
@@ -1343,7 +1343,7 @@ Cadru.porneste({
     varianta: D => D.varianta && D.varianta.dBula ? `Aer introdus: ${D.varianta.nBule} ${D.varianta.nBule === 1 ? "bulă" : "bule"} Ø${fmt(D.varianta.dBula, 1)} mm, V<sub>a0</sub> = ${fmt(D.varianta.Va0, 3)} cm³.` : "Aer introdus: —",
     indicatii: "Comparați K cu intervalul 1,5…2,0 GPa, discutați histerezisul, corecția cilindrului și forma curbei cu aer pentru varianta voastră…"
   },
-  subsol: "Modelul: lichid cu modul de elasticitate constant, corecția cilindrului cu pereți groși 1/K = 1/K<sub>m</sub> − D/(E·e), aer comprimat izoterm (p·V = const.), furtun cu complianță constantă. Valorile implicite reproduc exemplul rezolvat din îndrumar (n = 3,90 rot la 100 bar → K = 1,68 GPa).",
+  subsol: "Modelul: lichid cu modul de elasticitate constant, corecția cilindrului cu pereți groși 1/K = 1/K<sub>m</sub> − D/(E·e), aer comprimat izoterm (p·V = const.), furtun cu complianță constantă. Valorile implicite reproduc exemplul rezolvat (n = 3,90 rot la 100 bar → K = 1,68 GPa).",
   continut: {
     teorie: HTML_TEORIE, probleme: htmlProbleme, intrebari: INTREBARI, test: TEST,
     aplicatii: {
@@ -1481,7 +1481,7 @@ Cadru.porneste({
           </select>
         </label>
         <label class="bifa"><input type="checkbox" id="ck-rapid"> Timp accelerat ×10 (pentru scurgere)</label>
-        <p class="nota">Cu un defect activ, valoarea K determinată iese din intervalul 1,5…2,0 GPa sau curbele de încărcare/descărcare nu se suprapun – exact ca la §2.7 din îndrumar.</p>
+        <p class="nota">Cu un defect activ, valoarea K determinată iese din intervalul 1,5…2,0 GPa sau curbele de încărcare/descărcare nu se suprapun – exact ca la §2.7.</p>
       </details>
     </aside>
   </div>
