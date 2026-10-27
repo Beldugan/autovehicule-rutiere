@@ -546,6 +546,15 @@ void loop() {                          // la fiecare 10 ms
   float phiAcc = atan2(Ay, Az) * 57.2958;
   phi = ALPHA * (phi + wx * DT) + (1 - ALPHA) * phiAcc;
 }</pre>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Programul de măsurare</b> are constantele CORECTIE (calibrarea erorii de zero gx0 pe 1000 de eșantioane la pornire, cu suportul nemișcat) și FS_ADXL (frecvența de citire a ADXL377 la testul de șoc), precum și comenzile pe monitorul serial: „s” (statistica pe 1000 de eșantioane), „m” (media pe 1 s), „d” (testul de 60 s: deriva giroscopului și a filtrului, zgomotul σ al filtrului pe ultimele 10 s) și „z”.</li>
+<li><b>Deriva filtrului.</b> Filtrul complementar nu derivă nelimitat: eroarea de zero necorectată b<sub>g</sub> produce o abatere staționară ≈ b<sub>g</sub>·τ, atinsă în câteva constante de timp. De aceea deriva filtrului în 60 s se măsoară cu CORECTIE = false; cu corecție ea ar fi practic nulă.</li>
+<li><b>Întârzierea la înclinarea rapidă.</b> O înclinare de 30° făcută cu mâna în ≈ 0,1 s depășește domeniul de ±250 °/s al giroscopului: partea pierdută prin saturație este recuperată numai prin ramura accelerometrului, cu constanta de timp τ. t90 este timpul de la începutul mișcării până când filtrul ajunge la 90 % din treaptă; la α = 0,995 el ajunge la câteva secunde. Pentru mișcări rapide se alege domeniul ±500 sau ±1000 °/s (registrul 0x1B).</li>
+<li><b>Deriva giroscopului</b> se determină integrând viteza unghiulară 60 s cu modulul nemișcat, fără și cu corecția erorii de zero.</li>
+<li><b>Testul de șoc.</b> Cu ADC-ul de 10 biți al plăcii Mega (5 V) rezoluția ADXL377 este ≈ 0,75 g/LSB, deci în repaus citirea sare între 0 și 1,5 g; pentru rezoluție mai bună se folosește STM32 (12 biți, 3,3 V). Funcția analogRead durează ≈ 112 µs, deci 4 kHz pe trei canale este aproape de limita plăcii. La 100 Hz un impuls de ≈ 2 ms se pierde, iar la 1 kHz vârful este subestimat – de aceea senzorii de airbag eșantionează la câțiva kHz.</li>
+<li><b>Accelerațiile de mișcare.</b> Modulul se află la câțiva centimetri de axul de rotație: în timpul rotirii, accelerațiile tangențială și centripetă se adaugă gravitației și perturbă φ<sub>acc</sub> – vizibil la înclinarea rapidă și cu vibrațiile pornite.</li>
+</ul>
 <h2>8.3. Aparatură și echipamente</h2>
 <ul><li>Module MPU-6050 (6 axe, I²C) și ADXL377 (±200 g, analogic)</li>
 <li>Suport rotativ imprimat 3D cu raportor digital (referință de unghi)</li>

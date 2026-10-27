@@ -257,6 +257,12 @@ const HTML_TEORIE = `
 ${T82}
 <p><b>Exemplu (R1234yf):</b> p<sub>JP</sub> = 2,4 bar rel → 3,4 bar abs → T<sub>sat</sub> ≈ 2 °C; T<sub>asp</sub> = 8 °C → ΔT<sub>si</sub> ≈ 6 K. p<sub>ÎP</sub> = 13 bar rel → 14 bar abs → T<sub>sat</sub> ≈ 53 °C; T<sub>lic</sub> = 45 °C → ΔT<sub>sr</sub> ≈ 8 K. Pentru calcule exacte se folosesc tabelele termodinamice ale agentului (NIST REFPROP, CoolProp sau tabelele producătorului).</p>
 ${T83}
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Măsurările la ralanti</b> se fac și cu suflanta în treapta minimă (debit mic de aer prin vaporizator), pentru a vedea efectul sarcinii termice asupra presiunilor.</li>
+<li><b>Datele pentru diagnostic:</b> agentul frigorific (de pe etichetă), condițiile ambiante, temperatura aerului din habitaclu la intrarea în HVAC (recirculare), rezultatul verificării etanșeității.</li>
+<li><b>Temperaturile de saturație</b> se calculează din Tabelul 8.2 prin interpolare liniară (și extrapolare cu ultimul segment sub −10 °C sau peste 60 °C).</li>
+</ul>
 <h2>8.7. Interpretarea rezultatelor</h2>
 <ul><li>La o instalație cu supapă de destindere corect încărcată, orientativ ΔT<sub>si</sub> ≈ 3…8 K și ΔT<sub>sr</sub> ≈ 5…12 K; temperatura aerului la guri 4…10 °C la temperaturi ambiante moderate.</li>
 <li>Presiunile depind puternic de temperatura ambiantă și de turație; comparația se face cu diagramele producătorului pentru aceleași condiții.</li>

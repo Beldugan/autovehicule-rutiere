@@ -391,6 +391,12 @@ const HTML_TEORIE = `
 <figure><img src="img/fig6_4.jpg" alt="Fig. 6.4" loading="lazy"><figcaption>Fig. 6.4. Abaterea laterală a zonei „văzute” de senzor în funcție de nealinierea unghiulară</figcaption></figure>
 <p>Semnalele din Fig. 6.2 se verifică direct la conectorul senzorului: tensiunea senzorului pasiv cu sonda de tensiune, iar curentul senzorului activ cu un clește miliampermetric sau pe o rezistență de măsură. Fig. 6.5 arată cele două semnale pe ecranul osciloscopului, cu frecvența măsurată automat.</p>
 <figure><img src="img/fig6_5.jpg" alt="Fig. 6.5" loading="lazy"><figcaption>Fig. 6.5. Semnalul senzorului de roată pasiv la 15 km/h (CH1) și al senzorului activ (CH2) afișate pe osciloscop (20 ms/div)</figcaption></figure>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Standul ABS/ESC.</b> Senzori pasivi pe puntea față (roată dințată, z = 48) și activi pe puntea spate (inel multipolar, 48 de perechi de poli), motorul de antrenare a roților, direcția cu senzorul de unghi, frâna de parcare electrică, iar pentru ADAS – parbrizul cu camera frontală, radarul și ținta de calibrare. Datele vehiculului: d<sub>d</sub> = 0,594 m (155/60 R15), i<sub>d</sub> = 15, L = 1,873 m.</li>
+<li><b>Calibrarea senzorului de unghi al volanului</b> se face numai cu roțile drepte: o calibrare cu volanul rotit „mută” decalajul – senzorul va indica un unghi cu roțile drepte.</li>
+<li><b>Testul pe banc cu role</b> (eficacitatea și dezechilibrul frânării) se face la stația ITP; relațiile (6.6) și (6.7) se exersează în fila „Exemplu și probleme”.</li>
+</ul>
 <h2>6.4. Modul de lucru (în simulator)</h2>
 <ol><li>Scanarea modulului ABS/ESC cu X431, codurile.</li><li>Alimentarea și masa modulului, tensiunea în timpul testului pompei, contactul lămpilor de frână.</li><li>Senzorii de turație: rezistența / alimentarea, frecvența pe osciloscop, viteza afișată.</li><li>Identificarea roților prin rotirea individuală.</li><li>Datele ESC, calibrarea senzorului de unghi.</li><li>Teste active, modul service al frânei de parcare electrice.</li><li>ADAS: starea camerei, calibrarea statică.</li><li>Diagnosticul defectului ascuns.</li></ol>
 <h2>6.7. Interpretarea rezultatelor</h2>

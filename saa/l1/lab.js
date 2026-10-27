@@ -390,6 +390,15 @@ const HTML_TEORIE = `
 <div class="ec"><span>C<sub>h</sub> = 3,6·m/Δt [kg/h]</span><span class="nr">(1.5)</span></div>
 <div class="ec"><span>m<sub>inj</sub> = C<sub>h</sub>·10<sup>6</sup>/(i·(n/2)·60) [mg]</span><span class="nr">(1.6)</span></div>
 <figure><img src="img/fig1_3.jpg" alt="Fig. 1.3 Durata de injecție și determinarea q_s și t_mort" loading="lazy"><figcaption>Fig. 1.3. Durata de injecție în funcție de presiunea din colector și determinarea lui q<sub>s</sub> și t<sub>mort</sub> (valori exemplificative)</figcaption></figure>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Diferența de presiune pe injector.</b> La sistemele cu retur și regulator referit la presiunea din colector (schema din Fig. 1.1) diferența de presiune pe injector este menținută constantă. La sistemele fără retur (regulatorul în modulul pompei din rezervor, frecvente la motoarele actuale), presiunea din rampă este constantă față de atmosferă, iar diferența pe injector scade când crește presiunea din colector; ECU compensează prin calcul.</li>
+<li><b>Corecția de încălzire.</b> Raportul t<sub>i</sub>/t<sub>i,cald</sub> include și timpul mort, care nu depinde de temperatură, deci subestimează îmbogățirea reală. Corecția aplicată masei de combustibil este k<sub>ECT</sub> = (t<sub>i</sub> − t<sub>mort</sub>)/(t<sub>i,cald</sub> − t<sub>mort</sub>), cu t<sub>mort</sub> determinat din Tabelul 1.3. Rămâne și efectul ralantiului rece (turație și MAP mai mari), astfel că valoarea măsurată este o corecție „globală” de ralanti.</li>
+<li><b>Relația (1.6)</b> presupune injecție secvențială (o injecție pe ciclu la fiecare cilindru). La injecția simultană sau pe grupe injectorul acționează de două ori pe ciclu cu jumătate din cantitate: masa pe ciclu rămâne aceeași, dar t<sub>i</sub> măsurat pe osciloscop este cel al unei singure injecții.</li>
+<li><b>t<sub>i</sub> afișat de tester</b> poate include sau nu timpul mort, după constructor; de aceea se compară cu durata măsurată pe osciloscop (de la frontul descendent până la vârful de autoinducție).</li>
+<li><b>Consumul la ralanti.</b> Un motor de 1,4 l cald consumă la ralanti tipic 0,5…0,8 l/h; un consum de 0,72 kg/h (≈ 0,97 l/h) este mare.</li>
+<li><b>Factorul de umplere</b> nu trebuie să depășească ≈ 80…85 % la sarcină plină și turație maximă – peste această valoare injectorul nu mai are timp să se închidă complet, iar debitul nu mai crește liniar.</li>
+</ul>
 <h2>1.4. Modul de lucru (în simulator)</h2>
 <ol><li>Identificați pe macheta 3D componentele din Fig. 1.1 (injectoarele, rampa, senzorii MAP, CTS, CKP, clapeta).</li>
 <li>Cu motorul rece și oprit: bifați exhaustarea și adaptoarele back-probe; osciloscopul este pe comanda injectorului cilindrului 1, iar testerul OBD pe priza de diagnoză.</li>

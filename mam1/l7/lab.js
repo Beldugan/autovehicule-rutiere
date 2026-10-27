@@ -613,6 +613,15 @@ const HTML_TEORIE = `
   unsigned long t = pulseIn(ECHO,HIGH,30000); float c = 331.3+0.606*tempC;
   return c*t*1e-6/2*100; } // cm
 // zone: &gt;100 cm liber; 50…100 ton rar; 25…50 ton des; &lt;25 continuu</pre>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Rigla.</b> Pentru distanța de 200 cm se folosesc două rigle de 1 m puse cap la cap (sau o ruletă); originea este fața traductoarelor.</li>
+<li><b>Durata ECHO și distanța reală.</b> Impulsul ECHO nu începe exact la emisie și nu se termină exact la sosirea ecoului: detecția ecoului (amplificare, prag, câteva perioade de 40 kHz) adaugă o întârziere proprie de câteva zeci de µs. De aceea distanța calculată cu (7.2) iese de regulă cu 0,5…1 cm mai mare decât pe riglă, aproape constant – eroarea relativă este mare la distanțe mici. La 50 cm durata așteptată este ≈ 2,9 ms.</li>
+<li><b>Programul de măsurare</b> folosește alternativ cele două module la 60 ms (pentru ca ecoul unuia să nu fie recepționat de celălalt), face media pe 0,5 s și afișează distanța cu viteza de la 20 °C (d20) și cu viteza la temperatura DS18B20 (dT); constanta COMP alege valoarea folosită pentru zone și OLED. Funcția <code>pulseIn</code> are rezoluția de 1 µs (≈ 0,17 mm) și timeout de 30 ms (≈ 5 m).</li>
+<li><b>Ecoul de fundal.</b> Când ținta nu întoarce ecoul spre modul (înclinată la 60°, buretele), modulul măsoară peretele din spatele riglei (≈ 3 m) sau nu are ecou (afișează 0 / „—”). JSN-SR04T are și o distanță minimă (zona moartă a traductorului unic emițător–receptor), sub care citirea nu mai urmărește rigla.</li>
+<li><b>Temperatura.</b> DS18B20 are o inerție termică de câteva secunde, iar aerul încălzit ajunge la regim în ≈ 1 minut: valorile se citesc după stabilizare. Diferența de temperatură față de 20 °C (nu față de temperatura camerei) dă eroarea ε<sub>d</sub> a distanței necompensate.</li>
+<li><b>Zonele de avertizare</b> programate (sunetul buzzerului și LED-ul) se verifică față de distanța măsurată.</li>
+</ul>
 <h2>7.3. Aparatură și echipamente</h2>
 <ul><li>Module ultrasonice HC-SR04 (laborator) și JSN-SR04T (traductor etanș, de tip auto); senzor de temperatură DS18B20</li>
 <li>Riglă de 1 m (două, pentru 2 m); ținte: cub de lemn 100 mm, panou de carton, panou metalic, țintă înclinabilă la 30° și 60°, țintă moale (burete)</li>

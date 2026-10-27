@@ -375,6 +375,13 @@ const HTML_TEORIE = `
 <ul><li>Standul pentru pierderi de sarcină: rezervor, pompă centrifugă, robinet de reglare, conductă dreaptă d = 17 mm (L = 1,5 m între prizele 1–2), lărgire bruscă 17/26 mm (prizele 2–3), îngustare bruscă 26/17 mm (4–5), cot 90° (5–6, 0,30 m de țeavă între prize), robinet cu bilă (6–7, 0,20 m), rotametru și debitmetru cu turbină, termometru digital.</li>
 <li>Panoul cu 7 piezometre de sticlă cu scală milimetrică și colector presurizat (pompă de mână și supapă de aer); furtunuri transparente cu robinete de aerisire la prize.</li>
 <li>Pompa electrică de lichid de răcire de 12 V, sursa de laborator și manometrul digital pe refulare.</li></ul>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Poziția prizelor.</b> Prizele 3 și 4 sunt pe tronsonul de 26 mm; Δh₂₋₃ conține lărgirea (cota piezometrică crește, Δh negativ), iar Δh₄₋₅ – îngustarea și variația sarcinii cinetice.</li>
+<li><b>Calculul ξ.</b> Din Δh se scade pierderea longitudinală pe țeava dintre prize (cu λ măsurat): cot 0,30 m, robinet 0,20 m, îngustare 0,15 m (și variația sarcinii cinetice (v₁² − v₂²)/2g).</li>
+<li><b>Panoul presurizat.</b> Perna de aer din colector deplasează toate nivelurile cu aceeași valoare, fără să schimbe diferențele; se folosește pentru a aduce nivelurile în scală.</li>
+<li><b>Determinările suplimentare:</b> temperatura apei (pentru vâscozitate), pierderile cu robinetul parțial închis și punctul de funcționare al pompei de 12 V (intersecția caracteristicii pompei cu caracteristica rețelei).</li>
+</ul>
 <h2>6.4. Modul de lucru (în simulator)</h2>
 <ol><li>Pornirea pompei cu robinetul parțial deschis, aerisirea prizelor, temperatura apei.</li><li>Debitul maxim: Q și nivelurile celor 7 piezometre.</li><li>Încă 4 debite micșorate cu robinetul de reglare.</li><li>Robinetul cu bilă parțial închis.</li><li>Pompa de 12 V: Q și presiunea în punctul de funcționare, cu robinetul deschis și parțial închis.</li></ol>
 <h2>6.7. Interpretarea rezultatelor</h2>

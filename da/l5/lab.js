@@ -337,6 +337,11 @@ const HTML_TEORIE = `
 <p>Sistemul SCR injectează soluție de uree 32,5 % (AdBlue), care se transformă în amoniac și reduce NOₓ la azot și apă. ECU dozează soluția după senzorii NOₓ din amonte și aval. Opacitatea gazelor la accelerare liberă se exprimă prin coeficientul de absorbție k; opacimetrul măsoară opacitatea N [%] pe lungimea efectivă L<sub>A</sub> (0,43 m la opacimetrele standard). Limita pentru vehiculele Euro 6 este 0,7 m⁻¹; un DPF funcțional dă valori apropiate de zero.</p>
 <div class="ec"><span>η<sub>SCR</sub> = (c<sub>NOx,am</sub> − c<sub>NOx,av</sub>) / c<sub>NOx,am</sub> · 100 &nbsp; [%]</span><span class="nr">(5.5)</span></div>
 <div class="ec"><span>k = −(1/L<sub>A</sub>) · ln(1 − N/100) &nbsp; [m⁻¹]</span><span class="nr">(5.6)</span></div>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Presiunea la pornire.</b> Se citește în timpul antrenării (≈ 2 s), când ECU cere ≈ 250…320 bar; sub ≈ 150 bar motorul nu pornește.</li>
+<li><b>Coduri care blochează regenerarea.</b> ECU refuză regenerarea de service dacă senzorul de presiune diferențială nu este plauzibil (P2453) sau dacă există defecte de injecție / temperatură – exact cazurile în care regenerarea nu ar rezolva problema.</li>
+</ul>
 <h2>5.4. Modul de lucru (în simulator)</h2>
 <ol><li>Scanarea completă cu X431, codurile.</li><li>Presiunea cerută / reală la pornire, ralanti, 2500 rot/min.</li><li>Corecțiile pe cilindri; testul de retur 2 min.</li><li>EGR: debitul de aer cu supapa închisă și deschisă (test activ).</li><li>DPF: Δp, funingine, regenerarea de service cu osciloscopul în modul roll.</li><li>SCR: NOₓ, testul de dozare, concentrația AdBlue.</li><li>Opacitatea – trei accelerări libere.</li><li>Diagnosticul, ștergerea codurilor, ciclul de confirmare.</li></ol>
 <h2>5.7. Interpretarea rezultatelor</h2>

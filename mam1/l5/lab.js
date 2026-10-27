@@ -588,6 +588,15 @@ void loop() {
   float rho = p * 1000 / (287.0 * T);    // kg/m3
   delay(100);
 }</pre>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Senzorul de 2,5 bar.</b> Treptele de suprapresiune până la +90 kPa (≈ 190 kPa absolut) cer un senzor MAP pentru motoare supraalimentate (20…250 kPa → 0,4…4,65 V, a ≈ 0,0185 V/kPa); un MAP de 1 bar (10…115 kPa) ar ieși din domeniu peste ≈ +14 kPa.</li>
+<li><b>Manometrul etalon este de presiune relativă,</b> iar BMP280 dă presiunea atmosferică: p<sub>abs</sub> = p<sub>atm</sub>(BMP280) + p<sub>rel</sub>. Manometrul pompei (cadran în bar) servește doar la orientare.</li>
+<li><b>Tensiunea cu multimetrul sau din program.</b> Senzorul este ratiometric: U = U<sub>5V</sub>/5 · (a<sub>0</sub>p + b<sub>0</sub>). Multimetrul măsoară tensiunea absolută, programul calculează N·5/1024 = U·5/U<sub>5V</sub>. Dacă tensiunea USB nu este exact 5 V, panta măsurată cu multimetrul diferă de cea „văzută” de program (≈ 1…3 %) – ECU calibrează senzorii ratiometric, cu propria referință de 5 V. Abaterea apare la verificarea calibrării în program (Tabelul 5.3).</li>
+<li><b>Stabilizarea după o cursă.</b> La comprimare aerul se încălzește (la destindere se răcește), apoi revine la temperatura camerei în câteva secunde: presiunea „se mai mișcă” puțin după fiecare cursă, deci citirile se fac după stabilizare. Mica scurgere a montajului scade lent depresiunea – de aici testul de etanșeitate.</li>
+<li><b>Timpul de răspuns.</b> La eliberarea bruscă presiunea scade aproape exponențial (constanta de timp a descărcării prin supapă și furtun, câteva zeci de ms); senzorul MAP propriu-zis răspunde în ≈ 1 ms. Cu eșantionarea la 10 ms se măsoară timpul de la 90 % la 10 % din treaptă (≈ 2,2 τ), cu rezoluția de 10 ms.</li>
+<li><b>Densitatea aerului</b> se calculează cu ecuația de stare, ρ = p/(R·T), cu presiunea absolută dată de senzorul calibrat și temperatura aerului de la BMP280; ea se compară în trei regimuri: ralanti (≈ 35 kPa), sarcină plină aspirat (p<sub>atm</sub>) și supraalimentat (≈ 170 kPa).</li>
+</ul>
 <h2>5.4. Modul de lucru (în simulator)</h2>
 <ol><li>Ochelari, coliere strânse; p<sub>atm</sub> cu BMP280; testul de etanșeitate.</li><li>U la presiunea atmosferică.</li><li>Vid: −30, −50, −70 kPa relativ.</li><li>Suprapresiune: +30, +60, +90 kPa relativ.</li><li>Eliberarea bruscă înregistrată la 10 ms.</li><li>Parametrii calibrării în program: p și ρ la ralanti, atmosferic și supraalimentat.</li></ol>
 <h2>5.7. Interpretarea rezultatelor</h2>

@@ -790,6 +790,18 @@ float ntcTemp(int pin) {
 }</pre>
 <h3>Tabelul constructorului (NTC 2,5 kΩ la 25 °C)</h3>
 <div class="tabel-scroll"><table class="tabel mic"><thead><tr><th>ϑ [°C]</th>${MD.TABEL.map(r => `<th>${r[0]}</th>`).join("")}</tr></thead><tbody><tr><td>R [Ω]</td>${MD.TABEL.map(r => `<td>${r[1]}</td>`).join("")}</tr></tbody></table></div>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>U<sub>ref</sub> măsurat.</b> Relația (4.1) conține tensiunea de alimentare a divizorului, care este tensiunea USB a plăcii (4,85…5,02 V), nu exact 5 V; de aceea U<sub>ref</sub> se măsoară la TP 5V (Tabelul 4.3). Programul nu are nevoie de ea: ADC-ul are referința tot la 5 V al plăcii, deci raportul N/1024 = U<sub>s</sub>/U<sub>ref</sub> (măsurare ratiometrică, ca în ECU).</li>
+<li><b>LM35 nu este ratiometric.</b> Ieșirea lui (10 mV/°C) nu depinde de alimentare, dar programul o convertește cu referința de 5,0 V presupusă: la U<sub>USB</sub> = 4,90 V indicația este cu 2 % prea mare (≈ +1,2 °C la 60 °C). Rezoluția este 500/1024 ≈ 0,49 °C; se îmbunătățește cu referința internă de 1,1 V (0,11 °C) sau cu un ADC extern.</li>
+<li><b>Rezoluția NTC-ului depinde de temperatură.</b> Cu R<sub>p</sub> = 10 kΩ și un NTC de 2,5 kΩ, un pas al ADC-ului înseamnă ≈ 0,14 °C la 22 °C, dar ≈ 0,5 °C la 60 °C (U<sub>s</sub> mică). De aceea programul mediază NMED = 16 eșantioane, iar unele ECU comută a doua rezistență de polarizare la motor cald.</li>
+<li><b>Autoîncălzirea NTC-ului.</b> Curentul divizorului (≈ 0,4 mA) disipă ≈ 0,4 mW în termistor; în aer (≈ 2,5 mW/K) indicația crește cu ≈ 0,15 °C, în apă efectul este neglijabil.</li>
+<li><b>DS18B20 la 12 biți.</b> Conversia durează ≈ 750 ms; programul nu o așteaptă (setWaitForConversion(false)), ci citește rezultatul gata la trecerea următoare prin buclă (500 ms) – valoarea se actualizează la ≈ 1 s și are o întârziere suplimentară de ≈ 0,5…1 s, care se adaugă la τ măsurat.</li>
+<li><b>MAX6675.</b> Rezoluția este 0,25 °C (valoare trunchiată), iar compensarea joncțiunii reci se face cu senzorul de pe modul, cu o eroare de ±1…2 °C – termocuplul este rapid, dar nu precis la temperaturi joase.</li>
+<li><b>ϑ<sub>∞</sub> la 60 s.</b> După 60 s NTC-ul auto (τ ≈ 9…15 s) a parcurs 98…99,8 % din treaptă; ϑ<sub>∞</sub> citit la 60 s este puțin mai mic decât temperatura apei, deci τ rezultă puțin subestimat. τ se citește la primul eșantion (la 0,5 s) care atinge ϑ(τ); se poate interpola între eșantioane sau se face regresia ln(ϑ<sub>∞</sub> − ϑ) = f(t), a cărei pantă este −1/τ.</li>
+<li><b>Etalonul pe același stativ.</b> Termometrul etalon (rezoluție 0,1 °C) stă în mănunchiul senzorilor, la aceeași adâncime; după fiecare schimbare de mediu toate indicațiile se stabilizează înainte de citire. Recipientul izolat se răcește lent (≈ 0,1 °C/min), de aceea citirile se iau simultan.</li>
+<li><b>Răcirea înainte de treaptă.</b> După apa caldă, în aer NTC-ul se răcește foarte lent (constanta de timp în aer este de ≈ 10 ori mai mare). Senzorii se răcesc întâi în paharul cu apă la temperatura camerei, apoi se lasă în aer până la stabilizare.</li>
+</ul>
 <h2>4.4. Modul de lucru (în simulator)</h2>
 <ol><li>Porniți simularea; după cel puțin 5 minute în aer înregistrați citirile (Tabelul 4.1).</li>
 <li>Măsurați U<sub>s</sub>, U<sub>ref</sub> și rezistența NTC (X2 decuplat) – Tabelul 4.3.</li>

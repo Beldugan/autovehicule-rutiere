@@ -680,6 +680,15 @@ ISR(TIMER4_CAPT_vect) {               // captură pe ICP4 (pinul 49, Mega)
 }
 void setup() { TCCR4A = 0; TCCR4B = _BV(ICES4) | _BV(CS41); TIMSK4 = _BV(ICIE4); } // P = 8 → 0,5 µs
 void loop() { float n = 60.0 / (60 * Ti * 0.5e-6); float theta = 6.0 * k; }</pre>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Programul de captură</b> are pragul golului ca parametru (PRAG), verifică numărul de dinți dintre două goluri (58), cu un contor de erori de sincronizare, și face media perioadei pe 20 de dinți pentru afișare; turația și T<sub>i</sub> afișate exclud perioada golului.</li>
+<li><b>Depășirea timerului.</b> Cu P = 8 timerul de 16 biți se umple în 65 536 · 0,5 µs = 32,8 ms. Diferența „t − tPrev” pe 16 biți compensează o singură depășire, deci golul (3 · T<sub>i</sub>) se măsoară corect numai dacă T<sub>gol</sub> &lt; 32,8 ms, adică n &gt; ≈ 92 rot/min. Pentru turații de pornire mai mici se folosește P = 64 (4 µs, ε<sub>n</sub> de 8 ori mai mare).</li>
+<li><b>Abaterea față de tahometru.</b> Placa Mega folosește un rezonator ceramic de 16 MHz (±0,5 %): timerul numără cu frecvența reală, deci turația calculată are o abatere sistematică de ordinul a 0,1…0,4 %, aceeași la toate regimurile. Osciloscopul are propria bază de timp, precisă.</li>
+<li><b>Senzorul inductiv și întrefierul.</b> Amplitudinea crește proporțional cu turația și scade aproximativ exponențial cu întrefierul. Când vârful semnalului se apropie de pragul circuitului de formare (cu zgomotul suprapus), unii dinți nu mai dau impulsuri: un dinte lipsă dublează perioada și este luat drept gol, iar programul pierde sincronizarea. De aceea influența întrefierului se compară la aceeași turație (≈ 500 rot/min), cu o observare de 5 s a erorilor de sincronizare.</li>
+<li><b>Accelerarea bruscă.</b> La accelerare perioadele scad în timpul golului, iar raportul T<sub>gol</sub>/T<sub>i</sub> coboară sub 3 (la un disc ușor până la ≈ 2,5…2,8). Un prag apropiat de 3 (de ex. 2,9) pierde golul; un prag prea mic (1,2) confundă un dinte lipsă (zgomot, întrefier mare) cu golul. Pragul 1,5 este compromisul uzual.</li>
+<li><b>Declanșarea osciloscopului</b> se face pe front (pentru frecvență și perioadă) sau pe lățimea impulsului mai mare de 1,5 · T (golul) – funcția „Pulse width”; la întrefier mare, când semnalul format lipsește, osciloscopul rulează liber (AUTO).</li>
+</ul>
 <h2>6.3. Aparatură și echipamente</h2>
 <ul><li>Disc cu 60 − 2 dinți (din dezmembrări) antrenat de un motor de c.c. de 12 V cu reductor, comandat PWM prin driver L298N; capac de protecție și buton de oprire de urgență</li>
 <li>Senzor de turație auto (inductiv, cu circuit de formare LM393 cu histerezis și diode Zener) pe suport reglabil, lere 0,5…3 mm</li>

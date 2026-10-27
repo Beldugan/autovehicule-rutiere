@@ -571,6 +571,16 @@ const HTML_TEORIE = `
 <div class="ec"><span>ΔU = U<sub>0</sub> − U<sub>s</sub></span><span class="nr">(1.5)</span></div>
 <div class="ec"><span>R<sub>c</sub> = ΔU/I [Ω]</span><span class="nr">(1.6)</span></div>
 <p>Exemplu clasic (Smart Fortwo): macaraua geamului pasagerului nu funcționează. Dacă geamul poate fi acționat de pe partea șoferului, modulele ușilor, magistrala și motorul sunt în stare bună, iar defectul este probabil la comutatorul pasagerului. Abia după acest raționament se măsoară.</p>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Căderea de tensiune pe siguranță (1.5).</b> U<sub>0</sub> și U<sub>s</sub> se măsoară amândouă cu consumatorul (ventilatorul) pornit, sau direct pe bornele siguranței; o citire „fără sarcină” ar include în diferență și căderea de tensiune internă a bateriei și pe cablaj.</li>
+<li><b>Valoarea normală.</b> O siguranță-lamelă în bună stare are ≈ 3…8 mΩ, deci la 8 A căderea totală pe siguranță și contacte este sub ≈ 0,08 V (R<sub>c</sub> &lt; 0,01 Ω). La R<sub>c</sub> = 0,1 Ω și 8 A se disipă 6,4 W în suportul siguranței – contactul se încălzește și se degradează rapid.</li>
+<li><b>Încărcarea magistralei.</b> Rețelele se proiectează de regulă sub ≈ 50…60 % încărcare; peste ≈ 70…80 % cresc întârzierile mesajelor cu prioritate mică. O încărcare de 75 % este deci la limită.</li>
+<li><b>Stările codurilor de defect:</b> <i>în așteptare</i> (defect detectat într-un singur ciclu de funcționare), <i>confirmat</i> (detectat în cicluri succesive, lampa MIL aprinsă), <i>permanent</i> (nu poate fi șters cu testerul, dispare numai după ce monitorul trece testul) și <i>istoric</i> (defect care nu mai este prezent). Cititorul generic folosește serviciile OBD 01 (date curente), 02 (freeze frame), 03 (coduri confirmate), 07 (coduri în așteptare) și 0A (coduri permanente).</li>
+<li><b>Pragurile receptorului CAN.</b> Receptorul interpretează starea dominantă la U<sub>diff</sub> = U<sub>CAN-H</sub> − U<sub>CAN-L</sub> peste 0,9 V și starea recesivă sub 0,5 V; în starea recesivă U<sub>diff</sub> ≈ 0 V (ambele linii ≈ 2,5 V).</li>
+<li><b>Tensiunile medii CAN</b> citite cu multimetrul depind de încărcarea magistralei (proporția biților dominanți): la trafic intens CAN-H medie crește spre 2,7 V și CAN-L medie scade spre 2,3 V. La priza OBD a unui autoturism cu gateway, CAN-ul de diagnoză are trafic numai cât testerul comunică, deci mediile sunt foarte apropiate de 2,5 V; valori de 2,6…2,7 / 2,3…2,4 V corespund unei magistrale încărcate (de exemplu CAN motor măsurat la gateway).</li>
+<li><b>Arhitectura cu gateway.</b> La autoturismele actuale priza OBD este legată la CAN-ul de diagnoză al gateway-ului; celelalte magistrale (motor, șasiu, confort, infotainment) se verifică la conectorii gateway-ului.</li>
+</ul>
 <h2>1.4. Modul de lucru (în simulator)</h2>
 <ol><li>Citiți fișa „client” cu simptomul și faceți inspecția vizuală: tensiunea bateriei în repaus (≥ 12,4 V, pinul 16 față de pinul 4). Identificați pe machetă gateway-ul, magistralele și priza de diagnoză.</li>
 <li>Cu contactul decuplat conectați interfața X431; puneți contactul (vehiculul este identificat automat după VIN).</li>

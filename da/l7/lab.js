@@ -325,6 +325,11 @@ const HTML_TEORIE = `
 <figure><img src="img/fig7_4.jpg" alt="Fig. 7.4" loading="lazy"><figcaption>Fig. 7.4. Detectarea anomaliilor în corecția de amestec STFT la ralanti (fișierul de date al lucrării)</figcaption></figure>
 <p>Metoda se aplică pe regimuri comparabile (de exemplu ralanti cald); altfel variațiile normale de sarcină apar drept anomalii, ca accelerarea din Fig. 7.4. Același semnal STFT poate fi urmărit în timp real pe osciloscop în modul roll, cu pragurile ±3σ afișate ca linii de referință (Fig. 7.5).</p>
 <figure><img src="img/fig7_5.jpg" alt="Fig. 7.5" loading="lazy"><figcaption>Fig. 7.5. Corecția STFT la ralanti afișată pe osciloscop în modul roll, cu pragurile |z| = 3 (60 s/div, 5 %/div)</figcaption></figure>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Ordinea deconectării sistemului HV:</b> delimitarea zonei, echipamentul individual de protecție, contactul luat și cheia la distanță, conectorul de service scos și asigurat împotriva reconectării, timpul de așteptare pentru descărcarea condensatoarelor, verificarea detectorului de tensiune înainte și după măsurare, apoi verificarea izolației cu megohmmetrul.</li>
+<li><b>Fișierul de date OBD</b> (600 s, 1 Hz: STFT, MAP, tensiunea bateriei) conține o accelerare, o perioadă cu aer fals provocat și o eroare de achiziție; μ și σ se calculează pe porțiunea de referință (funcționare normală), iar anomaliile se identifică față de această referință.</li>
+</ul>
 <h2>7.4. Modul de lucru (în simulator)</h2>
 <ol><li>Instruirea HV, zona de lucru, EPI, P și frâna de parcare.</li><li>Scanarea tuturor modulelor, încercarea READY, codurile HV.</li><li>Datele BMS, tensiunile celulelor, izolația, 12 V, informațiile vehiculului.</li><li>Deconectarea, verificarea lipsei tensiunii, rezistența de izolație.</li><li>Diagnoza pe date: fișierul CSV, μ, σ, z, anomaliile.</li><li>Evaluarea bateriei și diagnosticul.</li></ol>
 <h2>7.7. Interpretarea rezultatelor</h2>

@@ -534,6 +534,14 @@ void loop() {                                       // nodul „motor”: ID 0x0
   CAN0.sendMsgBuf(0x0C8, 0, 8, d);
   delay(10);
 }</pre>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Lungimea cadrului.</b> Cadrul standard cu 8 octeți are 108 biți de la SOF până la sfârșitul EOF (1 + 11 + 3 + 4 + 64 + 15 + 1 + 2 + 7), plus 3 biți de pauză (IFS) până la cadrul următor. După fiecare 5 biți identici, între SOF și CRC, transmițătorul inserează un bit de valoare opusă (umplerea de biți), astfel că lungimea reală depinde de date (≈ 111…130 de biți cu pauza). În Tabelul 10.2 „biți pe cadru” înseamnă SOF…EOF, iar calculul încărcării adaugă cei 3 biți de pauză.</li>
+<li><b>Nodul monitor (C)</b> recepționează toate cadrele, le decodează după baza de date (DBC), numără cadrele și cadrele de eroare pe fiecare secundă și calculează încărcarea; comanda „r” resetează statisticile. Tabelul 10.3 consemnează numărul de cadre pe secundă și cadrele de eroare de la pornire sau de la resetare.</li>
+<li><b>Arbitrajul.</b> 0x0B4 = 000 1011 0100 și 0x0C8 = 000 1100 1000 sunt identice până la al 5-lea bit al ID-ului, unde 0x0B4 transmite 0 (dominant) și câștigă. Mesajul care pierde arbitrajul nu se pierde: controlerul îl retransmite automat imediat după.</li>
+<li><b>Defectele.</b> Pe magistrala scurtă (2 m) și la 500 kbit/s, lipsa unei terminări nu produce erori: se văd oscilații pe fronturi și revenirea mai lentă în starea recesivă (marja de siguranță scade). Cu CAN-L întrerupt la un nod, transmisiile acestuia eșuează: fiecare cadru de eroare crește contorul de erori la transmisie (TEC) cu 8; la 128 nodul trece în „error passive”, la 256 în „bus off” – după 32 de încercări se deconectează singur, iar restul rețelei continuă. O transmisie reușită scade TEC cu 1.</li>
+<li><b>Cristalul.</b> Modulele MCP2515 au de regulă cristal de 8 MHz; dacă programul folosește MCP_16MHZ, nodul transmite la jumătate din rata de biți și produce numai erori.</li>
+</ul>
 <h2>10.3. Aparatură și echipamente</h2>
 <ul><li>2–3 noduri: Arduino Mega + modul MCP2515 cu transceiver TJA1050 (cristal de 8 MHz); cablu torsadat de 2 m; rezistențe de terminare de 120 Ω</li>
 <li>Adaptor USB-CAN (CANable / PCAN-USB sau echivalent) cu programul SavvyCAN pentru monitorizare; alternativ, un al treilea nod care afișează mesajele pe portul serial</li>

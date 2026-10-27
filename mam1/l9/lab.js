@@ -683,6 +683,15 @@ void control() {                        // apelată la 2 ms (întrerupere timer)
   setPWM(u);                            // BTS7960: RPWM / LPWM la 20 kHz, după semn
   if (defectSenzor()) { setPWM(0); }    // arcul aduce clapeta în poziția de avarie
 }</pre>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Programul de comandă</b> are două moduri (MOD = BD – buclă deschisă cu comanda dNN; MOD = PID), limitarea comenzii UMAX (±60 % în primele încercări), protecția la blocare (comanda la limită peste 2 s → punte dezactivată), plauzibilitatea pistelor la fiecare ciclu (|U1 + U2 − 5 V| &gt; 0,3 V timp de 10 ms → EN = LOW) și comanda „t” pentru treapta 0 → 40 % (ref = 0 timp de 0,6 s, apoi 40 % timp de 1 s, înregistrare la 2 ms). Dezactivarea punții (EN = LOW) este reacția sigură; setPWM(0) ar frâna motorul (scurtcircuit prin punte), dar arcul aduce oricum clapeta în poziția de avarie.</li>
+<li><b>Pistele.</b> Clapeta are două piste complementare (U1 crește de la ≈ 0,5 V la ≈ 4,5 V, U2 scade invers; U1 + U2 ≈ 5 V). Suma U1 + U2 este mărimea verificată de plauzibilitate.</li>
+<li><b>Curentul motorului</b> se citește prin ieșirea IS a punții (A3). La echilibru motorul este oprit (fără t.e.m.), deci I ≈ U<sub>m</sub>/R. Curentul absorbit din sursa de 12 V este de ≈ DC/100 ori mai mic.</li>
+<li><b>Acordarea.</b> Cu Kp = 4, Ki = 20, Kd = 0,05 timpul de stabilizare iese de regulă peste 300 ms: eroarea rămasă din cauza frecării este eliminată lent de termenul integral. Criteriul se atinge mărind Ki (de exemplu 40); Kd prea mare amplifică zgomotul de cuantizare al ADC-ului.</li>
+<li><b>PWM 490 Hz.</b> La frecvența implicită analogWrite (490 Hz) perioada (2 ms) este mai mare decât constanta electrică L/R a motorului: curentul pulsează puternic (vizibil pe IS) și înfășurarea vibrează audibil. La 20 kHz ondulația este de câteva zeci de mA.</li>
+<li><b>Defectul unei piste și încălzirea punții.</b> La întreruperea pistei 2 programul detectează suma neplauzibilă, dezactivează puntea și arcul readuce clapeta în poziția de avarie; la funcționare prelungită (5 minute) radiatorul punții trebuie să rămână sub 60 °C.</li>
+</ul>
 <h2>9.3. Aparatură și echipamente</h2>
 <ul><li>Clapetă electronică auto (din dezmembrări), verificată cu multimetrul, cu capac de protecție imprimat 3D</li>
 <li>Punte H BTS7960 (43 A) cu radiator; siguranță de 5 A; diodă TVS P6KE24; buton de oprire de urgență</li>

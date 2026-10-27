@@ -372,6 +372,12 @@ const HTML_TEORIE = `
 <p>Vâscozitatea cinematică a apei scade cu temperatura (Tabelul 5.1), deci la același debit numărul Reynolds crește când apa se încălzește; efectul este mult mai puternic la ulei (lucrarea 1).</p>
 <h3>Tabelul 5.1. Vâscozitatea cinematică a apei</h3>
 <div class="tabel-scroll"><table class="tabel"><thead><tr><th>t [°C]</th>${MD.TNU.map(r => `<th>${r[0]}</th>`).join("")}</tr></thead><tbody><tr><td>ν [mm²/s]</td>${MD.TNU.map(r => `<td>${String(r[1]).replace(".", ",")}</td>`).join("")}</tr></tbody></table></div>
+<h3>Observații pentru efectuarea și interpretarea măsurărilor</h3>
+<ul>
+<li><b>Punctele critice.</b> La creșterea debitului se notează începutul oscilației firului colorat și amestecul complet (Re critic superior), iar la scăderea lui – revenirea la regimul laminar (Re critic inferior). Temperatura apei se notează separat, pentru vâscozitate.</li>
+<li><b>Repausul apei și manevrarea lentă.</b> Re critic superior depinde de cât de liniștită este apa: fără repaus sau după o manevră bruscă a robinetului tranziția apare aproape de 2300.</li>
+<li><b>Cronometrarea.</b> Timpul de colectare se pornește și se oprește manual (eroare de ± 0,1…0,2 s): colectați cel puțin 10…20 s.</li>
+</ul>
 <h2>5.4. Modul de lucru (în simulator)</h2>
 <ol><li>Alimentarea, repausul 5–10 min, temperatura apei.</li><li>Regim laminar: colorant, debit mic, V și t.</li><li>Creșterea lentă a debitului: începutul oscilației, amestecul complet; determinări în tranziție și turbulent.</li><li>Scăderea lentă: revenirea la laminar.</li><li>Tabelul 5.3: Re pentru curgerile din autovehicul.</li></ol>
 <h2>5.7. Interpretarea rezultatelor</h2>
