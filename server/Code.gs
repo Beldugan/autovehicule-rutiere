@@ -4587,8 +4587,15 @@ function codSesiune_(lab, data) {
   let c = ""; for (let i = 0; i < 6; i++) c += ALFABET[(b[i] + 256) % 32];
   return c;
 }
+/* codul universal al cadrului didactic: deschide orice lucrare, la orice disciplină, oricând (în sursă se păstrează doar amprenta SHA-256) */
+const COD_UNIVERSAL_SHA = "ce3bbddcd4cbcf3bef88d2c2b03e1af4fccc6adb64975beb8230d8df051649e3";
+function codUniversal_(cod) {
+  const b = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, "universal|" + String(cod || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), Utilities.Charset.UTF_8);
+  return b.map(x => ("0" + ((x + 256) % 256).toString(16)).slice(-2)).join("") === COD_UNIVERSAL_SHA;
+}
 function codValid_(lab, cod) {
-  cod = String(cod || "").toUpperCase().trim();
+  if (codUniversal_(cod)) return true;
+  cod = String(cod || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const acum = new Date();
   return [0, -ORE_SLOT * 60].some(min => codSesiune_(lab, new Date(acum.getTime() + min * 60000)) === cod);
 }
@@ -4717,7 +4724,7 @@ function doGet(e) {
       const { sh, row } = randStudent_(email, nume, grupa);
       const cel = sh.getRange(row, 3 + lab), acum = new Date();
       if (!String(cel.getValue()).startsWith("P")) cel.setValue("P");
-      cel.setNote((cel.getNote() ? cel.getNote() + "\n" : "") + "prezent: " + Utilities.formatDate(acum, TZ, "dd.MM.yyyy HH:mm"));
+      cel.setNote((cel.getNote() ? cel.getNote() + "\n" : "") + "prezent: " + Utilities.formatDate(acum, TZ, "dd.MM.yyyy HH:mm") + (codUniversal_(p.cod) ? " (cod universal)" : ""));
       cel.setBackground("#e5f4ea");
       const start = acum.toISOString();
       return json_({ ok: true, start, token: hmac_("tok|" + email + "|" + disc_() + "|" + lab + "|" + start), seed: seed_(email, lab, start) });

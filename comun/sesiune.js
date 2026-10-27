@@ -120,7 +120,7 @@ function randeazaBaraStudent() {
     <label class="camp">Nume și prenume<input id="st-nume" autocomplete="name" maxlength="80" value="${esc(id.nume || "")}"></label>
     <label class="camp">E-mail (contul din Google Classroom)<input id="st-email" type="email" autocomplete="email" maxlength="100" value="${esc(id.email || "")}"></label>
     <label class="camp">Grupa / subgrupa<input id="st-grupa" maxlength="40" value="${esc(id.grupa || "")}"></label>
-    <label class="camp">Codul sesiunii (afișat de cadrul didactic)<input id="st-cod" maxlength="8" style="text-transform:uppercase;letter-spacing:.15em" autocomplete="off"></label>
+    <label class="camp">Codul sesiunii (afișat de cadrul didactic)<input id="st-cod" maxlength="16" style="text-transform:uppercase;letter-spacing:.15em" autocomplete="off"></label>
     <button type="button" class="primar" id="btn-start"${conectat ? "" : " disabled"}>Începe laboratorul</button>
   </div><p class="nota" id="st-msg">${conectat ? "Introduceți datele și codul afișat în laborator. Prezența se înregistrează automat." : "Mod demonstrativ: această disciplină nu este încă conectată la registrul de prezență; referatul nu poate fi trimis."}</p>`;
   $("#btn-start").addEventListener("click", startLab);
@@ -129,7 +129,7 @@ function randeazaBaraStudent() {
 async function startLab(e) {
   const msg = $("#st-msg");
   if (!e.isTrusted || navigator.webdriver) { msg.textContent = "Aplicația trebuie folosită direct de student, nu printr-un program automat."; return; }
-  const nume = $("#st-nume").value.trim().replace(/\s+/g, " "), email = $("#st-email").value.trim().toLowerCase(), grupa = $("#st-grupa").value.trim(), cod = $("#st-cod").value.trim().toUpperCase();
+  const nume = $("#st-nume").value.trim().replace(/\s+/g, " "), email = $("#st-email").value.trim().toLowerCase(), grupa = $("#st-grupa").value.trim(), cod = $("#st-cod").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (nume.split(" ").length < 2) { msg.textContent = "Scrieți numele complet (nume și prenume)."; return; }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || (PORTAL.domeniuEmail && !email.endsWith("@" + PORTAL.domeniuEmail))) { msg.textContent = "Adresa de e-mail nu este validă."; return; }
   if (!grupa) { msg.textContent = "Completați grupa."; return; }
