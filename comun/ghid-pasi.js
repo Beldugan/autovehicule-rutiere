@@ -5,7 +5,10 @@
 "use strict";
 (function () {
   const css = `
-.ghid-pasi { border:2px solid var(--accent); border-radius:12px; margin:0 0 .7rem; background:color-mix(in srgb, var(--accent) 6%, var(--suprafata)); overflow:hidden; }
+.ghid-pasi { border:2px solid var(--accent); border-radius:12px; margin:0 0 .7rem; background:color-mix(in srgb, var(--accent) 6%, var(--suprafata)); overflow:hidden; color:var(--text); }
+.ghid-pasi .pas-corp, .ghid-pasi .pas-cap, .ghid-pasi .ghid-op > li, .ghid-pasi .pas-ver li, .ghid-titlu b, .ghid-pasi .pas-ctl, .ghid-pasi label { color:var(--text); }
+.ghid-pasi .pas-ver li.ok, .ghid-titlu .ghid-tab, .ghid-pasi .pas-cap small { color:var(--text-sec) !important; }
+.ghid-pasi code { color:var(--text); background:var(--suprafata-2); padding:0 .25rem; border-radius:4px; }
 .ghid-pasi > .ghid-cap { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .8rem; padding:.45rem .8rem; background:var(--accent); color:#fff; font:700 .95rem system-ui,sans-serif; }
 .ghid-pasi > .ghid-cap small { font-weight:500; opacity:.9; }
 .ghid-pasi > .ghid-cap .ghid-ascunde { margin-left:auto; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5); font-size:.78rem; padding:.15rem .55rem; }
