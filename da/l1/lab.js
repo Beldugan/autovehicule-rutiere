@@ -190,7 +190,7 @@ function actualizeazaSVG(dt) {
 /* ------------------------------------------------------------------ macheta 3D (aceeași rețea, pe autoturism) */
 function porneste3D() {
   const el = $("#retea3d"); if (!el) return;
-  import(BAZA_COMUN + "vehicul3d.js?v=31").then(m => {
+  import(BAZA_COMUN + "vehicul3d.js?v=32").then(m => {
     SV.v3d = m.creeaza(el, { sistem: "retea", control: {
       stare: () => ({ contact: sim.contact || treaza(), defBus: defBus(), defTip: sim.defActiv ? defect() : "", arataDefect: !MOD.eval, punct: sim.punct, sonde: sim.aparat === "mm" || sim.aparat === "osc" }),
       onSelect: k => { if (MD.MK[k] && raspunde(k)) { sim.modCod = k; if (sim.vx === "cod") panouX431(); } $("#af-sel").textContent = k === "obd" ? "Priza OBD (J1962)" : MD.MK[k].nume; $("#af-sel-b").textContent = k === "obd" ? "CAN diagnoză + DoIP" : k === "gw" ? "toate magistralele" : NUME_MAG(MD.MK[k].b) + " · " + MD.MK[k].adr; }

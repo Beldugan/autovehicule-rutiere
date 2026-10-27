@@ -339,7 +339,7 @@ function arataScena(k) {
   sim.scena = k; $("#st3d").hidden = k !== "stand"; $("#vh3d").hidden = k !== "hib"; $$(".saa7-scena .stand-doar").forEach(e => e.style.display = k !== "stand" ? "none" : "");
   $$("[data-scena]").forEach(b => b.classList.toggle("activ", b.dataset.scena === k));
   if (k === "hib" && !SV.vh) { SV.vh = true;
-    import(BAZA_COMUN + "vehicul3d.js?v=31").then(m => { SV.vh = m.creeaza($("#vh3d"), { sistem: "hibrid", masurare: true, tip: sim.tipH, date: MD.tipuri(P()),
+    import(BAZA_COMUN + "vehicul3d.js?v=32").then(m => { SV.vh = m.creeaza($("#vh3d"), { sistem: "hibrid", masurare: true, tip: sim.tipH, date: MD.tipuri(P()),
       laTip: t => { sim.tipH = t; actualizeazaPasi(); }, laMasurare: r => { (sim.masHib[r.tip] = sim.masHib[r.tip] || {})[r.ev] = r; actualizeazaPasi(); } }); })
       .catch(e => { $("#vh3d").innerHTML = `<p class="nota">Motopropulsorul 3D nu a putut fi încărcat (${esc(e.message)}).</p>`; }); }
   actualizeazaPasi();

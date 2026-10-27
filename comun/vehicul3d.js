@@ -259,7 +259,7 @@ export function creeaza(gazda, optiuni = {}) {
   const S = sistem === "racire" ? construiesteRacire({ caroserie, ctxMotor: ctx }) : sistem === "ungere" ? construiesteUngere({ THREE, caroserie, optiuni, ctxMotor: ctx }) : sistem === "senzori" ? construiesteSenzori({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "hibrid" ? construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor: ctx }) : sistem === "retea" ? construiesteRetea({ caroserie, optiuni }) : construiesteFrana({ THREE, sasiu, caroserie, roti, scene });
 
   // celelalte sisteme ale autoturismului (transmisie, direcție, baterie, combustibil, evacuare)
-  { const mSist = motCtx || (S.motor || null); const gs = sistemeAutoturism(caroserie, mSist); if (motCtx) estompeaza(gs, 0.5); }
+  { const mSist = motCtx || (S.motor || null); const gs = sistemeAutoturism(caroserie, mSist); if (motCtx) estompeaza(gs, 0.5); if (S.laSisteme) S.laSisteme(gs); }
 
   const motoare = REG_MOT; REG_MOT = null;
   // stilurile de vizualizare (realist / prezentare secționată / termic CFD); motorul unui autoturism „în mers” este cald
@@ -617,7 +617,8 @@ function construiesteFrana({ THREE, sasiu, caroserie, roti }) {
 function sistemeAutoturism(caroserie, mot) {
   const M = MAT(), G = new THREE.Group(); G.name = "sisteme"; caroserie.add(G);
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const add = (o, p = G) => { o.castShadow = true; p.add(o); return o; };
+  const ICE = new THREE.Group(); ICE.name = "ice"; G.add(ICE); let tinta = G;      // rezervorul de combustibil și evacuarea (ascunse la BEV)
+  const add = (o, p = tinta) => { o.castShadow = true; p.add(o); return o; };
   const bara = (a, b, r, m, seg = 16) => { const d = b.clone().sub(a), L = d.length(); const o = add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, seg), m)); o.position.copy(a).add(b).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); return o; };
   const tub = (pts, r, m, seg = 80) => add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p => V(...p)), false, "catmullrom", 0.3), seg, r, 10, false), m));
   const burduf = (a, b, r0, r1, n = 6) => {      // burduf de cauciuc (ondulat), de la a (rază r0) la b (rază r1)
@@ -656,8 +657,9 @@ function sistemeAutoturism(caroserie, mot) {
     tub([[1.86, 0.865, -0.58], [1.8, 0.88, -0.66], [1.75, 0.78, -0.72]], 0.009, M.cauciuc);                                              // cablul − spre caroserie
   }
   // 4. rezervorul de combustibil (în șa, sub bancheta spate), modulul pompei, canistra EVAP, conducta de alimentare și cea de purjare
+  tinta = ICE;
   { const mR = new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.7 });
-    const RG = new THREE.Group(); RG.position.set(-0.75, 0.0, 0.0); G.add(RG);
+    const RG = new THREE.Group(); RG.position.set(-0.75, 0.0, 0.0); ICE.add(RG);
     [[-0.32, 0.36], [0.27, 0.38]].forEach(([z, w]) => { const o = add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, w), mR), RG); o.position.set(0, 0.27, z); });
     add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 0.3), mR), RG).position.set(0, 0.33, -0.02);                                    // puntea peste tunel
     [-0.2, 0.2].forEach(x => add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 1.02), M.otel), RG).position.set(x, 0.165, 0));   // chingile de fixare
@@ -683,6 +685,7 @@ function sistemeAutoturism(caroserie, mot) {
     tub([[-1.92, 0.22, -0.46], [-2.05, 0.2, -0.5], [-2.3, 0.2, -0.5]], 0.025, mE); bara(V(-2.3, 0.2, -0.5), V(-2.38, 0.2, -0.5), 0.034, M.crom, 24);   // țeava finală cu ornament
     [[0.45, -0.05], [-0.9, -0.05], [-1.92, 0.12]].forEach(([x, z]) => bara(V(x, 0.15, z), V(x, 0.26, z), 0.008, M.cauciuc));            // suporturile elastice
   }
+  tinta = G;
   return G;
 }
 
@@ -1494,7 +1497,7 @@ function construiesteRetea({ caroserie, optiuni }) {
    • plug-in hybrid (P2): modulul P2 (motorul electric și ambreiajul K0) între motor și cutie, invertorul, bateria HV mare sub podea, încărcătorul
      de bord (OBC) și priza de tip 2. Fluxurile de energie sunt animate (portocaliu – mecanic, albastru – electric spre motor, verde – recuperare). */
 import { construiesteDemaror } from "./pornire3d.js?v=2";
-export const TIPURI_HIBRID = { ss: "Start-stop (12 V)", mh: "Mild hybrid 48 V (BSG, P0)", fh: "Full hybrid (e-CVT, MG1 + MG2)", phev: "Plug-in hybrid (P2, încărcare din rețea)" };
+export const TIPURI_HIBRID = { ss: "Start-stop (12 V)", mh: "Mild hybrid 48 V (BSG, P0)", fh: "Full hybrid (e-CVT, MG1 + MG2)", phev: "Plug-in hybrid (P2, încărcare din rețea)", bev: "Electric BEV (400 V, fără motor termic)" };
 function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   ascundeContur(ctxMotor, ["motor", "cutie", "radiator"]);
   const mot = motorAutoturism(caroserie), M = mot.M || MAT(), V = (x, y, z) => new THREE.Vector3(x, y, z), et = [], carcase = [], DATE = optiuni.date || {};
@@ -1519,7 +1522,7 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   const alternator = mot.rot.altern ? mot.rot.altern.parent : null;
   const demarorSimplu = mot.grup.children.find(o => o.isMesh && o.geometry.type === "CylinderGeometry" && Math.abs(o.position.x + 0.3) < 1e-3 && Math.abs(o.position.z - 0.17) < 1e-3);
   const cutieDCT = mot.grup.children.filter(o => { if (!o.isMesh) return false; o.geometry.computeBoundingBox(); return o.geometry.boundingBox.max.x + o.position.x < -0.385; });
-  const G = {}; ["ss", "mh", "fh", "phev"].forEach(k => { G[k] = { mot: new THREE.Group(), car: new THREE.Group() }; mot.grup.add(G[k].mot); caroserie.add(G[k].car); });
+  const G = {}; ["ss", "mh", "fh", "phev", "bev"].forEach(k => { G[k] = { mot: new THREE.Group(), car: new THREE.Group() }; mot.grup.add(G[k].mot); caroserie.add(G[k].car); });
   /* ---------- START-STOP: demarorul întărit (reductor planetar, pinion pe coroana volantului) */
   { const D = construiesteDemaror({ M: undefined, reductor: true }); D.G.position.set(-0.33, -0.02, 0.17); D.G.rotation.y = 0; G.ss.mot.add(D.G);
     D.carcase && D.carcase.forEach(o => carcase.push(o)); G.ss.dem = D;
@@ -1606,6 +1609,47 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     tub([V(PR.x, PR.y - 0.03, PR.z + 0.03), V(PR.x + 0.02, 0.6, -0.6), V(OBC.x, OBC.y + 0.02, OBC.z - 0.1)], 0.009, portocaliu, c, 40); tub([V(OBC.x + 0.12, OBC.y, OBC.z), V(-0.6, 0.18, -0.38), V(-0.2, 0.21, -0.36)], 0.009, portocaliu, c, 60);
     cald(g, V(-0.365, -0.02, 0), 0.17, "mot"); cald(c, INV, 0.18, "inv"); cald(c, V(0.3, 0.205, -0.36), 0.45, "bat"); cald(c, V(0.3, 0.205, 0.36), 0.45, "bat"); cald(c, OBC, 0.15, "obc");
     G.phev.OBC = OBC; G.phev.PR = PR; G.phev.INV = INV; G.phev.pP2 = pP2; }
+  /* ---------- ELECTRIC (BEV): unitatea de tracțiune pe puntea față (motor sincron cu magneți permanenți + reductor + diferențial,
+     invertorul deasupra), bateria HV de 400 V în podea, OBC + DC/DC, priza combinată CCS2, radiatorul circuitului de răcire */
+  { const c = G.bev.car, albastruM = new THREE.MeshStandardMaterial({ color: 0x2f6aa8, roughness: 0.4 });
+    const EM = V(1.5, 0.4, 0.12), RD = V(1.47, 0.36, -0.17), IV = V(1.56, 0.66, 0.0);
+    carc(cyl(0.135, 0.135, 0.34, aluC, EM.x, EM.y, EM.z, "z", c, 48));
+    for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, n = rb(0.012, 0.012, 0.32, aluC, EM.x + Math.cos(a) * 0.137, EM.y + Math.sin(a) * 0.137, EM.z, c); carc(n); }
+    cyl(0.12, 0.12, 0.28, cupru, EM.x, EM.y, EM.z, "z", c, 40);                                                           // statorul (în transparent)
+    const rotB = cyl(0.085, 0.085, 0.26, M.otel, EM.x, EM.y, EM.z, "z", c, 32);
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, mg = rb(0.03, 0.24, 0.03, new THREE.MeshStandardMaterial({ color: k % 2 ? 0xc62828 : 0x1565c0, roughness: 0.4 }), Math.cos(a) * 0.07, 0, Math.sin(a) * 0.07, rotB); mg.rotation.y = -a; }
+    carc(rb(0.3, 0.3, 0.18, aluC, RD.x, RD.y, RD.z, c)); cyl(0.07, 0.07, 0.06, M.otel, RD.x - 0.04, CAR.yRoata, RD.z - 0.1, "z", c);     // reductorul și diferențialul
+    carc(rb(0.42, 0.11, 0.36, M.alu, IV.x, IV.y, IV.z, c)); for (let k = 0; k < 7; k++) rb(0.4, 0.01, 0.006, M.alu, IV.x, IV.y + 0.06, IV.z - 0.15 + k * 0.05, c);
+    rb(0.34, 0.02, 0.3, new THREE.MeshStandardMaterial({ color: 0x0d6b3b, roughness: 0.5 }), IV.x, IV.y, IV.z, c);
+    sticker(c, "⚡ PERICOL", "400 V c.c.", 0.16, IV.x, IV.y + 0.058, IV.z, -Math.PI / 2, Math.PI / 2, "#ffd400", "#111111");
+    [-1, 0, 1].forEach(j => tub([[IV.x - 0.05 + j * 0.03, IV.y - 0.06, IV.z + 0.17], [EM.x + j * 0.03, EM.y + 0.2, EM.z + 0.12], [EM.x + j * 0.03, EM.y + 0.13, EM.z + 0.08]], 0.007, portocaliu, c, 30));
+    eticheta(ancora(c, EM.clone().add(V(0.05, -0.05, 0.25))), "Motorul electric de tracțiune (PMSM, 150 kW)", "bev");
+    eticheta(ancora(c, RD.clone().add(V(0, -0.12, -0.1))), "Reductorul cu o treaptă + diferențialul", "bev");
+    eticheta(ancora(c, IV.clone().add(V(0, 0.1, 0))), "Invertorul de tracțiune (c.c. 400 V → c.a. trifazat)", "bev");
+    // radiatorul circuitului de răcire al bateriei și al unității de tracțiune
+    carc(rb(0.05, 0.42, 1.3, aluC, 2.24, 0.52, 0, c)); for (let k = 0; k < 18; k++) rb(0.052, 0.004, 1.28, M.alu, 2.24, 0.33 + k * 0.022, 0, c);
+    eticheta(ancora(c, V(2.24, 0.78, 0.4)), "Radiatorul circuitului de răcire (baterie, invertor, motor)", "bev");
+    // bateria HV în podea: carcasa din aluminiu, 2 × 6 module, cutia de conexiuni cu contactoarele și siguranța
+    const BP = V(-0.08, 0.215, 0); carc(rb(2.2, 0.13, 1.34, aluC, BP.x, BP.y, BP.z, c));
+    for (let i = 0; i < 6; i++) for (const z of [-0.33, 0.33]) rb(0.33, 0.1, 0.6, albastruM, BP.x - 0.88 + i * 0.355, BP.y, z, c);
+    const JB = V(0.95, 0.3, 0.0); carc(rb(0.18, 0.1, 0.4, M.plastic, JB.x, JB.y, JB.z, c));
+    sticker(c, "HV Li-ion 400 V", "64 kWh · BMS", 0.34, BP.x - 0.3, BP.y + 0.067, 0.25, -Math.PI / 2, Math.PI / 2, "#f07d00", "#111111");
+    eticheta(ancora(c, V(-0.4, 0.33, -0.45)), "Bateria HV Li-ion 400 V în podea (64 kWh, răcită cu lichid)", "bev");
+    eticheta(ancora(c, JB.clone().add(V(0, 0.08, 0))), "Cutia de joncțiune: contactoare, precharge, siguranța", "bev");
+    [-0.03, 0.03].forEach(dz => tub([[JB.x + 0.09, JB.y, JB.z + dz], [1.2, 0.3, dz], [IV.x - 0.2, IV.y - 0.04, IV.z + dz]], 0.011, portocaliu, c, 60));
+    // OBC + DC/DC la spate, priza CCS2
+    const OB = V(-1.45, 0.42, -0.2); carc(rb(0.3, 0.09, 0.26, M.alu, OB.x, OB.y, OB.z, c)); for (let k = 0; k < 5; k++) rb(0.29, 0.008, 0.005, M.alu, OB.x, OB.y + 0.05, OB.z - 0.1 + k * 0.05, c);
+    eticheta(ancora(c, OB.clone().add(V(0, 0.09, 0))), "Încărcătorul de bord (OBC 11 kW c.a.) + convertorul DC/DC 400 → 12 V", "bev");
+    const PR = V(-1.62, 0.86, -0.86); cyl(0.06, 0.06, 0.04, M.plastic, PR.x, PR.y, PR.z, "z", c);
+    const fata = new THREE.Mesh(new THREE.CircleGeometry(0.056, 32), new THREE.MeshBasicMaterial({ map: tex(128, 128, (x) => { x.fillStyle = "#1b1d20"; x.fillRect(0, 0, 128, 128); x.fillStyle = "#c9ced3";
+      [[64, 22], [44, 34], [84, 34], [46, 56], [82, 56], [64, 66], [64, 44]].forEach(([a, b], i) => { x.beginPath(); x.arc(a, b, i > 4 ? 6 : 8, 0, 7); x.fill(); }); [[44, 100], [84, 100]].forEach(([a, b]) => { x.beginPath(); x.arc(a, b, 14, 0, 7); x.fill(); }); }) }));
+    fata.position.set(PR.x, PR.y, PR.z - 0.021); fata.rotation.y = Math.PI; c.add(fata);
+    eticheta(ancora(c, PR.clone().add(V(0, 0.09, 0))), "Priza CCS2 (c.a. tip 2 + c.c. rapid până la 150 kW)", "bev");
+    tub([[PR.x, PR.y - 0.04, PR.z + 0.03], [PR.x + 0.02, 0.6, -0.6], [OB.x - 0.1, OB.y, OB.z - 0.12]], 0.009, portocaliu, c, 40);
+    tub([[PR.x + 0.03, PR.y - 0.05, PR.z + 0.04], [-1.5, 0.5, -0.65], [-1.2, 0.26, -0.55]], 0.012, portocaliu, c, 40);           // linia de c.c. rapid direct la baterie
+    tub([[OB.x + 0.15, OB.y, OB.z], [-1.25, 0.28, -0.2], [-1.17, 0.25, -0.2]], 0.009, portocaliu, c, 40);
+    cald(c, EM, 0.18, "mot"); cald(c, IV, 0.2, "inv"); cald(c, V(-0.6, 0.215, 0), 0.6, "bat"); cald(c, V(0.45, 0.215, 0), 0.6, "bat"); cald(c, OB, 0.16, "obc");
+    G.bev.rot = rotB; G.bev.EM = EM; G.bev.IV = IV; G.bev.JB = JB; G.bev.OB = OB; G.bev.PR = PR; }
   Object.values(G).forEach(g => g.mot.traverse(o => { if (o.isMesh) o.userData.fixMat = true; }));
   /* ---------- fluxurile de energie (particule) */
   const PG = new THREE.Group(); caroserie.add(PG);
@@ -1616,36 +1660,39 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     ss: { inc: [[altP, altP.clone().add(V(0.1, 0.2, -0.3)), BAT12]], dem: [[BAT12, BAT12.clone().add(V(-0.2, -0.2, 0.2)), demP]] },
     mh: { el: [[G.mh.P48.clone(), V(0.9, 0.16, 0.42), V(1.45, 0.18, 0.4), G.mh.pB]], aux: [[G.mh.P48.clone(), V(0.5, 0.26, 0.42), V(1.3, 0.3, 0.2), BAT12]] },
     fh: { el: [[G.fh.HB.clone(), V(-1.2, 0.15, 0.32), V(0.3, 0.13, 0.32), G.fh.pP, mg2]], mg1: [[mg1, G.fh.pP, mg2]], mg2r: [[mg2, cut, flS, rL], [mg2, cut, flD, rR]] },
-    phev: { el: [[V(0.3, 0.205, -0.36), V(0.82, 0.21, -0.3), G.phev.INV, G.phev.pP2, p2P]], priza: [[G.phev.PR.clone(), V(G.phev.PR.x + 0.02, 0.6, -0.6), G.phev.OBC, V(-0.6, 0.18, -0.38), V(0.3, 0.205, -0.36)]], p2r: [[p2P, cut, flS, rL], [p2P, cut, flD, rR]] }
+    phev: { el: [[V(0.3, 0.205, -0.36), V(0.82, 0.21, -0.3), G.phev.INV, G.phev.pP2, p2P]], priza: [[G.phev.PR.clone(), V(G.phev.PR.x + 0.02, 0.6, -0.6), G.phev.OBC, V(-0.6, 0.18, -0.38), V(0.3, 0.205, -0.36)]], p2r: [[p2P, cut, flS, rL], [p2P, cut, flD, rR]] },
+    bev: { el: [[V(-0.3, 0.215, 0), G.bev.JB.clone(), V(1.2, 0.3, 0), G.bev.IV.clone(), G.bev.EM.clone()]], priza: [[G.bev.PR.clone(), V(G.bev.PR.x + 0.02, 0.6, -0.6), G.bev.OB.clone(), V(-1.2, 0.25, -0.2), V(-0.3, 0.215, 0)]],
+      roti: [[G.bev.EM.clone(), V(1.47, CAR.yRoata, -0.25), rL], [G.bev.EM.clone(), V(1.47, CAR.yRoata, 0.3), rR]] }
   };
   const fluxuri = [];
   const flux = (cai, col, n = 26) => cai.map(pts => { const crv = new THREE.CatmullRomCurve3(pts.map(p => p.clone())), L = crv.getLength(), im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, depthWrite: false }), n); im.renderOrder = 6; PG.add(im);
     const f = { crv, L, im, n, s: Array.from({ length: n }, (_, k) => k / n), v: 0, inv: false }; fluxuri.push(f); return f; });
   const F = { mec: flux(CAI.mec, 0xff9a1a), ssInc: flux(CAI.ss.inc, 0x2ee86a, 14), ssDem: flux(CAI.ss.dem, 0x3aa0ff, 14), mhEl: flux(CAI.mh.el, 0x3aa0ff), mhAux: flux(CAI.mh.aux, 0x9fd3ff, 14),
-    fhEl: flux(CAI.fh.el, 0x3aa0ff, 34), fhMg1: flux(CAI.fh.mg1, 0x2ee86a, 14), fhMg2: flux(CAI.fh.mg2r, 0x3aa0ff), phEl: flux(CAI.phev.el, 0x3aa0ff, 30), phPr: flux(CAI.phev.priza, 0x2ee86a, 30), phMg: flux(CAI.phev.p2r, 0x3aa0ff) };
+    fhEl: flux(CAI.fh.el, 0x3aa0ff, 34), fhMg1: flux(CAI.fh.mg1, 0x2ee86a, 14), fhMg2: flux(CAI.fh.mg2r, 0x3aa0ff), phEl: flux(CAI.phev.el, 0x3aa0ff, 30), phPr: flux(CAI.phev.priza, 0x2ee86a, 30), phMg: flux(CAI.phev.p2r, 0x3aa0ff),
+    bvEl: flux(CAI.bev.el, 0x3aa0ff, 34), bvPr: flux(CAI.bev.priza, 0x2ee86a, 30), bvR: flux(CAI.bev.roti, 0x3aa0ff) };
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), s1 = V(1, 1, 1), s0 = V(0, 0, 0);
   function animFluxuri(dt) { fluxuri.forEach(f => { const on = Math.abs(f.v) > 1e-3; f.im.visible = on; if (!on) return; f.s.forEach((s, k) => { let sN = (s + f.v * dt / f.L) % 1; if (sN < 0) sN += 1; f.s[k] = sN; m4.compose(f.crv.getPointAt(sN), q0, s1); f.im.setMatrixAt(k, m4); }); f.im.instanceMatrix.needsUpdate = true; }); }
   const seteazaFlux = (lista, v, inv) => lista.forEach(f => { f.v = inv ? -v : v; });
   /* ---------- regimurile de funcționare */
   const REG = { stop: "Staționare (semafor)", pornire: "Pornire de pe loc", acc: "Accelerare", croaziera: "Croazieră 70 km/h", franare: "Frânare (recuperare)", ev: "Mod electric (EV)", priza: "Încărcare la priză" };
-  const PERMIS = { ss: ["stop", "pornire", "acc", "croaziera", "franare"], mh: ["stop", "pornire", "acc", "croaziera", "franare"], fh: ["stop", "pornire", "acc", "croaziera", "franare", "ev"], phev: ["stop", "pornire", "acc", "croaziera", "franare", "ev", "priza"] };
+  const PERMIS = { ss: ["stop", "pornire", "acc", "croaziera", "franare"], mh: ["stop", "pornire", "acc", "croaziera", "franare"], fh: ["stop", "pornire", "acc", "croaziera", "franare", "ev"], phev: ["stop", "pornire", "acc", "croaziera", "franare", "ev", "priza"], bev: ["stop", "pornire", "acc", "croaziera", "franare", "priza"] };
   const stareRef = { tip: optiuni.tip || "mh" };
   const html = `
     <div class="v3d-grup">${optiuni.tipuri ? `<span class="v3d-et">Autoturismul</span>${optiuni.tipuri.map(k => `<button type="button" data-tipb="${k}">${TIPURI_HIBRID[k]}</button>`).join("")}`
-      : `<label>Motopropulsorul <select data-h="tip">${Object.entries(TIPURI_HIBRID).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>`}
+      : `<label>Motopropulsorul <select data-h="tip">${Object.entries(TIPURI_HIBRID).filter(([k]) => k !== "bev").map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>`}
       <label><input type="checkbox" data-h="tr"> Carcase transparente (motor, cutie, mașini electrice, baterii)</label></div>
     <div class="v3d-grup">${Object.entries(REG).map(([k, t]) => `<button type="button" data-reg="${k}">${t}</button>`).join("")}<button type="button" class="primar" data-h="ciclu">Ciclu urban automat</button></div>
     ${optiuni.masurare ? `<div class="v3d-grup"><span class="v3d-et">Măsurare (data logger pe cablul bateriei)</span><button type="button" data-ev="rep">Oprire → repornire</button><button type="button" data-ev="rec">Frânare recuperativă</button></div>` : ""}`;
   const stare = { tip: stareRef.tip, reg: "stop", rT: "stop", v: 0, rpm: 0, rpmT: 0, soc: 0.62, Pel: 0, PelT: 0, tReg: 0, ciclu: false, tc: 0, tr: false, mas: null, log: [] };
-  let cmdEl = null;
+  let cmdEl = null, iceSist = null, stUlt = null;
   function aplicaTip(st) {
-    stareRef.tip = st.tip; Object.entries(G).forEach(([k, g]) => { g.mot.visible = g.car.visible = k === st.tip; });
+    stUlt = st; stareRef.tip = st.tip; mot.grup.visible = st.tip !== "bev"; if (iceSist) iceSist.visible = st.tip !== "bev"; Object.entries(G).forEach(([k, g]) => { g.mot.visible = g.car.visible = k === st.tip; });
     if (alternator) alternator.visible = st.tip === "ss" || st.tip === "phev";
     if (demarorSimplu) demarorSimplu.visible = false;
     cutieDCT.forEach(o => o.visible = st.tip !== "fh");
     if (!PERMIS[st.tip].includes(st.reg)) st.reg = "stop";
     if (cmdEl) cmdEl.querySelectorAll("[data-reg]").forEach(b => { b.disabled = !PERMIS[st.tip].includes(b.dataset.reg); });
-    st.soc = { ss: 0.8, mh: 0.6, fh: 0.58, phev: 0.85 }[st.tip];
+    st.soc = { ss: 0.8, mh: 0.6, fh: 0.58, phev: 0.85, bev: 0.8 }[st.tip];
   }
   function aplicaTr(st) { mot.modCarcasa(st.tr ? "transparent" : "opac"); carcase.forEach(o => { const m = o.material; if (!o.userData.m0h) o.userData.m0h = { t: m.transparent, op: m.opacity }; m.transparent = st.tr || o.userData.m0h.t; m.opacity = st.tr ? 0.18 : o.userData.m0h.op; m.depthWrite = !st.tr; m.needsUpdate = true; }); }
   function leaga(cmd, st) {
@@ -1675,17 +1722,17 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
       if (m.ev === "rep") { if (m.t < 1.5) st.reg = "stop"; else if (m.t < 2.5) st.reg = "pornire"; else if (m.t < 7) st.reg = "acc"; else { m.gata = true; const d = DATE[st.tip] || {}; m.val = { Erep: d.Erep, Uinc: d.Uinc, Iinc: d.Iinc, Un: d.Un, Cn: d.Cn, dsoc: d.dsoc }; optiuni.laMasurare && optiuni.laMasurare({ tip: st.tip, ev: "rep", ...m.val }); st.reg = "croaziera"; } }
       else { if (m.t < 0.8) st.reg = "croaziera"; else if (m.t < 4) st.reg = "franare"; else { m.gata = true; const d = DATE[st.tip] || {}; m.val = { Prec: d.Prec }; optiuni.laMasurare && optiuni.laMasurare({ tip: st.tip, ev: "rec", ...m.val }); st.reg = "stop"; } } }
     st.tReg += dt;
-    const r = st.reg, tip = st.tip, ice = { ss: r !== "stop", mh: r !== "stop" && r !== "franare", fh: r === "acc" || r === "croaziera", phev: r === "acc" || r === "croaziera" }[tip] && r !== "ev" && r !== "priza";
+    const r = st.reg, tip = st.tip, ice = { ss: r !== "stop", mh: r !== "stop" && r !== "franare", fh: r === "acc" || r === "croaziera", phev: r === "acc" || r === "croaziera", bev: false }[tip] && r !== "ev" && r !== "priza";
     const vT = { stop: 0, pornire: 15, acc: 55, croaziera: 70, franare: 0, ev: 35, priza: 0 }[r] / 3.6, acc = r === "franare" ? -2.4 : r === "acc" || r === "pornire" || r === "ev" ? 1.6 : 0.8;
     st.v += Math.max(-Math.abs(acc) * dt, Math.min(Math.abs(acc) * dt, vT - st.v)); if (r === "franare" && st.v < 0.3) st.v = 0;
     st.rpmT = ice ? (r === "acc" ? 2600 : r === "croaziera" ? 1800 : r === "pornire" ? 1400 : 900) : 0; st.rpm += (st.rpmT - st.rpm) * Math.min(1, dt / (st.rpmT > st.rpm ? 0.35 : 0.5));
     // puterea electrică a bateriei de tracțiune / 48 V (+ descărcare, − încărcare) [kW]
-    const Pmax = { ss: 1.5, mh: 12, fh: 27, phev: 85 }[tip];
-    st.PelT = { stop: tip === "ss" ? 0.4 : 0.6, pornire: tip === "ss" ? 3.5 : tip === "mh" ? 6 : 15, acc: tip === "ss" ? -0.6 : 0.6 * Pmax, croaziera: tip === "ss" ? -0.4 : tip === "mh" ? -0.5 : -2, franare: tip === "ss" ? -1.5 : -0.8 * Pmax, ev: 0.35 * Pmax, priza: -7.2 }[r];
+    const Pmax = { ss: 1.5, mh: 12, fh: 27, phev: 85, bev: 150 }[tip];
+    st.PelT = { stop: tip === "ss" ? 0.4 : 0.6, pornire: tip === "ss" ? 3.5 : tip === "mh" ? 6 : tip === "bev" ? 30 : 15, acc: tip === "ss" ? -0.6 : 0.6 * Pmax, croaziera: tip === "ss" ? -0.4 : tip === "mh" ? -0.5 : tip === "bev" ? 11 : -2, franare: tip === "ss" ? -1.5 : tip === "bev" ? -60 : -0.8 * Pmax, ev: 0.35 * Pmax, priza: tip === "bev" ? -11 : -7.2 }[r];
     if (r === "pornire" && tip === "ss" && st.tReg > 0.9) st.PelT = -0.6;
     st.Pel += (st.PelT - st.Pel) * Math.min(1, dt / 0.3);
     { const f = Math.min(1, Math.abs(st.Pel) / Pmax), k = Math.min(1, dt / 3); TE.bat += (25 + 22 * f + (r === "priza" ? 8 : 0) - TE.bat) * k; TE.inv += (30 + 55 * f - TE.inv) * k; TE.mot += (32 + 85 * f - TE.mot) * k; TE.obc += ((r === "priza" ? 62 : 25) - TE.obc) * k; }
-    const cap = { ss: 0.8, mh: 0.5, fh: 1.3, phev: 13 }[tip] * 3600; st.soc = Math.max(0.15, Math.min(0.97, st.soc - st.Pel * dt * 4 / cap));
+    const cap = { ss: 0.8, mh: 0.5, fh: 1.3, phev: 13, bev: 64 }[tip] * 3600; st.soc = Math.max(0.15, Math.min(0.97, st.soc - st.Pel * dt * 4 / cap));
     // animațiile: roțile, motorul, mașinile electrice, fluxurile
     roti.forEach(rr => { rr.rot.rotation.z -= st.v / CAR.Rroata * dt; });
     mot.actualizeaza({ rpm: st.rpm, tps: r === "acc" ? 40 : 10, tEv: st.rpm > 0 ? 380 : 60 }, dt);
@@ -1700,20 +1747,24 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     if (tip === "mh" && regen) seteazaFlux(F.mec, kmec, true);
     seteazaFlux(F.fhEl, tip === "fh" ? (regen ? 1.0 : ev || r === "acc" ? 1.0 : 0) : 0, tip === "fh" && regen); seteazaFlux(F.fhMg1, tip === "fh" && ice ? 0.7 : 0); seteazaFlux(F.fhMg2, tip === "fh" && st.v > 0.2 && (ev || r === "acc" || regen) ? kmec : 0, tip === "fh" && regen);
     seteazaFlux(F.phEl, tip === "phev" ? (regen ? 1.0 : ev || r === "acc" ? 1.0 : 0) : 0, tip === "phev" && regen); seteazaFlux(F.phPr, tip === "phev" && r === "priza" ? 0.8 : 0); seteazaFlux(F.phMg, tip === "phev" && st.v > 0.2 && (ev || regen || r === "acc") ? kmec : 0, tip === "phev" && regen);
+    if (G.bev.rot) G.bev.rot.rotation.y -= st.v / CAR.Rroata * 9 * dt * 0.5;
+    seteazaFlux(F.bvEl, tip === "bev" && (regen || r === "pornire" || r === "acc" || r === "croaziera") ? 1.0 : 0, tip === "bev" && regen); seteazaFlux(F.bvPr, tip === "bev" && r === "priza" ? 0.8 : 0);
+    seteazaFlux(F.bvR, tip === "bev" && st.v > 0.2 ? kmec : 0, tip === "bev" && regen);
     animFluxuri(dt);
     st.ice = ice;
   }
   const f = (v, n = 1) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n).replace(".", ",");
   function hud(st) {
     const d = DATE[st.tip] || {}, m = st.mas;
-    const Ubat = { ss: 12.6, mh: 48, fh: 201.6, phev: 350 }[st.tip];
+    const Ubat = { ss: 12.6, mh: 48, fh: 201.6, phev: 350, bev: 400 }[st.tip];
     return `<div><b>${TIPURI_HIBRID[st.tip]}</b></div>
       <div>regim: <b>${REG[st.reg]}</b> · <b>${f(st.v * 3.6, 0)}</b> km/h</div>
-      <div>motor termic: <b>${st.rpm > 50 ? f(st.rpm, 0) + " rot/min" : "OPRIT"}</b></div>
+      <div>${st.tip === "bev" ? `motor electric: <b>${f(st.v / CAR.Rroata * 9 * 60 / (2 * Math.PI), 0)} rot/min</b> (reductor i = 9)` : `motor termic: <b>${st.rpm > 50 ? f(st.rpm, 0) + " rot/min" : "OPRIT"}</b>`}</div>
       <div>${st.tip === "ss" ? "bateria 12 V" : st.tip === "mh" ? "bateria 48 V" : "bateria HV"} (${Ubat} V): <b>${st.Pel >= 0 ? "descărcare " : "încărcare "}${f(Math.abs(st.Pel), 1)} kW</b> · SOC <b>${f(st.soc * 100, 0)} %</b></div>
       ${optiuni.masurare && m ? `<div class="v3d-mas">data logger: ${m.gata ? (m.ev === "rep" ? (st.tip === "ss" ? "repornirea cu demarorul – energia se măsoară pe standul de pornire (Tabelul 7.2)" : `E<sub>rep</sub> = <b>${d.Erep} J</b> · după 10 s: U<sub>înc</sub> = <b>${d.Uinc} V</b>, I<sub>înc</sub> = <b>${d.Iinc} A</b>`) : (st.tip === "ss" ? "start-stop fără mașină electrică: recuperarea se face cu alternatorul (P<sub>BSG</sub> din scenariu)" : `P<sub>rec</sub> max = <b>${d.Prec} kW</b>`)) : "înregistrare…"}</div>` : ""}`;
   }
-  return { motor: mot, etichete: et, html, leaga, pas, hud, stare,
+  function laSisteme(gs) { iceSist = gs.getObjectByName("ice"); if (stUlt) aplicaTip(stUlt); }
+  return { motor: mot, etichete: et, html, leaga, pas, hud, stare, laSisteme,
     camere: { motor: [[3.3, 1.6, 1.6], [1.75, 0.5, 0.0]], cutie: [[2.4, 1.2, -1.6], [1.75, 0.45, -0.45]], baterie: [[-2.8, 2.2, 2.4], [-0.6, 0.4, 0.0]], podea: [[1.5, -2.0, 2.0], [0.2, 0.2, 0.0]] },
     camereButoane: [["motor", "motopropulsorul"], ["cutie", "cutia / transmisia"], ["baterie", "bateriile"], ["podea", "de dedesubt"]],
     cameraInitiala: [[4.2, 2.3, 3.4], [0.8, 0.45, 0.0]] };
