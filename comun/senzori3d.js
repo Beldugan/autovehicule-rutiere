@@ -464,7 +464,7 @@ export function creeaza(gazda, optiuni = {}) {
 
   /* --- macheta autoturismului (sistemul „senzori” în modul catalog) */
   let v3d = null;
-  import("./vehicul3d.js?v=30").then(m => { v3d = m.creeaza($(".sz-masina"), { sistem: "senzori", catalog: true, laSelectare: k => { const x = C.dupaK[k]; if (x) alege(x.id, false); } }); })
+  import("./vehicul3d.js?v=31").then(m => { v3d = m.creeaza($(".sz-masina"), { sistem: "senzori", catalog: true, laSelectare: k => { const x = C.dupaK[k]; if (x) alege(x.id, false); } }); })
     .catch(e => { $(".sz-masina").innerHTML = `<p class="nota">Macheta nu a putut fi încărcată (${esc(e.message)}).</p>`; });
 
   alege(optiuni.initial || "ckp", false);

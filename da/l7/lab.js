@@ -444,10 +444,10 @@ Cadru.porneste({
   },
   exemplu(D) { const t = D.t; Object.assign(t.t72.tip, { v: "exemplu / 400 V" }); t.t72.energN.v = "50"; t.t72.energU.v = "41.5"; t.t72.umin.v = "3.641"; t.t72.umax.v = "3.726"; t.t73.e.vech = "6 / 90000"; t.t73.e.riso = "2.5"; },
   vehicul3d: {
-    titluTab: "Pe autovehicul (3D)", titlu: "Senzorii și rețelele autoturismului",
-    intro: `<p>Diagnoza pe bază de date folosește aceleași semnale pe care le citește testerul: corecțiile de amestec, presiunea din colector, tensiunea bateriei. Selectați senzorul MAP și urmăriți semnalul.</p>`,
-    dupa: `<p class="nota">Macheta este comună cu celelalte lucrări.</p>`,
-    optiuni: () => ({ sistem: "senzori", selInitial: "map" })
+    titluTab: "Pe autovehicul (3D)", titlu: "Autoturismele hibride: mild hybrid 48 V, full hybrid, plug-in hybrid",
+    intro: `<p>Comutați între cele trei arhitecturi și urmăriți componentele de înaltă (sau medie) tensiune: <b>mild hybrid 48 V</b> – alternatorul-demaror BSG pe cureaua motorului și bateria Li-ion 48 V cu convertorul DC/DC; <b>full hybrid</b> – transmisia e-CVT cu cele două mașini electrice MG1 și MG2, invertorul și bateria HV; <b>plug-in hybrid</b> – mașina electrică P2 în cutia de viteze, bateria HV de capacitate mare și încărcătorul de bord cu priza de încărcare. Regimurile (pornire, accelerare, croazieră, frânare recuperativă) arată fluxurile de energie; „Carcase transparente” lasă să se vadă interiorul.</p>`,
+    dupa: `<p class="nota">Cablurile portocalii sunt circuitele HV: înainte de orice intervenție – deconectarea de serviciu, verificarea lipsei tensiunii și a izolației (fila Simulator).</p>`,
+    optiuni: () => ({ sistem: "hibrid", tip: "mh", tipuri: ["mh", "fh", "phev"] })
   },
   referat: {
     scop: "Cunoașterea arhitecturii HV a vehiculelor electrice și a regulilor de siguranță, citirea datelor BMS și evaluarea bateriei față de Euro 7, verificarea lipsei tensiunii și a izolației, detectarea anomaliilor cu scorul z într-un fișier de date OBD.",

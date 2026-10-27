@@ -1631,7 +1631,8 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   const PERMIS = { ss: ["stop", "pornire", "acc", "croaziera", "franare"], mh: ["stop", "pornire", "acc", "croaziera", "franare"], fh: ["stop", "pornire", "acc", "croaziera", "franare", "ev"], phev: ["stop", "pornire", "acc", "croaziera", "franare", "ev", "priza"] };
   const stareRef = { tip: optiuni.tip || "mh" };
   const html = `
-    <div class="v3d-grup"><label>Motopropulsorul <select data-h="tip">${Object.entries(TIPURI_HIBRID).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
+    <div class="v3d-grup">${optiuni.tipuri ? `<span class="v3d-et">Autoturismul</span>${optiuni.tipuri.map(k => `<button type="button" data-tipb="${k}">${TIPURI_HIBRID[k]}</button>`).join("")}`
+      : `<label>Motopropulsorul <select data-h="tip">${Object.entries(TIPURI_HIBRID).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>`}
       <label><input type="checkbox" data-h="tr"> Carcase transparente (motor, cutie, mașini electrice, baterii)</label></div>
     <div class="v3d-grup">${Object.entries(REG).map(([k, t]) => `<button type="button" data-reg="${k}">${t}</button>`).join("")}<button type="button" class="primar" data-h="ciclu">Ciclu urban automat</button></div>
     ${optiuni.masurare ? `<div class="v3d-grup"><span class="v3d-et">Măsurare (data logger pe cablul bateriei)</span><button type="button" data-ev="rep">Oprire → repornire</button><button type="button" data-ev="rec">Frânare recuperativă</button></div>` : ""}`;
@@ -1649,7 +1650,11 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   function aplicaTr(st) { mot.modCarcasa(st.tr ? "transparent" : "opac"); carcase.forEach(o => { const m = o.material; if (!o.userData.m0h) o.userData.m0h = { t: m.transparent, op: m.opacity }; m.transparent = st.tr || o.userData.m0h.t; m.opacity = st.tr ? 0.18 : o.userData.m0h.op; m.depthWrite = !st.tr; m.needsUpdate = true; }); }
   function leaga(cmd, st) {
     cmdEl = cmd;
-    const sel = cmd.querySelector('[data-h="tip"]'); sel.value = st.tip; sel.addEventListener("change", () => { st.tip = sel.value; st.ciclu = false; aplicaTip(st); optiuni.laTip && optiuni.laTip(st.tip); });
+    const sel = cmd.querySelector('[data-h="tip"]'), btip = cmd.querySelectorAll("[data-tipb]");
+    const marcheaza = () => btip.forEach(b => { const a = b.dataset.tipb === st.tip; b.classList.toggle("primar", a); b.setAttribute("aria-pressed", String(a)); });
+    const schimba = t => { st.tip = t; st.ciclu = false; aplicaTip(st); marcheaza(); optiuni.laTip && optiuni.laTip(st.tip); };
+    if (sel) { sel.value = st.tip; sel.addEventListener("change", () => schimba(sel.value)); }
+    btip.forEach(b => b.addEventListener("click", () => schimba(b.dataset.tipb))); marcheaza();
     cmd.querySelector('[data-h="tr"]').addEventListener("change", e => { st.tr = e.target.checked; aplicaTr(st); });
     cmd.querySelectorAll("[data-reg]").forEach(b => b.addEventListener("click", () => { st.ciclu = false; st.reg = b.dataset.reg; st.tReg = 0; }));
     cmd.querySelector('[data-h="ciclu"]').addEventListener("click", () => { st.ciclu = true; st.tc = 0; });
