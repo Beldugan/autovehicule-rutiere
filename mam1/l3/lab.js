@@ -215,7 +215,7 @@ function desenCablaj() {
     s += W([[TP.t5V[0], TP.t5V[1] + 12], [TP.t5V[0], 668], [HDR(3)[0] - 0.01, 668]], "#c62828", 1.5, 0.5) + W([[TP.tGND[0], TP.tGND[1] + 12], [TP.tGND[0], 662], [HDR(4)[0], 662]], "#222", 1.5, 0.5);
   }
   g.innerHTML = s;
-  x1.innerHTML = `<rect x="${xc}" y="${yc + 20}" width="22" height="64" rx="3" fill="#202326" stroke="#000"/><rect x="${sim.dec ? xc + 52 : xc + 24}" y="${yc + 22}" width="24" height="60" rx="3" fill="#33383e" stroke="#000"/><text x="${xc + 30}" y="${yc + 98}" font-size="10" text-anchor="middle" fill="#333" font-weight="700">X1 ${sim.dec ? "decuplat" : "cuplat"}</text>`;
+  x1.innerHTML = `<rect x="${xc - 4}" y="${yc + 14}" width="88" height="86" fill="transparent"/><rect x="${xc}" y="${yc + 20}" width="22" height="64" rx="3" fill="#202326" stroke="#000"/><rect x="${sim.dec ? xc + 52 : xc + 24}" y="${yc + 22}" width="24" height="60" rx="3" fill="#33383e" stroke="#000"/><text x="${xc + 30}" y="${yc + 98}" font-size="10" text-anchor="middle" fill="#333" font-weight="700">X1 ${sim.dec ? "decuplat" : "cuplat"}</text>`;
 }
 const SONDE = [{ id: "dmmR", x0: 632, y0: 349, cul: "#d32f2f", et: "+" }, { id: "dmmB", x0: 530, y0: 349, cul: "#222", et: "−" }];
 const LOC_SONDE = { dmmR: [700, 410], dmmB: [455, 410] };
@@ -351,8 +351,10 @@ function inspector(k) {
   el.innerHTML = `<div class="tk-insp-t">${t}<button type="button" aria-label="Închide">✕</button></div>${r.map(([a, b]) => `<div class="tk-insp-r"><span>${a}</span><b>${b}</b></div>`).join("")}`;
   el.hidden = false; el.querySelector("button").addEventListener("click", () => { el.hidden = true; });
 }
+const cablajOk = () => !!sim.as && [1, 2, 3, 4, 5, 6].every(p => sim.as[p] === MD.CORECT[p]);
 function avertizari() {
   const av = [];
+  if (sim.run && sim.as && !cablajOk() && sim.pr && sim.pr.fault && !["s1", "s2", "s3"].some(k => sim.f[k])) av.push("defect fără niciun comutator închis: cablajul (identificarea pinilor) pare greșit");
   if (sim.run && sim.as) { const c = circ(); if (Object.values(sim.as).filter(v => v === "A0").length !== 1 || Object.values(sim.as).filter(v => v === "A1").length !== 1) av.push("cablaj neobișnuit: verificați identificarea pinilor"); if (c.A0 > 4.9 || c.A1 > 4.9) av.push("intrare la 5 V"); }
   $("#tk-av").textContent = av.length ? "⚠ " + av.join(" · ") : "";
 }
@@ -398,8 +400,13 @@ function inregIdent(e) {
   const id = {}; for (let p = 1; p <= 6; p++) { const v = $(`#id-p${p}`).value; if (!v) return Cadru.mesajTemporar(`Alegeți funcția pinului ${p}.`, "atentie"); id[p] = v; }
   const ok = Cadru.inregistreaza(e, { log: { m: "ident", id }, celule: [1, 2, 3, 4, 5, 6].map(p => ({ t: "t30", r: "p" + p, c: "fn", v: id[p] })) });
   if (!ok) return;
-  sim.ident = id; sim.as = MD.cablaj(id); sim.dec = true; desenCablaj();
-  msg("Tabelul 3.0 completat; cablajul s-a montat conform identificării (5 V și GND ale plăcii, semnalul pistei 1 spre A0 prin S2, al pistei 2 spre A1 prin S1/S3). Cuplați X1.");
+  const vechi = sim.as, nou = MD.cablaj(id);
+  if (vechi && JSON.stringify(vechi) !== JSON.stringify(nou)) {   // cablajul s-a schimbat: măsurătorile făcute cu vechiul cablaj nu mai sunt valabile
+    ["t31", "t32", "t33"].forEach(t => Object.values(Cadru.D.t[t]).forEach(r => Object.keys(r).forEach(c => { r[c] = ""; })));
+    Cadru.salveaza(); Cadru.reconstruiesteTabele(); sim.p3 = { mn: 99, mx: -1 }; sim.p3ok = false; sim.testRez = null;
+  }
+  sim.ident = id; sim.as = nou; sim.dec = true; desenCablaj();
+  msg((vechi && JSON.stringify(vechi) !== JSON.stringify(nou) ? "Cablajul a fost refăcut; valorile din Tabelele 3.1–3.3 măsurate cu cablajul anterior au fost șterse și se măsoară din nou. " : "") + "Tabelul 3.0 completat; cablajul s-a montat conform identificării (5 V și GND ale plăcii, semnalul pistei 1 spre A0 prin S2, al pistei 2 spre A1 prin S1/S3). Cuplați X1 și treceți la pasul 2.");
 }
 function gridS() { for (const s of MD.POZ) if (Math.abs(sim.teta - s * 0.6) < 1e-6) return s; return null; }
 function inregU(e) {
@@ -460,7 +467,7 @@ const PASI = [
     instr: [`Cu simularea pornită rulează programul <i>pedala_app</i> cu EPS = 0,20 V și NCONF = 5 (valorile se pot schimba în cod doar cu simularea oprită).`, `Apăsați <b>„↔ Acționează pârghia (10 s)”</b> sau trageți pârghia pe toată cursa 0 → 60°.`, `Urmăriți pe OLED U1, U2, ΔU, cursa calculată s și starea; pe monitorul serial – mesajele programului.`, `Comparați U1 de pe OLED cu U1 măsurat cu multimetrul: diferența provine din referința ADC (5 V al plăcii).`],
     ctl: () => `<div class="rand-mic"><button type="button" data-auto="1">↔ Acționează pârghia (10 s)</button></div>`,
     ver: () => [[sim.run && sim.fw && sim.fw.eps === 0.2 && sim.fw.n === 5, "rulează programul cu EPS = 0,20 V, NCONF = 5"], [sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5, "cursa completă parcursă"], [!(sim.pr && sim.pr.fault), "fără defect confirmat"]],
-    prog: () => (sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5 ? 1 : 0) + (sim.run && sim.fw && sim.fw.eps === 0.2 ? 1 : 0), tot: 2,
+    prog: () => { if (sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5 && sim.run && sim.fw && sim.fw.eps === 0.2 && sim.fw.n === 5) sim.p3ok = true; return sim.p3ok ? 2 : (sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5 ? 1 : 0) + (sim.run && sim.fw && sim.fw.eps === 0.2 ? 1 : 0); }, tot: 2,
     butoane: [] },
   { t: "Defectele simulate", tab: "Tabelul 3.2", zona: [440, 0, 860, 700], pini: [],
     banda: `Pasul 4 · Pârghia la ${MD.S_DEF * 0.6}° (s = ${MD.S_DEF} %). RESET, apoi închideți un singur comutator S1, S2 sau S3. Monitorul serial afișează t_conf; OLED-ul și lampa EPC – reacția.`,
@@ -492,9 +499,16 @@ function giCfg(eps, n) {   // programul trebuie să ruleze cu (EPS; NCONF) dat
     ...giX1Cuplat(), [giS, "Apăsați <b>▶ Pornește simularea</b>", ok]];
 }
 function giFaraDefecte(pastreaza) { return ["s1", "s2", "s3"].filter(k => sim.f[k] && k !== pastreaza).map(k => [`#sw-${k}`, `Deschideți comutatorul <b>${k.toUpperCase()}</b> (clic)`, false]); }
+const GI_REGULA = "semnalul unei piste = borna a cărei rezistență se schimbă cu pârghia; cu pârghia la 0° cursorul este lângă masă (R cursor–masă mică); pista 2 are rezistența totală ≈ dublă";
+const giSelOk = () => { const id = {}; [1, 2, 3, 4, 5, 6].forEach(p => { id[p] = ($(`#id-p${p}`) || {}).value || sim.ident[p] || ""; }); const c = MD.cablaj(id); return [1, 2, 3, 4, 5, 6].every(p => c[p] === MD.CORECT[p]); };
+const giCablaj = () => sim.as && sim.run && !cablajOk() && (sim.giCabVazut = true) ? [['#pasi [data-pas="0"] .pas-cap', "Cablajul nu corespunde senzorului (U1 trebuie să crească ≈ 0,75 → 4,25 V cu pârghia, iar U2 ≈ U1/2; programul semnalează defect fără comutator închis). Reveniți la <b>pasul 1</b> și corectați identificarea pinilor", false]] : [];
 const GI_PER = [[1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [2, 3], [2, 4], [2, 5], [2, 6], [3, 4], [3, 5], [3, 6], [4, 5], [4, 6], [5, 6]];
 PASI[0].ind = () => {
   const L = (Cadru.D.log || []).filter(l => l.m === "ohm"), are = (a, b) => L.some(l => (l.a === a && l.b === b) || (l.a === b && l.b === a));
+  if (sim.as && !cablajOk() && sim.giCabVazut) return [[giS, "Opriți simularea (cablajul se reface fără alimentare)", !sim.run],
+    ["#x1", "Dați clic pe <b>X1</b> pentru a-l <b>decupla</b>", sim.dec],
+    ["#id-p1", `Corectați funcțiile pinilor în Comenzi rapide (cel puțin una este greșită): ${GI_REGULA}`, giSelOk()],
+    [giR(1), "Apăsați <b>„● Trece în Tabelul 3.0 și montează cablajul”</b> (valorile măsurate cu vechiul cablaj se șterg)", cablajOk()]];
   const o = [[giS, "Opriți simularea – rezistențele se măsoară fără alimentare", !sim.run],
     ["#x1", sim.dec ? "X1 este deja <b>decuplat</b> – lăsați-l așa" : "Dați clic pe <b>X1</b> pentru a-l <b>decupla</b>", sim.dec],
     [giDmm("R"), "Rotiți comutatorul multimetrului pe <b>Ω</b> (clic pe „Ω”)", sim.dmm.mod === "R"]];
@@ -514,7 +528,7 @@ PASI[0].ind = () => {
   return o;
 };
 PASI[1].ind = () => {
-  const o = [...giX1Cuplat(), [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ...giFaraDefecte(),
+  const o = [...giCablaj(), ...giX1Cuplat(), [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ...giFaraDefecte(),
     [giDmm("V"), "Comutatorul multimetrului pe <b>V⎓</b>", sim.dmm.mod === "V"],
     [[giSd("dmmB"), giP("tGND")], "Trageți sonda <b>−</b> (neagră) pe <b>TP GND</b>", ["tGND", "p3", "p5"].includes(sim.dmm.s.dmmB)]];
   let urm = null; for (const s of MD.POZ) { for (const c of ["U1", "U2"]) if (!pe("t31", "s" + s, c)) { urm = [s, c]; break; } if (urm) break; }
@@ -526,14 +540,14 @@ PASI[1].ind = () => {
 };
 PASI[2].ind = () => {
   const full = sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5;
-  return [...giCfg(0.2, 5), [giA("[data-auto]"), "Apăsați <b>„↔ Acționează pârghia (10 s)”</b> (sau trageți pârghia 0 → 60°)", full],
+  return [...giCablaj(), ...giCfg(0.2, 5), [giA("[data-auto]"), "Apăsați <b>„↔ Acționează pârghia (10 s)”</b> (sau trageți pârghia 0 → 60°)", full],
     ["#tk-svg [data-comp=\"oled\"]", "Urmăriți pe OLED U1, U2, ΔU, s și starea; comparați U1 cu multimetrul", full]];
 };
 PASI[3].ind = () => {
   const k = ["d1", "d2", "d3"].find(r => !pe("t32", r, "U1")); if (!k) return [[giR(0), "Toate cele 3 defecte sunt în tabel", true]];
   const sw = { d1: "s1", d2: "s2", d3: "s3" }[k], x = sim.exp && sim.exp.k === sw ? sim.exp : null, t = MD.S_DEF * 0.6;
   const fault = !!(sim.pr && sim.pr.fault) && !x;
-  return [...giCfg(0.2, 5), ...giFaraDefecte(x ? sw : null),
+  return [...giCablaj(), ...giCfg(0.2, 5), ...giFaraDefecte(x ? sw : null),
     [giA(`[data-teta="${t}"]`), `Pârghia la <b>${t}°</b>`, !!x || Math.abs(sim.teta - t) < 1e-6],
     [giA("[data-rst]"), "Lampa EPC este aprinsă: apăsați <b>RESET placă</b>", !fault],
     [`#sw-${sw}`, `Dați clic pe comutatorul <b>${sw.toUpperCase()}</b> (închis)`, !!x],
@@ -544,9 +558,11 @@ PASI[4].ind = () => {
   const k = Object.keys(MD.CONFIG).find(c => !pe("t33", c, "inv")); if (!k) return [[giR(0), "Toate cele 3 configurații sunt în tabel", true]];
   const C = MD.CONFIG[k], fw = sim.fw || {}, T = sim.testRez, Tok = !!(T && T.eps === fw.eps && T.n === fw.n && T.dist >= 100 && fw.eps === C.eps && fw.n === C.n);
   const x = sim.exp && sim.exp.k === "s3" && sim.exp.eps === C.eps && sim.exp.n === C.n ? sim.exp : null, t = MD.S_DEF * 0.6, fault = !!(sim.pr && sim.pr.fault) && !x;
-  return [...giCfg(C.eps, C.n), ...giFaraDefecte(x ? "s3" : null),
-    [giA("[data-ser]"), "Apăsați <b>„Trimite „t” (test 10 s)”</b>", Tok || !!(sim.pr && sim.pr.test)],
-    [giA("[data-auto]"), "Imediat apăsați <b>„↔ Acționează pârghia (10 s)”</b> și așteptați rezultatul testului", Tok],
+  const test = !!(sim.pr && sim.pr.test);
+  return [...giCablaj(), ...giCfg(C.eps, C.n), ...giFaraDefecte(x ? "s3" : null),
+    [giA("[data-ser]"), "Apăsați <b>„Trimite „t” (test 10 s)”</b>", Tok || test],
+    [giA("[data-auto]"), "Imediat apăsați <b>„↔ Acționează pârghia (10 s)”</b>", Tok || sim.auto > 0 || (test && sim.pr.test.dist >= 100)],
+    ["#tk-serial", `Așteptați rezultatul testului pe monitorul serial${test ? ` (${fx(Math.max(0, 10 - (sim.pr.tN - sim.pr.test.t0)), 0)} s)` : ""}`, Tok],
     [giA(`[data-teta="${t}"]`), `Pârghia la <b>${t}°</b>`, !!x || (Tok && Math.abs(sim.teta - t) < 1e-6)],
     [giA("[data-rst]"), "Apăsați <b>RESET placă</b> (lampa EPC aprinsă)", !!x || (Tok && !fault)],
     ["#sw-s3", "Dați clic pe <b>S3</b> (deriva de 2,2 kΩ)", !!x],
@@ -876,7 +892,7 @@ Cadru.porneste({
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       C.mesaj("Pasul 1: cu alimentarea oprită și X1 decuplat, identificați pinii senzorului cu ohmmetrul.", "");
     },
-    reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.serial = []; },
+    reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.p1ok = false; sim.p3ok = false; sim.giCabVazut = false; sim.serial = []; },
     cadru(dt, C, vizibil) {
       const acum = performance.now(), h = Math.min(dt || 0.016, 0.1);
       if (sim.auto > 0) { sim.tAuto = (sim.tAuto || 0) + h; sim.auto -= h; seteazaTeta(Math.round((30 - 30 * Math.cos(2 * Math.PI * 0.5 * sim.tAuto)) * 10) / 10); if (sim.auto <= 0) { sim.auto = 0; seteazaTeta(Math.round(sim.teta * 2) / 2); } }

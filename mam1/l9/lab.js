@@ -175,7 +175,7 @@ function planseSVG() {
     <g data-k="psu" class="tk-comp" filter="url(#umbra)"><rect x="400" y="176" width="170" height="104" rx="10" fill="#e1e3e5" stroke="#999"/><rect x="414" y="190" width="92" height="36" rx="3" fill="#0f1a12"/><text id="psu9" x="500" y="216" font-size="20" text-anchor="end" fill="#7dff8a" font-family="ui-monospace,monospace">00.0V</text>
       <circle id="psuLed9" cx="530" cy="206" r="7" fill="#333"/><text x="530" y="230" font-size="8" text-anchor="middle" fill="#333">12 V ON</text><circle cx="430" cy="258" r="8" fill="#d32f2f"/><circle cx="470" cy="258" r="8" fill="#111"/><text x="485" y="272" font-size="9" fill="#444">Sursă 12 V / 5 A</text></g>
     <g data-k="sig" class="tk-comp" filter="url(#umbra)"><rect x="520" y="40" width="70" height="30" rx="4" fill="#37474f"/><rect x="532" y="48" width="46" height="14" rx="7" fill="#eceff1" stroke="#999"/><text x="555" y="86" font-size="9" text-anchor="middle" fill="#333">siguranță 5 A</text></g>
-    <g data-k="tvs" class="tk-comp"><rect x="590" y="140" width="22" height="12" rx="2" id="tvs9" fill="#ddd" stroke="#888" stroke-dasharray="3 2"/><text x="601" y="166" font-size="8" text-anchor="middle" fill="#555" id="tvs9t">TVS lipsă</text></g>`;
+    <g data-k="tvs" class="tk-comp"><rect x="582" y="134" width="38" height="38" fill="transparent"/><rect x="590" y="140" width="22" height="12" rx="2" id="tvs9" fill="#ddd" stroke="#888" stroke-dasharray="3 2"/><text x="601" y="166" font-size="8" text-anchor="middle" fill="#555" id="tvs9t">TVS lipsă</text></g>`;
   /* ---- puntea BTS7960 cu radiator */
   s += `<g data-k="bts" class="tk-comp" filter="url(#umbra)"><rect x="620" y="30" width="230" height="150" rx="6" fill="#c62828" stroke="#7f1010"/>${Array.from({ length: 12 }, (_, i) => `<rect x="${650 + i * 14}" y="40" width="9" height="80" rx="2" fill="#b0b6bc" stroke="#7c848c"/>`).join("")}
     <rect x="645" y="38" width="175" height="10" fill="#9aa2aa"/><text x="735" y="140" font-size="12" text-anchor="middle" fill="#fff" font-weight="800">BTS7960 · 43 A</text><text id="rad9" x="735" y="156" font-size="9" text-anchor="middle" fill="#ffd8d8"></text>
@@ -412,7 +412,7 @@ const PASI = [
       "Apăsați <b>▶ Pornește simularea</b>: placa Mega (USB) alimentează senzorii clapetei la 5 V; programul pornește în buclă deschisă cu DC = 0 %."],
     ctl: () => "",
     ver: () => [[sim.capac, "capacul montat"], [sim.tvs, "dioda TVS montată"], [sim.estopVerif && !sim.estop, "oprirea de urgență verificată și eliberată"], [sim.run, "programul rulează"]],
-    prog: () => [sim.capac, sim.tvs, sim.estopVerif && !sim.estop, sim.run].filter(Boolean).length, tot: 4, butoane: [] },
+    prog: () => { const v = [sim.capac, sim.tvs, sim.estopVerif && !sim.estop, sim.run].filter(Boolean).length; if (v === 4) sim.p1ok = true; return sim.p1ok ? 4 : v; }, tot: 4, butoane: [] },
   { t: "Senzorii clapetei", tab: "Tabelul 9.1", v3: "clapeta",
     banda: "Pasul 2 · Fără 12 V, clapeta rotită cu mâna: tensiunile celor două piste (U1 crește, U2 scade, U1 + U2 ≈ 5 V) pe multimetru.",
     instr: ["Linia de 12 V oprită; programul pornit (senzorii la 5 V).",
@@ -492,9 +492,9 @@ PASI[1].ind = () => {
   const o = [giAlim(false), [giS, "Apăsați <b>▶ Pornește simularea</b> (senzorii la 5 V)", sim.run]];
   const p = MD.POZ.find(x => !(pe("t91", "p" + x, "u1") && pe("t91", "p" + x, "u2")));
   if (p === undefined) return [...o, ...giElib()];
-  const c = pe("t91", "p" + p, "u1") ? "U2" : "U1", et = p === 0 ? "închisă" : p === 100 ? "deschisă" : p + " %";
+  const ret = sim._senz && sim._senz[p] && Number.isFinite(sim._senz[p].u1), c = ret ? "U2" : "U1", et = p === 0 ? "închisă" : p === 100 ? "deschisă" : p + " %";
   return [...o, [[giA(`[data-ma2="${p}"]`), giPm(`[data-ma="${p}"]`)], `Rotire manuală: <b>${et}</b>`, sim.mana === p && Math.abs(sim.st.th - p) <= 0.05], giMm(c),
-    [giR(0), `Apăsați <b>„● U → Tabelul 9.1”</b> (${et}, ${c})`, false]];
+    [giR(0), `Apăsați <b>„● U → Tabelul 9.1”</b> (${et}, ${c}${ret ? " – U1 este reținut, acum U2" : ""})`, false]];
 };
 PASI[2].ind = () => {
   const m = sim.osc.acq && sim.osc.acq.m, o = [...giElib(), [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run]];
@@ -516,7 +516,8 @@ PASI[4].ind = () => {
   if (!C) return [[giR(0), "Tabelul 9.3 este complet (PID: Mp < 10 %, ts < 300 ms)", true]];
   const [k, ki, kd] = C, f = sim.fw || {}, ok = sim.run && f.mod === "PID" && f.kp === 4 && f.ki === +ki && f.kd === +kd, r = ok && sim.pr && sim.pr.rez.t;
   return [...giElib(), ...giCfg({ MOD: "PID", KP: "4", KI: ki, KD: kd }, ok), ...giMotor(true), giAlim(true),
-    [[giA("[data-tr2]"), giPm("[data-tr]")], "Apăsați <b>⤴ Treapta 0 → 40 %</b> și așteptați rezultatul (1,6 s)", !!(r && r.kp === 4 && r.ki === +ki && r.kd === +kd)],
+    [[giA("[data-tr2]"), giPm("[data-tr]")], "Apăsați <b>⤴ Treapta 0 → 40 %</b>", !!(ok && sim.pr && sim.pr.step) || !!(r && r.kp === 4 && r.ki === +ki && r.kd === +kd)],
+    ["#tk-serial", "Așteptați rezultatul treptei pe monitorul serial (1,6 s)", !!(r && r.kp === 4 && r.ki === +ki && r.kd === +kd)],
     [giR(0), `Apăsați <b>„● Răspunsul → Tabelul 9.3”</b> (${k.toUpperCase()})`, false]];
 };
 PASI[5].ind = () => {
@@ -909,7 +910,7 @@ Cadru.porneste({
       $$("#tk-svg [data-k]").forEach(g => g.addEventListener("click", e => { e.stopPropagation(); laClic3d(g.dataset.k); }));
       C.mesaj("Urmați pașii din chenarul „Desfășurarea lucrării – pas cu pas”; începeți cu pregătirea standului (NSSM).", "");
     },
-    reset() { if (sim.run && $("#tk-start")) opresteSim(); Object.assign(sim, { serial: [], ist: [], st: null, alim: false, estop: false, mana: null, defP2: false, pot: 0, viteza: 1, mm: "off", ir: null, crono: null, en: false, uCmd: 0, pwmOk: false, pwmVazut: false }); init(); },
+    reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.p1ok = false; sim.p3ok = false; sim.giCabVazut = false; Object.assign(sim, { serial: [], ist: [], st: null, alim: false, estop: false, mana: null, defP2: false, pot: 0, viteza: 1, mm: "off", ir: null, crono: null, en: false, uCmd: 0, pwmOk: false, pwmVazut: false }); init(); },
     cadru(dt, C, vizibil) {
       init(); const acum = performance.now(); let rest = Math.min(dt || 0.016, 0.1) * sim.viteza;
       while (rest > 1e-9) { const d = Math.min(DTF, rest); rest -= d; sim.tS += d; if (sim.run && sim.pr) { sim.pr.tAcc += d; while (sim.pr && sim.pr.tAcc >= TS) { sim.pr.tAcc -= TS; cicluProgram(); } } pasFizic(d); }

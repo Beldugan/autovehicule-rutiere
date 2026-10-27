@@ -321,7 +321,7 @@ function desenStativ() {
   let s = C("ntc", [X2.x - 6, X2.y + 10], "#2b2f35", 5) + C("lm", [664, 468], "#c62828", 1.4, -1.5) + C("lm", [671, 468], "#f9a825", 1.4) + C("lm", [678, 468], "#222", 1.4, 1.5);
   s += C("ds", [771, 468], "#1b1d20", 4) + C("tc", [738, 612], "#2e7d32", 1.6, -1) + C("tc", [755, 612], "#eee", 1.6, 1);
   $("#cabluri").innerHTML = s;
-  $("#x2").innerHTML = `<rect x="${X2.x + 16}" y="${X2.y}" width="22" height="22" rx="3" fill="#202326" stroke="#000"/><rect x="${sim.dec ? X2.x - 16 : X2.x - 6}" y="${X2.y + 1}" width="22" height="20" rx="3" fill="#4a5058" stroke="#000"/>
+  $("#x2").innerHTML = `<rect x="${X2.x - 24}" y="${X2.y - 18}" width="70" height="50" fill="transparent"/><rect x="${X2.x + 16}" y="${X2.y}" width="22" height="22" rx="3" fill="#202326" stroke="#000"/><rect x="${sim.dec ? X2.x - 16 : X2.x - 6}" y="${X2.y + 1}" width="22" height="20" rx="3" fill="#4a5058" stroke="#000"/>
     <path d="M${X2.x - 6},${X2.y + 11} L${X2.x - 20},${X2.y + 11}" stroke="#2b2f35" stroke-width="5"/><path d="M${TPX.n1[0]},${TPX.n1[1] - 7} L${TPX.n1[0]},${X2.y + 22} M${TPX.n2[0]},${TPX.n2[1] - 7} L${TPX.n2[0]},${X2.y + 26} L${X2.x + 2},${X2.y + 26}" stroke="#777" stroke-width="1.4" fill="none"/>
     <text x="${X2.x + 16}" y="${X2.y - 6}" font-size="9" text-anchor="middle" fill="#333" font-weight="700">X2 ${sim.dec ? "decuplat" : "cuplat"}</text>`;
   $("#abur").style.opacity = sim.poz === "apa" ? 0.45 : 1;
@@ -681,7 +681,12 @@ PASI[3].ind = () => {
   const r = sim.inreg, o = [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run]];
   if (!r || sim.rec) {
     if (String(sim.camp.res) !== "12" && !sim.rec) o.push([`#tk-cod [data-cf="res"]`, "Opriți simularea și setați în cod rezoluția DS18B20 = <b>12</b> biți", false]);
-    return [...o, giX2(true), ...(sim.rec ? [] : [[giA('[data-poz="pahar"]'), "Răciți senzorii: <b>Pahar</b> ≈ 1 min, apoi <b>↑ Aer</b>", sim.poz === "aer" && sim.tPoz >= 120 || stabil("aer")], ...giPoz("aer"), ...giStabil("aer")]),
+    if (sim.poz === "pahar" && sim.tPoz >= 60) sim.giRacit = true;
+    const st = stabil("aer"), rac = sim.giRacit || st;
+    return [...o, giX2(true), ...(sim.rec ? [] : [[giA("[data-man]"), "Puneți <b>🧤 Mănușile</b>", sim.manusi],
+      [giA('[data-poz="pahar"]'), "Răciți senzorii: apăsați <b>Pahar</b> (apă la temperatura camerei)", rac || sim.poz === "pahar"],
+      [giA('[data-vit="60"]'), `Lăsați-i ≈ 1 min în pahar (accelerați timpul ×60; acum ${fx(sim.poz === "pahar" ? sim.tPoz / 60 : 0, 1)} min)`, rac],
+      [giA('[data-poz="aer"]'), "Apăsați <b>↑ Aer</b> (stativul ridicat)", sim.poz === "aer"], ...giStabil("aer")]),
       [giA("[data-man]"), "Puneți <b>🧤 Mănușile</b>", sim.manusi], [giA("[data-trp]"), "Apăsați <b>„▶ Treaptă”</b> (timpul trece la ×1)", !!sim.rec],
       ["#tk-plot", `Așteptați înregistrarea de 60 s${sim.rec ? ` (${fx(sim.rec.k * 0.5, 0)} s)` : ""}`, false]];
   }

@@ -139,7 +139,7 @@ function planseSVG() {
 <rect x="-2000" y="-2000" width="5300" height="4800" fill="#fbfbfb"/>`;
   s += nodSVG("A", "A – Motor (0x0C8, 10 ms)", `<g data-k="senzA" class="tk-comp"><rect x="${NODX.A + 160}" y="${NY + 20}" width="62" height="60" rx="6" fill="#eceff1" stroke="#90a4ae"/><text x="${NODX.A + 191}" y="${NY + 36}" font-size="7" text-anchor="middle" fill="#37474f">turație / NTC</text><text id="srcA" x="${NODX.A + 191}" y="${NY + 54}" font-size="9" text-anchor="middle" fill="#c62828" font-weight="700" font-family="ui-monospace,monospace"></text><text id="srcA2" x="${NODX.A + 191}" y="${NY + 70}" font-size="9" text-anchor="middle" fill="#c62828" font-weight="700" font-family="ui-monospace,monospace"></text></g>`);
   s += nodSVG("B", "B – Pedală (0x0B4, 20 ms)", `<g data-k="senzB" class="tk-comp"><rect x="${NODX.B + 160}" y="${NY + 20}" width="62" height="60" rx="6" fill="#eceff1" stroke="#90a4ae"/><circle cx="${NODX.B + 191}" cy="${NY + 46}" r="13" fill="#263238"/><line id="potB" x1="${NODX.B + 191}" y1="${NY + 46}" x2="${NODX.B + 191}" y2="${NY + 35}" stroke="#fff" stroke-width="3"/><text id="srcB" x="${NODX.B + 191}" y="${NY + 74}" font-size="9" text-anchor="middle" fill="#c62828" font-weight="700" font-family="ui-monospace,monospace"></text></g>
-    <g data-k="canl" class="tk-comp"><circle cx="${NODX.B + 132}" cy="${BUSY - 22}" r="9" fill="#fff" stroke="#c62828" stroke-width="2"/><text x="${NODX.B + 132}" y="${BUSY - 18}" font-size="10" text-anchor="middle">✂</text><text id="canlT" x="${NODX.B + 150}" y="${BUSY - 16}" font-size="9" fill="#c62828" font-weight="700"></text></g>`);
+    <g data-k="canl" class="tk-comp"><rect x="${NODX.B + 118}" y="${BUSY - 36}" width="90" height="30" fill="transparent"/><circle cx="${NODX.B + 132}" cy="${BUSY - 22}" r="9" fill="#fff" stroke="#c62828" stroke-width="2"/><text x="${NODX.B + 132}" y="${BUSY - 18}" font-size="10" text-anchor="middle">✂</text><text id="canlT" x="${NODX.B + 150}" y="${BUSY - 16}" font-size="9" fill="#c62828" font-weight="700"></text></g>`);
   s += nodSVG("C", "C – Monitor (recepție, decodare)", `<g data-k="oled" class="tk-comp" filter="url(#umbra)"><rect x="${NODX.C + 236}" y="${NY + 10}" width="64" height="0" fill="none"/></g>`);
   /* ---- cablul torsadat (CAN-H galben, CAN-L verde) cu derivațiile */
   let tw = ""; for (let x = 30; x < 1270; x += 12) tw += `<path d="M${x},${BUSY} q3,-6 6,0 t6,0" fill="none" stroke="#f2d600" stroke-width="2.5"/><path d="M${x},${BUSY + 8} q3,6 6,0 t6,0" fill="none" stroke="#3ddc84" stroke-width="2.5"/>`;
@@ -368,9 +368,14 @@ const giMag = () => [...(sim.canl ? [[[giK("canl"), giPm("[data-canl]")], "Refac
 const giMagCuStop = () => { const m = giMag(); return m.length && sim.run ? [giStop("pentru a reface magistrala"), ...m] : m; };
 const giAstept1s = () => ["#tk-serial", "Așteptați cel puțin 1 s (linia „1 s: …” a nodului C)", !!(sim.bus && sim.tS - sim.bus.tot.t0 >= 1)];
 const giObs = k => [giA(`[data-obs="${k}"]`), "Alegeți <b>observația</b> în comenzile pasului", !!sim.obs[k]];
-PASI[0].ind = () => [giStop("rezistența se măsoară fără alimentare"), ...giMag(), [[giPm("[data-mm]"), giK("dmm")], "Apăsați <b>Multimetru Ω</b> (sondele pe CAN-H și CAN-L)", sim.mm],
-  [giR(0), "Citiți ≈ 60 Ω și apăsați <b>„● R → Tabelul 10.2”</b>", pe("t102", "R", "mas")],
-  ...(pe("t102", "R", "mas") ? [[[giK("jC"), giPm('[data-j="C"]')], "Opțional: scoateți J1 la C (≈ 120 Ω), apoi puneți-l la loc și opriți multimetrul", !sim.mm && sim.jC]] : [])];
+PASI[0].ind = () => {
+  if (!pe("t102", "R", "mas")) return [giStop("rezistența se măsoară fără alimentare"), ...giMag(), [[giPm("[data-mm]"), giK("dmm")], "Apăsați <b>Multimetru Ω</b> (sondele pe CAN-H și CAN-L)", sim.mm],
+    [giR(0), "Apăsați <b>„● R → Tabelul 10.2”</b> (multimetrul arată ≈ 60 Ω)", false]];
+  if (!sim.jC && sim.mm && !sim.run) sim.giJc = true;
+  return [[[giK("jC"), giPm('[data-j="C"]')], "Scoateți <b>J1 la nodul C</b>: multimetrul arată ≈ 120 Ω (o singură terminare)", !!sim.giJc],
+    [[giK("jC"), giPm('[data-j="C"]')], "Puneți la loc <b>J1 la nodul C</b>", !!sim.giJc && sim.jC],
+    [[giPm("[data-mm]"), giK("dmm")], "Opriți multimetrul (Multimetru Ω)", !!sim.giJc && !sim.mm]];
+};
 PASI[1].ind = () => { const rx = sim.bus && sim.bus.rx;
   return [...giMagCuStop(), [[giPm("[data-mm]"), giK("dmm")], "Opriți multimetrul", !sim.mm || sim.run], ...giCfgBus(), giStart(),
     [[giA('[data-rpm2="875"]'), giPm('[data-rpm="875"]')], "Nodul A: turația <b>875</b> rot/min", sim.rpm === 875 || pe("t101", "rpm", "oct")],
@@ -388,7 +393,7 @@ PASI[2].ind = () => {
 PASI[3].ind = () => { const w = sim.bus && sim.bus.win;
   return [...giMagCuStop(), ...giCfgBus(), giStart(), ["#tk-serial", "Așteptați linia „1 s: …” a nodului C (fără erori)", !!(w && !w.err)], [giR(0), "Apăsați <b>„● Încărcarea → Tabelul 10.2”</b>", pe("t102", "S", "mas")]]; };
 PASI[4].ind = () => { const b = sim.bus;
-  return [...giMagCuStop(), ...giCfgBus(), giStart(), [[giA("[data-r2]"), giPm("[data-r]")], "Apăsați <b>r</b> (resetează statisticile nodului C)", !!(b && b.arb) || pe("t103", "sim", "err")],
+  return [...giMagCuStop(), ...giCfgBus(), giStart(), [[giA("[data-r2]"), giPm("[data-r]")], "Apăsați <b>r</b> (resetează statisticile nodului C)", !!(b && (b.arb || b.arbCere || sim.serial.slice(-60).some(l => /statisticile au fost resetate/.test(l)))) || pe("t103", "sim", "err")],
     [[giA("[data-d32]"), giPm("[data-d3]"), giK("d3")], "Apăsați <b>🔘 Buton D3</b> (transmisie simultană)", !!(b && b.arb) || pe("t103", "sim", "err")],
     giAstept1s(), giObs("sim"), [giR(0), "Apăsați <b>„● Situația → Tabelul 10.3”</b>", pe("t103", "sim", "err")]]; };
 PASI[5].ind = () => {
@@ -747,7 +752,7 @@ Cadru.porneste({
       $$("#tk-svg [data-k]").forEach(g => g.addEventListener("click", e => { e.stopPropagation(); laClic3d(g.dataset.k); }));
       C.mesaj("Urmați pașii din chenarul „Desfășurarea lucrării – pas cu pas”; începeți cu magistrala și terminările (NSSM).", "");
     },
-    reset() { if (sim.run && $("#tk-start")) opresteSim(); Object.assign(sim, { serial: [], ist: [], jA: true, jB: false, jC: true, canl: false, rpm: null, mm: false, arbVazut: false, obs: { term: "", canl: "", sim: "" } }); init(); },
+    reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.giJc = false; Object.assign(sim, { serial: [], ist: [], jA: true, jB: false, jC: true, canl: false, rpm: null, mm: false, arbVazut: false, obs: { term: "", canl: "", sim: "" } }); init(); },
     cadru(dt, C, vizibil) {
       init(); const acum = performance.now(); sim.tS += Math.min(dt || 0.016, 0.1); if (sim.run) pasBus();
       if (!vizibil) { if (C.tabActiv === "anim" && acum - (this._t3 || 0) > 200) { this._t3 = acum; achizitie(); planseAfis(); sincron3d(); } return; }

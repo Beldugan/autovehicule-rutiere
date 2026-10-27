@@ -131,6 +131,7 @@ function achizitie() {
     else if (ed.length) tr = ed[ed.length - 1].t;
   } else if (ch1 === "D5" && sim.run && sim.d > 0) { const T = 1 / 490.2; tr = Math.floor((acum - W) / T) * T; }
   else if (ch1 === "tVR" && ed.length) tr = ed[ed.length - 1].t;
+  if (tr === null && ch2 === "tVR" && sim.n > 30 && o.trig !== "gol") tr = acum - W * 0.95;   // fără fronturi formate (întrefier mare): osciloscopul rulează liber (AUTO), CH2 se vede
   if (tr === null) { o.acq = { tr: null, pts: [[], []], m: {} }; return; }
   const t0 = tr - (o.trig === "gol" && (ch1 === "D49" || ch1 === "tOUT") ? 5 : 1) * o.tdiv, N = 500, pts = [[], []]; semnal.ed = sim.edges.filter(e => e.t >= t0 - 0.05 && e.t <= t0 + W);
   for (let i = 0; i <= N; i++) { const t = t0 + W * i / N; [ch1, ch2].forEach((s, c) => { if (s !== "nc") pts[c].push([i / N, semnal(s, t, vp)]); }); }
@@ -436,7 +437,7 @@ const PASI = [
       "Apăsați din nou <b>12 V OFF</b> → <b>12 V ON</b> (alimentarea motorului; discul încă nu se rotește – PWM-ul îl dă programul)."],
     ctl: () => "",
     ver: () => [[sim.capac, "capacul montat"], [sim.estopVerif && !sim.estop, sim.estopVerif ? (sim.estop ? "oprirea de urgență verificată – eliberați butonul" : "oprirea de urgență verificată") : "oprirea de urgență verificată"], [Math.abs(sim.g - 1) < 1e-9, `întrefierul 1,0 mm (acum ${fx(sim.g, 1)} mm)`], [alimentat(), "linia de 12 V a motorului alimentată"]],
-    prog: () => [sim.capac, sim.estopVerif, Math.abs(sim.g - 1) < 1e-9, alimentat()].filter(Boolean).length, tot: 4, butoane: [] },
+    prog: () => { const v = [sim.capac, sim.estopVerif, Math.abs(sim.g - 1) < 1e-9, alimentat()].filter(Boolean).length; if (v === 4) sim.p1ok = true; return sim.p1ok ? 4 : v; }, tot: 4, butoane: [] },
   { t: "Semnalul pe osciloscop", tab: "golul și perioada unui dinte", v3: "osc",
     banda: "Pasul 2 · Motorul la turație mică (PWM 20…30 %). CH2 pe TP VR (senzorul), CH1 pe D49 (semnalul format); declanșarea pe lățimea impulsului arată golul.",
     instr: ["Apăsați <b>▶ Pornește simularea</b> (bara planșei): programul <i>roata_60_2</i> pornește și comandă motorul prin D5.",
@@ -496,7 +497,8 @@ const giAlim = () => [[giK("psu"), giPm('[data-st="alim"]')], "Apăsați <b>12 V
 const giStart = () => [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run];
 function giGap(g) {
   if (Math.abs(sim.g - g) < 1e-9) return [];
-  return [[giPm('[data-pwm="0"]'), "PWM <b>0</b> % și așteptați oprirea discului", sim.n <= 0.5 || !sim.run],
+  return [[[giA('[data-pwm2="0"]'), giPm('[data-pwm="0"]')], "Apăsați PWM <b>0</b> %", sim.n <= 0.5 || !sim.run || Math.round(sim.d * 100) === 0],
+    ["#tk-serial", `Așteptați oprirea discului (acum ${fx(sim.n, 0)} rot/min)`, sim.n <= 0.5],
     [[giK("psu"), giPm('[data-st="alim"]')], "Apăsați <b>12 V ON</b> → <b>12 V OFF</b> (întrefierul se reglează fără alimentare)", !sim.alim],
     [giPm(`[data-gap="${g}"]`), `La „Întrefier (lere)” alegeți <b>${fx(g, 1)}</b> mm`, false]];
 }
@@ -509,7 +511,7 @@ PASI[0].ind = () => [[[giK("capac"), giPm('[data-st="capac"]')], "Montați <b>ca
   [[giK("estop"), giPm('[data-st="estop"]')], "Eliberați butonul de urgență (clic din nou)", sim.estopVerif && !sim.estop],
   ...giGap(1), giAlim()];
 PASI[1].ind = () => [...giGap(1), giAlim(), giStart(), giPwm(30, sim.n > 100), giCh2(), giCh1(),
-  [[giO('[data-td="1"]'), giO('[data-td="-1"]')], "Pe osciloscop <b>T/div = 5 ms</b>", sim.osc.tdiv === 0.005 || sim.golVazut],
+  [giO(`[data-td="${sim.osc.tdiv < 0.005 ? 1 : -1}"]`), `Pe osciloscop apăsați <b>T/div ${sim.osc.tdiv < 0.005 ? "+" : "−"}</b> până la <b>5 ms/div</b> (acum ${fmtT(sim.osc.tdiv)}/div)`, Math.abs(sim.osc.tdiv - 0.005) < 1e-9 || sim.golVazut],
   [giO('[data-tg="gol"]'), "Apăsați <b>Trig: lățime (golul)</b>", sim.osc.trig === "gol"],
   ["#tk-svg", "Urmăriți golul de 3 perioade pe ecran (CH2: amplitudinea crește după gol)", sim.golVazut]];
 PASI[2].ind = () => [...giGap(1), giAlim(), giStart(), giPwm(30, sim.n > 100), ["#tk-serial", "Urmăriți pe OLED și pe monitorul serial n, Ti, k, θ, SYNC și Tgol/Ti", sim.syncVazut],
@@ -521,7 +523,8 @@ PASI[3].ind = () => {
   return [...giGap(1), giAlim(), giStart(), giPwm(v), ["#tk-serial", "Așteptați turația constantă și SYNC (câteva secunde)", sim.run && stabil() && !!(sim.pr && sim.pr.sync)], giCh1(),
     [giO('[data-tg="front"]'), "Apăsați <b>Trig: front ↑</b>", sim.osc.trig === "front"],
     [giA(`[data-tdv="${v >= 50 ? "0.0005" : "0.002"}"]`), `Baza de timp <b>${v >= 50 ? "0,5" : "2"} ms/div</b> (până apare CH1 Freq)`, f && sim.osc.trig === "front"],
-    [[giA("[data-tah2]"), giK("tah")], "Apăsați <b>Tahometru: măsoară</b> și așteptați ≈ 1,5 s", t.val !== null && Math.abs(t.dVal - sim.d) < 1e-9 && t.stab],
+    [[giA("[data-tah2]"), giK("tah")], t.val !== null && Math.abs(t.dVal - sim.d) < 1e-9 && !t.stab ? "Citirea tahometrului s-a făcut înainte de stabilizare: apăsați din nou <b>Tahometru: măsoară</b>" : "Apăsați <b>Tahometru: măsoară</b>", !!t.act || (t.val !== null && Math.abs(t.dVal - sim.d) < 1e-9 && t.stab)],
+    [giK("tah"), "Așteptați citirea tahometrului (≈ 1,5 s)", t.val !== null && Math.abs(t.dVal - sim.d) < 1e-9 && t.stab],
     [giR(0), `Apăsați <b>„● f, Ti, n, n tahometru, Tgol/Ti → Tabelul 6.1”</b> (PWM ${v} %)`, false]];
 };
 PASI[4].ind = () => {
@@ -529,8 +532,9 @@ PASI[4].ind = () => {
   if (g === undefined) return [...giGap(1), giAlim()];
   const o = sim.obs, v = vpp2(), vd = sim.osc.vdiv, okV = Number.isFinite(v) && v <= 7.6 * vd && (v >= 2 * vd || vd <= 0.05);
   return [...giGap(g), giAlim(), giStart(), giPwm(30), ["#tk-serial", `Așteptați turația constantă (≈ ${MD.NREF} rot/min)`, sim.run && stabil() && Math.abs(sim.n - MD.NREF) <= 80], giCh2(), giCh1(),
-    [[giO('[data-vd="1"]'), giO('[data-vd="-1"]')], "Reglați <b>CH2 V/div</b> până când semnalul ocupă 2…7 diviziuni", okV],
-    [giA("[data-obs]"), `Apăsați <b>„Observă sincronizarea ${MD.TOBS} s”</b> și așteptați rezultatul`, !!(o && o.gata && Math.abs(o.g - sim.g) < 1e-9)],
+    [giO(`[data-vd="${Number.isFinite(v) && v > 7.6 * vd ? 1 : -1}"]`), Number.isFinite(v) ? `Apăsați <b>CH2 V ${v > 7.6 * vd ? "+" : "−"}</b> până când semnalul ocupă 2…7 diviziuni (acum ${fx(vd, vd < 1 ? 2 : 0)} V/div, ${fx(v / vd, 1)} div)` : "Reglați <b>CH2 V/div</b> (semnalul CH2 trebuie să apară pe ecran)", okV],
+    [giA("[data-obs]"), `Apăsați <b>„Observă sincronizarea ${MD.TOBS} s”</b>`, !!(o && Math.abs(o.g - sim.g) < 1e-9)],
+    ["#tk-serial", `Așteptați rezultatul observării pe monitorul serial${o && !o.gata ? ` (${fx(Math.max(0, MD.TOBS - (sim.tS - o.t0)), 0)} s)` : ""}`, !!(o && o.gata && Math.abs(o.g - sim.g) < 1e-9)],
     [giA("#sel-forma"), "Alegeți <b>forma</b> semnalului observată pe CH2", !!($("#sel-forma") && $("#sel-forma").value)],
     [giR(0), `Apăsați <b>„● Vpp, forma, sincronizarea → Tabelul 6.2”</b> (${fx(g, 1)} mm)`, false]];
 };
@@ -541,7 +545,8 @@ PASI[5].ind = () => {
   return [...giGap(1), [giS, "Opriți simularea (■) pentru a schimba PRAG", !sim.run || ok], ['#tk-cod [data-cf="PRAG"]', `Setați în cod <b>PRAG = ${pr}</b>`, ok || String(sim.camp.PRAG) === String(pr)],
     giAlim(), [giS, "Apăsați <b>▶ Pornește simularea</b>", ok], giPwm(20, ok && (Math.round(sim.d * 100) === 20 || !!sim.acc || !!r)),
     ["#tk-serial", "Așteptați turația constantă", ok && (stabil() || !!sim.acc || !!r)],
-    [[giA("[data-acc2]"), giPm("[data-acc]")], "Apăsați <b>⚡ Accelerare bruscă</b> și așteptați 2,5 s rezultatul pe monitorul serial", !!(ok && r)],
+    [[giA("[data-acc2]"), giPm("[data-acc]")], "Apăsați <b>⚡ Accelerare bruscă</b>", !!(ok && (r || sim.acc))],
+    ["#tk-serial", "Așteptați ≈ 2,5 s rezultatul pe monitorul serial (Tgol/Ti minim)", !!(ok && r)],
     [giR(0), `Apăsați <b>„● Tgol/Ti minim, sincronizarea → Tabelul 6.3”</b> (PRAG = ${pr})`, false]];
 };
 
@@ -898,7 +903,7 @@ Cadru.porneste({
       $$("#tk-svg [data-k]").forEach(g => g.addEventListener("click", e => { e.stopPropagation(); laClic3d(g.dataset.k); }));
       C.mesaj("Urmați pașii din chenarul „Desfășurarea lucrării – pas cu pas”; începeți cu pregătirea standului (NSSM).", "");
     },
-    reset() { if (sim.run && $("#tk-start")) opresteSim(); Object.assign(sim, { serial: [], ist: [], edges: [], buf: [], n: 0, d: 0, alim: false, estop: false, obs: null, acc: null, accRez: {}, golVazut: false, syncVazut: false }); sim.tah = { act: false, t0: 0, val: null, d: -1 }; },
+    reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.p1ok = false; sim.p3ok = false; sim.giCabVazut = false; Object.assign(sim, { serial: [], ist: [], edges: [], buf: [], n: 0, d: 0, alim: false, estop: false, obs: null, acc: null, accRez: {}, golVazut: false, syncVazut: false }); sim.tah = { act: false, t0: 0, val: null, d: -1 }; },
     cadru(dt, C, vizibil) {
       const acum = performance.now(); let rest = Math.min(dt || 0.016, 0.1);
       while (rest > 1e-9) { const d = Math.min(DT, rest); rest -= d; pasMecanic(d); }

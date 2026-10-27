@@ -37,7 +37,7 @@
 .ghid-pasi .pas-ver li { margin:.15rem 0; } .ghid-pasi .pas-ver li::before { content:"○ "; color:#c62828; font-weight:700; } .ghid-pasi .pas-ver li.ok::before { content:"✓ "; color:#2e9e44; } .ghid-pasi .pas-ver li.ok { color:var(--text-sec); }
 .ghid-pasi .pas-ctl { grid-area:ctl; margin:0; } .ghid-pasi .pas-ctl::before { content:"Comenzi rapide"; }
 .ghid-pasi .pas-but { grid-area:but; display:flex; flex-direction:column; gap:.35rem; align-self:end; }
-.ghid-indiciu { grid-area:ind; display:none; gap:.5rem; align-items:flex-start; padding:.45rem .65rem; border-radius:8px; background:color-mix(in srgb, #ff9800 14%, var(--suprafata)); border:1px solid color-mix(in srgb, #ff9800 55%, transparent); font-size:.9rem; line-height:1.4; cursor:pointer; }
+.ghid-indiciu .gi-opt { color:#2e9e44; } .ghid-indiciu .gi-loc { font-size:.78em; color:#b45309; white-space:nowrap; text-decoration:underline dotted; } .ghid-indiciu { grid-area:ind; display:none; gap:.5rem; align-items:flex-start; padding:.45rem .65rem; border-radius:8px; background:color-mix(in srgb, #ff9800 14%, var(--suprafata)); border:1px solid color-mix(in srgb, #ff9800 55%, transparent); font-size:.9rem; line-height:1.4; cursor:pointer; }
 .ghid-pasi.cu-indicii .ghid-indiciu.are { display:flex; }
 .ghid-indiciu .gi-nr { flex:none; min-width:1.5rem; height:1.5rem; border-radius:999px; background:#ef6c00; color:#fff; display:grid; place-items:center; font:700 .78rem system-ui; padding:0 .3rem; }
 .ghid-indiciu .gi-lista { margin:.25rem 0 0; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:.25rem .5rem; font-size:.78rem; color:var(--text-sec); }
@@ -85,6 +85,7 @@
     const c = [[r.left, r.top], [r.right, r.top], [r.left, r.bottom], [r.right, r.bottom]].map(([x, y]) => { p.x = x; p.y = y; const q = p.matrixTransform(inv); return [q.x, q.y]; });
     const xs = c.map(v => v[0]), ys = c.map(v => v[1]); return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), k: Math.abs(inv.a) || 1 }; };
   let indSig = "";
+  const PANOU_BTN = { "tk-codp": "#tk-codb", "tk-serial": "#tk-serb" };
   function curataInd() {
     indElem.forEach(el => { el.classList.remove("ghid-tinta"); el.removeAttribute("data-ghid-nr"); }); indElem = [];
     document.querySelectorAll(".ghid-ov").forEach(g => g.remove());
@@ -96,29 +97,48 @@
     document.querySelectorAll(".ghid-indiciu").forEach(b => { if (b !== box) b.classList.remove("are"); });
     let lista = []; if (p && p.ind && box) { try { lista = p.ind() || []; } catch (e) { lista = []; } }
     const j = lista.findIndex(x => !x[2]), toateGata = j < 0;
+    let complet = false; try { complet = !!(p && p.prog && p.prog() >= p.tot && p.tot > 0); } catch (e) { complet = false; }
+    const ultimul = i >= indPasi.length - 1, urm = document.querySelector('.pas.activ [data-ghid="1"]');
     // ce trebuie desenat: în SVG (dreptunghi + număr) sau în pagină (clasa ghid-tinta)
-    const svgs = new Map(), dom = [];
+    const svgs = new Map(), dom = []; let inafara = false;
     if (indOn && !toateGata) lista.forEach((x, n) => {
       if (x[2] || n > j + 2) return;
-      (Array.isArray(x[0]) ? x[0] : [x[0]]).forEach(sel => {
+      const sels = Array.isArray(x[0]) ? x[0] : [x[0]];
+      if (n === j && !sels.some(sel => [...document.querySelectorAll(sel)].some(e => e.getClientRects().length))) {
+        // ținta este într-un panou ascuns: se evidențiază butonul care îl deschide
+        const as = sels.map(sel => document.querySelector(sel)).find(Boolean), cut = as && as.closest("[hidden]"), b = cut && PANOU_BTN[cut.id] && document.querySelector(PANOU_BTN[cut.id]);
+        if (b && b.getClientRects().length) dom.push([b, n + 1]);
+      }
+      sels.forEach(sel => {
       const el = [...document.querySelectorAll(sel)].find(e => e.getClientRects().length); if (!el) return;
       const svg = el.ownerSVGElement;
       if (svg) { const r = el.getBoundingClientRect(); if (!r.width && !r.height) return; const b = inSvgCoord(svg, r); if (!b) return;
+        if (n === j) { const R = svg.getBoundingClientRect(); if (r.right < R.left || r.left > R.right || r.bottom < R.top || r.top > R.bottom) inafara = true; }
         const k = b.k, pad = 5 * k, acum = n === j, cul = acum ? "#ef6c00" : "#8a94a3";
         svgs.set(svg, (svgs.get(svg) || "") + `<rect class="${acum ? "gi-acum" : ""}" x="${(b.x - pad).toFixed(1)}" y="${(b.y - pad).toFixed(1)}" width="${(b.w + 2 * pad).toFixed(1)}" height="${(b.h + 2 * pad).toFixed(1)}" rx="${6 * k}" fill="${acum ? "rgba(239,108,0,.08)" : "none"}" stroke="${cul}" stroke-width="${(acum ? 3 : 1.6) * k}"${acum ? "" : ` stroke-dasharray="${5 * k} ${4 * k}"`}/>
           <circle cx="${(b.x + b.w + pad).toFixed(1)}" cy="${(b.y - pad).toFixed(1)}" r="${10 * k}" fill="${cul}"/><text x="${(b.x + b.w + pad).toFixed(1)}" y="${(b.y - pad + 4 * k).toFixed(1)}" font-size="${12 * k}" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui">${n + 1}</text>`); }
       else if (n === j) dom.push([el, n + 1]);
       });
     });
-    const sig = [i, indOn, j, lista.map(x => (x[2] ? 1 : 0) + x[1]).join("|"), [...svgs.values()].join(""), dom.map(d => d[1]).join()].join("#");
+    if (indOn && toateGata && complet && !ultimul && urm) dom.push([urm, "▶"]);
+    const sig = [i, indOn, j, complet, inafara, lista.map(x => (x[2] ? 1 : 0) + x[1]).join("|"), [...svgs.values()].join(""), dom.map(d => d[1]).join()].join("#");
     const ovLipsa = [...svgs.keys()].some(sv => !sv.querySelector(":scope > .ghid-ov")) || dom.some(([el]) => !el.classList.contains("ghid-tinta"));
     if (sig === indSig && !ovLipsa) return; indSig = sig;
     curataInd();
     if (!lista.length) { if (box) box.classList.remove("are"); return; }
     box.classList.add("are");
-    box.innerHTML = `<span class="gi-nr">${toateGata ? "✓" : j + 1}</span><div><b>${toateGata ? "Operațiile pasului sunt făcute" : "Indiciu – acum:"}</b> ${toateGata ? "verificați rezultatele și înregistrați / treceți la pasul următor." : lista[j][1]}
+    box.innerHTML = `<span class="gi-nr">${toateGata ? "✓" : j + 1}</span><div><b>${toateGata ? (complet ? "Pasul este încheiat." : "Operațiile pasului sunt făcute") : "Indiciu – acum:"}</b> ${toateGata ? (complet ? (ultimul ? "Toți pașii lucrării sunt încheiați: verificați tabelele în fila Determinări." : "Apăsați „Pasul următor ▶”.") : "verificați rezultatele și înregistrați.") : lista[j][1] + ` <span class="gi-loc" title="Derulează la elementul de acționat">📍 ${inafara ? "elementul este în afara zonei afișate – clic aici" : "arată unde"}</span>` + (complet && !ultimul ? ' <small class="gi-opt">(tabelul pasului este deja complet – puteți trece și la „Pasul următor ▶”)</small>' : "")}
       <ol class="gi-lista">${lista.map((x, n) => `<li data-n="${n + 1}" class="${x[2] ? "ok" : n === j ? "acum" : ""}">${x[2] ? "✓ " : ""}${String(x[1]).replace(/<[^>]+>/g, "").split(/ \(| – |; /)[0].trim().slice(0, 60)}</li>`).join("")}</ol></div>`;
-    box.onclick = () => { if (j < 0) return; const s0 = lista[j][0], el = document.querySelector(Array.isArray(s0) ? s0[s0.length - 1] : s0); if (el && el.scrollIntoView) el.scrollIntoView({ block: "center", behavior: "smooth" }); };
+    box.onclick = () => {
+      if (j < 0) { const u = document.querySelector('.pas.activ [data-ghid="1"]'); if (u) u.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+      const s0 = [].concat(lista[j][0]), el = s0.map(q => [...document.querySelectorAll(q)].find(e => e.getClientRects().length)).filter(Boolean).pop() || document.querySelector(s0[s0.length - 1]); if (!el) return;
+      const svg = el.ownerSVGElement;
+      if (svg) {   // ținta în afara zonei vizibile a planșei: se încadrează planșa întreagă
+        const r = el.getBoundingClientRect(), R = svg.getBoundingClientRect();
+        if (r.right < R.left || r.left > R.right || r.bottom < R.top || r.top > R.bottom) { const f = [...document.querySelectorAll("button")].find(b => /Încadrează/.test(b.textContent)); if (f) f.click(); }
+      }
+      setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 60);
+    };
     svgs.forEach((html, svg) => { const g = document.createElementNS("http://www.w3.org/2000/svg", "g"); g.setAttribute("class", "ghid-ov"); g.setAttribute("pointer-events", "none"); g.innerHTML = html; svg.appendChild(g); });
     dom.forEach(([el, n]) => { el.classList.add("ghid-tinta"); el.setAttribute("data-ghid-nr", n); indElem.push(el); });
   }

@@ -185,7 +185,7 @@ function planseSVG() {
   /* ---- furtunurile, teul, colierele */
   s += furt("M282,162 C330,162 360,162 412,162", "fu0") + furt("M452,162 C500,162 520,150 548,150", "fu1") + furt("M432,182 C432,220 432,240 432,262", "fu2");
   s += `<g data-k="tee" class="tk-comp" filter="url(#umbra)"><rect x="410" y="148" width="44" height="28" rx="4" fill="url(#gAlama)" stroke="#7a5a10"/><rect x="420" y="170" width="24" height="18" rx="3" fill="url(#gAlama)" stroke="#7a5a10"/><text x="432" y="140" font-size="10" text-anchor="middle" fill="#555">teu de alamă</text></g>`;
-  s += colier(0, 296, 162, 90) + colier(1, 540, 150, 90) + colier(2, 432, 256, 0);
+  s += colier(0, 296, 162, 90) + colier(2, 432, 256, 0);
   /* ---- manometrul etalon digital */
   s += `<g data-k="etalon" class="tk-comp" filter="url(#umbra)"><rect x="352" y="262" width="160" height="150" rx="12" fill="#2b2f35"/><rect x="368" y="284" width="128" height="52" rx="4" fill="#bfd0b0" stroke="#111"/><text id="et-v" x="488" y="320" font-size="24" fill="#1d2414" text-anchor="end" font-family="ui-monospace,monospace" font-weight="700">0.0</text><text x="374" y="296" font-size="8" fill="#1d2414">kPa rel.</text>
     <text x="432" y="362" font-size="11" text-anchor="middle" fill="#e6ebf0" font-weight="700">Manometru etalon</text><text x="432" y="378" font-size="9" text-anchor="middle" fill="#aab4be">−100…+200 kPa · 0,1 kPa</text></g>`;
@@ -194,6 +194,7 @@ function planseSVG() {
     <rect x="548" y="118" width="110" height="64" rx="10" fill="#1f2226"/><rect x="540" y="140" width="14" height="20" rx="3" fill="#1f2226"/><circle cx="572" cy="132" r="5" fill="url(#gAlu)" stroke="#333"/><circle cx="636" cy="168" r="5" fill="url(#gAlu)" stroke="#333"/>
     <rect x="610" y="182" width="40" height="26" rx="3" fill="#2b2f35"/>${[0, 1, 2].map(k => `<rect x="${617 + k * 10}" y="200" width="5" height="6" fill="#c9a227"/>`).join("")}
     <text x="603" y="152" font-size="11" text-anchor="middle" fill="#e6ebf0" font-weight="800">MAP</text><text x="603" y="166" font-size="8" text-anchor="middle" fill="#9aa">2,5 bar abs.</text></g>`;
+  s += colier(1, 540, 150, 90);   // după racordul senzorului MAP, ca să rămână accesibil la clic
   /* ---- multimetrul */
   s += `<g data-k="dmm" class="tk-comp" filter="url(#umbra)"><rect x="700" y="36" width="190" height="300" rx="18" fill="#f2b705"/><rect x="712" y="48" width="166" height="276" rx="12" fill="#3b3f45"/>
     <rect x="726" y="62" width="138" height="58" rx="5" fill="#bfd0b0" stroke="#222" stroke-width="2"/><text id="dmm5-v" x="856" y="102" font-size="26" fill="#1d2414" text-anchor="end" font-family="ui-monospace,monospace" font-weight="700"></text><text id="dmm5-u" x="858" y="115" font-size="9" fill="#1d2414" text-anchor="end"></text>
@@ -205,7 +206,7 @@ function planseSVG() {
   s += `<g data-k="oled" class="tk-comp" filter="url(#umbra)"><rect x="930" y="40" width="200" height="176" rx="6" fill="#16337a" stroke="#0b1d48"/>${["GND", "VCC", "SCL", "SDA"].map((t, i) => `<rect x="${992 + i * 14}" y="46" width="6" height="8" fill="#c9a227"/><text x="${995 + i * 14}" y="64" font-size="6" fill="#fff" text-anchor="middle">${t}</text>`).join("")}
     <rect x="938" y="72" width="184" height="118" rx="3" fill="#050608" stroke="#333"/><g id="oled5" font-family="ui-monospace,Consolas,monospace"></g><text x="1030" y="206" font-size="8" fill="#cfd8ff" text-anchor="middle">OLED 0,96" SSD1306 · I²C</text></g>`;
   s += `<g data-k="ceas" class="tk-comp" filter="url(#umbra)"><rect x="1150" y="40" width="130" height="82" rx="8" fill="#3b3f45"/><rect x="1160" y="50" width="110" height="40" rx="4" fill="#0f1a12"/><text id="ceas5" x="1215" y="78" font-size="20" text-anchor="middle" fill="#7dff8a" font-family="ui-monospace,monospace">00:00</text><text id="ceas5p" x="1215" y="110" font-size="8.5" text-anchor="middle" fill="#ddd"></text></g>
-    <g data-k="ochelari" class="tk-comp"><path d="M1160,170 q20,-26 44,0 q8,6 16,0 q24,-26 44,0 l0,14 q-22,26 -44,0 q-8,-6 -16,0 q-22,26 -44,0z" fill="#cfe8ff" stroke="#555" stroke-width="2" opacity=".9"/><text id="och5" x="1215" y="214" font-size="10" text-anchor="middle" fill="#444" font-weight="700">ochelari: nu</text></g>`;
+    <g data-k="ochelari" class="tk-comp"><rect x="1156" y="150" width="112" height="72" fill="transparent"/><path d="M1160,170 q20,-26 44,0 q8,6 16,0 q24,-26 44,0 l0,14 q-22,26 -44,0 q-8,-6 -16,0 q-22,26 -44,0z" fill="#cfe8ff" stroke="#555" stroke-width="2" opacity=".9"/><text id="och5" x="1215" y="214" font-size="10" text-anchor="middle" fill="#444" font-weight="700">ochelari: nu</text></g>`;
   /* ---- placa de test cu BMP280 și punctele de test */
   s += `<g data-k="bb" class="tk-comp" filter="url(#umbra)"><rect x="440" y="440" width="460" height="230" rx="6" fill="url(#tk-gauri)" stroke="#d2d2cc"/><line x1="450" y1="448" x2="890" y2="448" stroke="#e53935" stroke-width="1.5"/><line x1="450" y1="470" x2="890" y2="470" stroke="#1e63d6" stroke-width="1.5"/><text x="452" y="663" font-size="8" fill="#999">placă de test</text></g>`;
   s += `<g data-k="bmp" class="tk-comp" filter="url(#umbra)"><rect x="470" y="500" width="78" height="64" rx="4" fill="#5b2c8f"/><rect x="498" y="520" width="18" height="18" rx="2" fill="#c9cdd2"/><circle cx="507" cy="529" r="2" fill="#333"/><text x="509" y="556" font-size="8" fill="#fff" text-anchor="middle">BMP280</text>${[0, 1, 2, 3].map(k => `<rect x="${478 + k * 16}" y="494" width="6" height="8" fill="#c9a227"/>`).join("")}</g>`;
@@ -430,7 +431,10 @@ function giTinta(T, tol, cond) {
   else {
     const mod = T < 0 ? "vid" : "pres", peste = mod === "vid" ? pr < T - tol : pr > T + tol;
     o.push([[giPm(`[data-pm="${mod}"]`), giK("selector")], `Selectorul pompei pe <b>${mod === "vid" ? "Vid" : "Presiune"}</b>`, sim.mod === mod || aici]);
-    if (peste && !sim.lent) o.push([[giPm("[data-lent]"), giK("lent")], `Ați depășit ținta (${fx(pr, 1)} kPa): deschideți scurt <b>supapa lentă</b>`, false]);
+    const L = [giPm("[data-lent]"), giK("lent")];
+    if (sim.lent && !aici) o.push(peste ? [L, `Așteptați: supapa lentă este deschisă și presiunea revine spre ${T > 0 ? "+" : ""}${T} kPa (acum ${fx(pr, 1)} kPa) – închideți-o când ajunge acolo`, false]
+      : [L, `Închideți <b>supapa lentă</b> (presiunea a trecut de ${T > 0 ? "+" : ""}${T} kPa), apoi pompați din nou`, false]);
+    else if (peste && !sim.lent) o.push([L, `Ați depășit ținta (${fx(pr, 1)} kPa): deschideți <b>supapa lentă</b>`, false]);
     else o.push([[giPm('[data-cs="1"]'), giK("pompa")], `Pompați (cursă plină / ¼ cursă) până la ≈ <b>${T > 0 ? "+" : ""}${T} kPa</b> (acum ${fx(pr, 1)} kPa)`, aici || (cond && cond())]);
   }
   o.push([[giPm("[data-lent]"), giK("lent")], "Închideți <b>supapa lentă</b>", !sim.lent], [giK("etalon"), "Așteptați stabilizarea presiunii (câteva secunde)", stabil()]);
@@ -444,6 +448,7 @@ PASI[0].ind = () => {
   return [...o, [[giPm('[data-pm="vid"]'), giK("selector")], "Selectorul pompei pe <b>Vid</b>", sim.mod === "vid" || pr <= -44],
     [[giPm('[data-cs="1"]'), giK("pompa")], `Pompați până la ≈ <b>−50 kPa</b> pe manometrul etalon (acum ${fx(pr, 1)} kPa)`, pr <= -44],
     [[giPm("[data-lent]"), giK("lent")], "Închideți <b>supapa lentă</b>", !sim.lent],
+    [giK("etalon"), "Așteptați câteva secunde stabilizarea presiunii (după ultima cursă)", stabil()],
     [giA("[data-et]"), E && E.gata ? `Pierdere ${fx(E.dp, 2)} kPa: verificați colierele și repetați <b>testul de etanșeitate</b>` : "Apăsați <b>Test de etanșeitate (60 s)</b>", false]];
 };
 PASI[1].ind = () => [...giPrep(), ...giTinta(0, 0.6), ...giDmm(), [giR(0), "Apăsați <b>„● p (etalon), U (multimetru) → Tabelul 5.1”</b>", pe("t51", "p4", "u")]];

@@ -387,7 +387,7 @@ const PASI = [
       "Urmăriți pe OLED și pe monitorul serial distanțele HC și JSN, temperatura DS18B20 și zona."],
     ctl: () => "",
     ver: () => [[sim.vol === "mic", "buzzerul la volum mic"], [sim.run, "programul rulează (5 V prin USB)"], [sim.tinta === "lemn" && sim.unghi === 0 && sim.d === 50, "cubul de lemn la 50 cm, 0°"], [!!ultimaOk(), "distanțele afișate de program"]],
-    prog: () => [sim.vol === "mic", sim.run, sim.tinta === "lemn" && sim.unghi === 0 && sim.d === 50, !!ultimaOk()].filter(Boolean).length, tot: 4, butoane: [] },
+    prog: () => { const v = [sim.vol === "mic", sim.run, sim.tinta === "lemn" && sim.unghi === 0 && sim.d === 50, !!ultimaOk()].filter(Boolean).length; if (v === 4) sim.p1ok = true; return sim.p1ok ? 4 : v; }, tot: 4, butoane: [] },
   { t: "Impulsul ECHO pe osciloscop", tab: "Tabelul 7.0", v3: "osc",
     banda: "Pasul 2 · CH1 pe TRIG (D30), CH2 pe ECHO (D31) al HC-SR04, ținta la 50 cm: durata impulsului ECHO (+Width) este timpul de ecou t_ecou ≈ 2,9 ms.",
     instr: ["Clic pe pinul <b>D30 TRIG HC</b> (CH1) și pe <b>D31 ECHO HC</b> (CH2) – sau alegeți-le în panoul osciloscopului.",
@@ -458,10 +458,14 @@ PASI[3].ind = () => {
     return [...o, giDist(50), [[giA(`[data-caz="${t},${u}"]`), giPm(`[data-ti="${t}"]`)], `Alegeți ținta <b>${MD.TINTE[t].et}</b>, unghiul <b>${u}°</b>`, sim.tinta === t && sim.unghi === u],
       ["#tk-serial", "Așteptați ≈ 2 s (16 măsurări HC-SR04)", detectie() !== null], [giR(0), `Apăsați <b>„● Ecoul țintei → Tabelul 7.3”</b> (${t} ${u}°)`, false]]; }
   if (pe("t73", "jmin", "dr")) return o;
-  const v = sim.pr && sim.pr.last, urm = !!(v && Math.abs(v.dJ - sim.d) < 1.5), esec = sim.esecJ[sim.d - 1] === true;
+  const v = ultimaOk(), urm = !!(v && Math.abs(v.dJ - sim.d) < 1.5);
+  const fail = Object.keys(sim.esecJ).map(Number).filter(d => sim.esecJ[d] === true && sim.esecJ[d + 1] === false && d < 40), dF = fail.length ? Math.max(...fail) : null;   // ultima pereche: la d eșuează, la d + 1 măsoară corect
   return [...o, ...giTinta("lemn", 0), [[giA('[data-di2="30"]'), giPm('[data-di="30"]')], "Ținta la <b>30 cm</b>", sim.d <= 40],
-    [[giA('[data-dd2="-1"]'), giPm('[data-dd="-1"]')], "Apăsați <b>−1 cm</b> (așteptați ≈ 1 s după fiecare pas) până când JSN nu mai urmărește rigla", sim.d <= 40 && (esec || !urm)],
-    [[giA('[data-dd2="1"]'), giPm('[data-dd="1"]')], "Apăsați <b>+1 cm</b> – înapoi la ultima poziție corectă", sim.d <= 40 && esec && urm && !!ultimaOk()],
+    ["#tk-serial", `Așteptați ≈ 1 s citirea JSN la ${sim.d} cm`, !!v || dF !== null],
+    [[giA('[data-dd2="-1"]'), giPm('[data-dd="-1"]')], `Apăsați <b>−1 cm</b> (acum ${sim.d} cm${v ? `, JSN ${fx(v.dJ, 1)} cm` : ""}) până când citirea JSN nu mai urmărește rigla`, dF !== null],
+    dF !== null && sim.d > dF + 1 ? [[giA('[data-dd2="-1"]'), giPm('[data-dd="-1"]')], `Apăsați <b>−1 cm</b> până la ${dF + 1} cm (acum ${sim.d} cm)`, false]
+      : [[giA('[data-dd2="1"]'), giPm('[data-dd="1"]')], dF !== null ? `Apăsați <b>+1 cm</b> – înapoi la ${dF + 1} cm, ultima poziție corectă (la ${dF} cm JSN nu mai măsoară corect)` : "Apăsați +1 cm", dF !== null && sim.d === dF + 1],
+    ["#tk-serial", `Așteptați ≈ 1 s citirea JSN la ${sim.d} cm`, dF !== null && sim.d === dF + 1 && urm],
     [giR(1), "Apăsați <b>„● Distanța minimă JSN → Tabelul 7.3”</b>", false]];
 };
 PASI[4].ind = () => {
@@ -834,7 +838,7 @@ Cadru.porneste({
       tragereTinta();
       C.mesaj("Urmați pașii din chenarul „Desfășurarea lucrării – pas cu pas”; începeți cu pregătirea montajului (NSSM).", "");
     },
-    reset() { if (sim.run && $("#tk-start")) opresteSim(); Object.assign(sim, { serial: [], ist: [], d: 50, tinta: "lemn", unghi: 0, aero: false, Tp: null, Tds: null, vol: "mare", viteza: 1, esecJ: {}, buz: false }); initTemp(); },
+    reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.p1ok = false; sim.p3ok = false; sim.giCabVazut = false; Object.assign(sim, { serial: [], ist: [], d: 50, tinta: "lemn", unghi: 0, aero: false, Tp: null, Tds: null, vol: "mare", viteza: 1, esecJ: {}, buz: false }); initTemp(); },
     cadru(dt, C, vizibil) {
       const acum = performance.now(), d = Math.min(dt || 0.016, 0.1);
       sim.tS += d; pasTermic(d); if (sim.run) pasProgram(d); pasBuzzer();

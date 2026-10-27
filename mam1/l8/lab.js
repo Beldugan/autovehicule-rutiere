@@ -316,7 +316,7 @@ const PASI = [
       "Urmăriți pe OLED și pe plotter unghiurile: din accelerometru, din giroscop și din filtru."],
     ctl: () => "",
     ver: () => [[sim.v3, "ADXL377 la 3,3 V"], [sim.bratari, "cablurile fixate cu brățări"], [sim.run, "programul rulează"], [!!(sim.pr && !sim.pr.cal && sim.pr.last), sim.pr && sim.pr.cal ? `calibrare ${sim.pr.cal.n}/1000` : "calibrarea terminată, unghiurile afișate"]],
-    prog: () => [sim.v3, sim.bratari, sim.run, !!(sim.pr && !sim.pr.cal && sim.pr.last)].filter(Boolean).length, tot: 4, butoane: [] },
+    prog: () => { const v = [sim.v3, sim.bratari, sim.run, !!(sim.pr && !sim.pr.cal && sim.pr.last)].filter(Boolean).length; if (v === 4) sim.p1ok = true; return sim.p1ok ? 4 : v; }, tot: 4, butoane: [] },
   { t: "Senzorul în repaus", tab: "Tabelul 8.1", v3: "suport",
     banda: "Pasul 2 · Modulul în repaus, pe orizontală: media și abaterea standard pe 1000 de eșantioane pentru fiecare axă; ωx mediu = eroarea de zero a giroscopului.",
     instr: ["Suportul la <b>0°</b>, vibrațiile oprite.",
@@ -388,7 +388,11 @@ PASI[1].ind = () => { const r = rez("s"), ok = !!(r && !r.miscat && Math.abs(r.p
     ["#tk-serial", "Așteptați rezultatul pe monitorul serial", ok], [giR(0), "Apăsați <b>„● Medii și σ → Tabelul 8.1”</b>", pe("t81", "med", "az")]]; };
 PASI[2].ind = () => {
   const u = MD.UNGHIURI.find(x => !pe("t82", "u" + x, "ay")), o = [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ...giFaraVib()];
-  if (u === undefined) return [...o, [giPm("[data-vib]"), "Porniți <b>〰 Vibrații</b> câteva secunde, comparați φacc cu φ din filtru, apoi opriți-le", false]];
+  if (u === undefined) {
+    if (sim.vib) { if (sim.giVibT0 == null) sim.giVibT0 = sim.tS; if (sim.tS - sim.giVibT0 >= 3) sim.giVib = true; } else sim.giVibT0 = null;
+    return [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run || sim.giVib], [giPm("[data-vib]"), "Porniți <b>〰 Vibrații</b>", sim.vib || !!sim.giVib],
+      ["#tk-plot", "Urmăriți pe plotter ≈ 3 s: φacc devine zgomotos, φ din filtru rămâne liniștit", !!sim.giVib], [giPm("[data-vib]"), "Opriți <b>〰 Vibrațiile</b>", !!sim.giVib && !sim.vib]];
+  }
   const r = rez("m"), ok = !!(r && !r.miscat && Math.abs(r.phiR - u) < 0.05);
   return [...o, giUnghi(u), giCmd("m", "Apăsați <b>m – mediere 1 s</b>", ok || giCmdRul("m")), ["#tk-serial", "Așteptați ay, az, φacc pe monitorul serial", ok], [giR(0), `Apăsați <b>„● ay, az → Tabelul 8.2”</b> (${u}°)`, false]];
 };
@@ -762,7 +766,7 @@ Cadru.porneste({
       $$("#tk-svg [data-k]").forEach(g => g.addEventListener("click", e => { e.stopPropagation(); laClic3d(g.dataset.k); }));
       C.mesaj("Urmați pașii din chenarul „Desfășurarea lucrării – pas cu pas”; începeți cu pregătirea montajului (NSSM).", "");
     },
-    reset() { if (sim.run && $("#tk-start")) opresteSim(); Object.assign(sim, { serial: [], ist: [], phi: 0, om: 0, ep: 0, mot: null, vib: false, viteza: 1, v3: false, bratari: false, bw: 0 }); },
+    reset() { if (sim.run && $("#tk-start")) opresteSim(); sim.p1ok = false; sim.p3ok = false; sim.giCabVazut = false; Object.assign(sim, { serial: [], ist: [], phi: 0, om: 0, ep: 0, mot: null, vib: false, viteza: 1, v3: false, bratari: false, bw: 0 }); },
     cadru(dt, C, vizibil) {
       const acum = performance.now(); let rest = Math.min(dt || 0.016, 0.1) * sim.viteza;
       while (rest > 1e-9) { const d = Math.min(0.005, rest); rest -= d; sim.tS += d; pasMiscare(d); sim.bw += -sim.bw * d / 200 + 0.001 * Math.sqrt(d) * gauss(); if (sim.run) pasProgram(d); }

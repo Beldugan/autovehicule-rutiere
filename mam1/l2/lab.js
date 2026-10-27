@@ -619,7 +619,7 @@ PASI[1].ind = () => {
   const o = [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ["#gen-out", "Pe generator apăsați <b>OUTPUT</b> (pornit)", sim.gen],
     giSonda("ch0", "genBB", "gen", "Trageți sonda <b>1</b> (CH1) pe intrarea filtrului (stânga lui R = 10 kΩ)"), giSonda("ch1", "rc", "rc", "Trageți sonda <b>2</b> (CH2) pe condensatorul C = 100 nF")];
   if (!f) return o;
-  return [...o, giFrec(f), ['#tk-svg [data-ob="tdiv+"]', "Ajustați <b>T/div +/−</b> pe osciloscop până apar 1–3 perioade (Freq, Vpp)", !!(a && Number.isFinite(a.m[0].f)) && fGen() === f],
+  return [...o, giFrec(f), [`#tk-svg [data-ob="tdiv${10 * sim.osc.tdiv * f > 5 ? "-" : "+"}"]`, `Apăsați <b>T/div ${10 * sim.osc.tdiv * f > 5 ? "−" : "+"}</b> pe osciloscop până apar 1–3 perioade și măsurătorile Freq, Vpp (acum ${fmtT(sim.osc.tdiv)}/div)`, !!(a && Number.isFinite(a.m[0].f)) && fGen() === f && 10 * sim.osc.tdiv * f <= 5],
     [giR(), `Apăsați <b>„● U<sub>in</sub>, U<sub>out</sub> Vpp → Tabelul 2.2”</b> (${f} Hz)`, false]];
 };
 PASI[2].ind = () => {
@@ -646,9 +646,10 @@ PASI[4].ind = () => {
   if (ok && sim.motor) { if (giMot === null) giMot = sim.t; } else giMot = null;
   if (ok && giMot !== null) { const t = sim.trepte.filter(x => x.t > giMot); giS3 = t.length ? t[t.length - 1].t : null; } else giS3 = null;
   return [...giSchita("stm_filtre", { Ts: "10", N: String(C[0]), a: C[1] }, ok),
-    ["#sw2", `Dați clic pe <b>S2</b> (motorul – zgomot) și așteptați ≈ 6 s${giMot !== null && sim.t - giMot < 6 ? ` (încă ${fx(6 - (sim.t - giMot), 0)} s)` : ""}`, ok && sim.motor && (giS3 !== null || sim.t - giMot >= 6)],
-    ["#sw3", "Dați clic pe <b>S3</b> (treapta) și așteptați ≈ 2 s", ok && giS3 !== null],
-    ["#tk-plot", "Așteptați să se completeze răspunsul la treaptă pe plotter", ok && !a.er],
+    ["#sw2", "Dați clic pe <b>S2</b> (pornește motorul – semnalul cu zgomot)", ok && sim.motor],
+    ["#tk-plot", `Așteptați ≈ 6 s fără să atingeți nimic${giMot !== null && sim.t - giMot < 6 ? ` (încă ${fx(6 - (sim.t - giMot), 0)} s)` : ""}`, ok && sim.motor && (giS3 !== null || sim.t - giMot >= 6)],
+    ["#sw3", "Dați clic pe <b>S3</b> (treapta de semnal)", ok && giS3 !== null],
+    ["#tk-plot", "Așteptați ≈ 2 s să se completeze răspunsul la treaptă pe plotter", ok && !a.er],
     [giR(), `Apăsați <b>„● σ și întârzierea → Tabelul 2.4”</b> (N = ${C[0]}, α = ${C[1].replace(".", ",")})`, false]];
 };
 
