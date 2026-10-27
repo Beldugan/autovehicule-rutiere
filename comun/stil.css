@@ -689,17 +689,22 @@ th[data-formula] { text-decoration: underline dotted color-mix(in srgb, var(--ac
 .v3d-scena:has(.vz-jos) .v3d-ajutor { display: none; }
 .vz-bara { left: 0; right: 0; margin: 0 auto; width: max-content; transform: none; }
 
-/* pagina principală: anii de studiu, cu cele două semestre alăturate */
-.an-studiu { margin: 1.4rem 0 0; background: var(--suprafata); border: 1px solid var(--linie); border-radius: 14px; overflow: hidden; box-shadow: var(--umbra); }
-.an-studiu > h2 { margin: 0; padding: .7rem 1.1rem; font-size: 1.15rem; letter-spacing: .02em; color: #fff; background: linear-gradient(120deg, var(--antet-1) 0%, var(--antet-2) 100%); display: flex; align-items: baseline; gap: .6rem; }
-.an-studiu > h2 small { font-size: .8rem; font-weight: 500; opacity: .85; }
-.an-semestre { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.an-semestre .semestru { padding: .9rem 1.1rem 1.1rem; min-width: 0; }
-.an-semestre .semestru + .semestru { border-left: 1px solid var(--linie); }
-.an-semestre .semestru > h3 { margin: 0 0 .7rem; font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); display: flex; align-items: center; gap: .5rem; }
-.an-semestre .semestru > h3::after { content: ""; flex: 1; height: 1px; background: var(--linie); }
-.an-semestre .grila-discipline { grid-template-columns: 1fr; gap: .7rem; }
-.an-semestre .disc-card { background: var(--fundal, var(--suprafata)); border-left: 3px solid var(--accent); }
+/* pagina principală: anii de studiu și semestrele ca meniuri derulante */
+.an-studiu { margin: 1rem 0 0; background: var(--suprafata); border: 1px solid var(--linie); border-radius: 14px; overflow: hidden; box-shadow: var(--umbra); }
+.an-studiu > summary, .an-semestre .semestru > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .65rem; user-select: none; }
+.an-studiu > summary::-webkit-details-marker, .an-semestre .semestru > summary::-webkit-details-marker { display: none; }
+.an-studiu > summary { padding: .85rem 1.1rem; font-size: 1.15rem; font-weight: 700; letter-spacing: .02em; color: #fff; background: linear-gradient(120deg, var(--antet-1) 0%, var(--antet-2) 100%); }
+.an-studiu > summary small, .an-semestre .semestru > summary small { margin-left: auto; font-size: .78rem; font-weight: 500; opacity: .85; }
+.sageata { width: .55rem; height: .55rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .18s; flex: none; margin-right: .1rem; }
+details[open] > summary > .sageata { transform: rotate(45deg); }
+.an-studiu > summary:hover { filter: brightness(1.08); }
+.an-semestre { padding: .6rem .9rem .9rem; display: grid; gap: .6rem; }
+.an-semestre .semestru { border: 1px solid var(--linie); border-radius: 10px; background: var(--suprafata); }
+.an-semestre .semestru > summary { padding: .65rem .9rem; font-size: .9rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+.an-semestre .semestru > summary small { text-transform: none; letter-spacing: 0; color: var(--text-sec); opacity: 1; }
+.an-semestre .semestru > summary:hover { background: var(--accent-slab); border-radius: 10px; }
+.an-semestre .semestru[open] > summary { border-bottom: 1px solid var(--linie); border-radius: 10px 10px 0 0; }
+.an-semestre .grila-discipline { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .7rem; padding: .8rem .9rem .9rem; }
+.an-semestre .disc-card { border-left: 3px solid var(--accent); }
 .an-semestre .disc-card h3 { font-size: 1.05rem; color: var(--titlu); }
-.semestru-gol { margin: 0; padding: .9rem 1rem; border: 1px dashed var(--linie-tare); border-radius: 10px; color: var(--text-sec); font-size: .88rem; }
-@media (max-width: 760px) { .an-semestre { grid-template-columns: 1fr; } .an-semestre .semestru + .semestru { border-left: 0; border-top: 1px solid var(--linie); } }
+.semestru-gol { margin: .8rem .9rem .9rem; padding: .8rem 1rem; border: 1px dashed var(--linie-tare); border-radius: 10px; color: var(--text-sec); font-size: .88rem; }

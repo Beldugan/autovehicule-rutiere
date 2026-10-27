@@ -18,9 +18,11 @@ function paginaPrincipala() {
       <span class="meta">${tot ? `${tot} lucrări · ${gata} disponibile în laboratorul virtual` : "proiect · aplicațiile de calcul și etapele"}</span>
       ${tot ? `<span class="progres"><i style="width:${Math.round(gata / tot * 100)}%"></i></span>` : ""}</a>`; };
   const ani = ROM.map(an => {
-    const sem = [1, 2].map(s => { const l = toate.filter(([, d]) => String(d.an).toLowerCase() === "anul " + an.toLowerCase() && d.sem === s);
-      return `<section class="semestru"><h3>Semestrul ${s === 1 ? "I" : "II"}</h3>${l.length ? `<div class="grila-discipline">${l.map(card).join("")}</div>` : `<p class="semestru-gol">Disciplinele vor fi adăugate pe parcurs.</p>`}</section>`; }).join("");
-    return `<section class="an-studiu"><h2>Anul ${an} <small>${esc(PORTAL.program)}</small></h2><div class="an-semestre">${sem}</div></section>`;
+    const dinAn = toate.filter(([, d]) => String(d.an).toLowerCase() === "anul " + an.toLowerCase());
+    const sem = [1, 2].map(s => { const l = dinAn.filter(([, d]) => d.sem === s), id = `an${an}-s${s}`;
+      return `<details class="semestru" data-mem="${id}"><summary><span class="sageata" aria-hidden="true"></span>Semestrul ${s === 1 ? "I" : "II"}<small>${l.length ? `${l.length} ${l.length === 1 ? "disciplină" : "discipline"}` : "în pregătire"}</small></summary>
+        ${l.length ? `<div class="grila-discipline">${l.map(card).join("")}</div>` : `<p class="semestru-gol">Disciplinele vor fi adăugate pe parcurs.</p>`}</details>`; }).join("");
+    return `<details class="an-studiu" data-mem="an${an}"><summary><span class="sageata" aria-hidden="true"></span>Anul ${an}<small>${dinAn.length ? `${dinAn.length} ${dinAn.length === 1 ? "disciplină" : "discipline"}` : "în pregătire"}</small></summary><div class="an-semestre">${sem}</div></details>`;
   }).join("");
   document.body.innerHTML = antetPortal(`${esc(PORTAL.program)} – laboratoare și proiecte`, `Laboratoare virtuale · ${esc(PORTAL.cadru)}`) + `
   <main class="pagina">
@@ -36,6 +38,10 @@ function paginaPrincipala() {
     </section>
   </main>
   <footer class="subsol"><p>${esc(PORTAL.cadru)} · ${esc(PORTAL.univ)}, ${PORTAL.an}</p></footer>`;
+  // meniurile derulante: starea deschis / închis se păstrează în browser
+  let mem = {}; try { mem = JSON.parse(localStorage.getItem("portal-meniu") || "{}"); } catch (e) { mem = {}; }
+  document.querySelectorAll("details[data-mem]").forEach(el => { if (mem[el.dataset.mem]) el.open = true;
+    el.addEventListener("toggle", () => { mem[el.dataset.mem] = el.open; try { localStorage.setItem("portal-meniu", JSON.stringify(mem)); } catch (e) { /* fără stocare */ } }); });
   Tema.leaga();
 }
 
