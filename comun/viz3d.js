@@ -114,7 +114,7 @@ export function ataseazaViz(o) {
   const { renderer, scene, camera, cont } = o, prof = Object.assign({ titlu: "Temperatura", T0: 20, Tmin: 20, Tmax: 120, unit: "°C" }, o.profil || {});
   let mod = 0, cadre = 0, sect = 0.5, bgAnt = null, fogAnt = null;
   const bara = document.createElement("div"); bara.className = "vz-bara" + (o.pozitie ? " vz-" + o.pozitie : "");
-  bara.innerHTML = MODURI.map(([t, d], i) => `<button type="button" data-vz="${i}" title="${d}" aria-pressed="${i ? "false" : "true"}">${t}</button>`).join("") +
+  bara.innerHTML = MODURI.map(([t, d], i) => (o.faraPrezentare && i === 1) ? "" : `<button type="button" data-vz="${i}" title="${d}" aria-pressed="${i ? "false" : "true"}">${t}</button>`).join("") +
     `<label class="vz-sect" hidden title="Poziția planului de secțiune"><span>Secțiune</span><input type="range" min="0" max="1" step="0.005" value="0.5"></label>`;
   const leg = document.createElement("div"); leg.className = "vz-legenda"; leg.hidden = true;
   const sonda = document.createElement("div"); sonda.className = "vz-sonda"; sonda.hidden = true;

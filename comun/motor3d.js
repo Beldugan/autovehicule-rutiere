@@ -1236,7 +1236,7 @@ export function construiesteMotor(opt = {}) {
 /* ======================================================================= standul de laborator (scenă separată) */
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
-import { ataseazaViz } from "./viz3d.js?v=1";
+import { ataseazaViz } from "./viz3d.js?v=2";
 
 export function creeazaStand(gazda, optiuni = {}) {
   gazda.innerHTML = `<div class="m3d"><canvas></canvas><div class="m3d-etichete"></div><div class="m3d-vederi"></div><div class="m3d-ajutor">clic pe o componentă = selectare · trageți = rotire · rotița = zoom</div></div>`;

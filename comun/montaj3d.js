@@ -10,7 +10,7 @@ import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
-import { ataseazaViz } from "./viz3d.js?v=1";
+import { ataseazaViz } from "./viz3d.js?v=2";
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const mm = v => v / 1000;

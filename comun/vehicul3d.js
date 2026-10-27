@@ -4,21 +4,35 @@
    Coordonate: x înainte, y în sus, z spre dreapta; unități: metri. */
 import * as THREE from "./vendor/three.module.min.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { ataseazaViz } from "./viz3d.js?v=1";
+import { ataseazaViz } from "./viz3d.js?v=2";
 import { construiesteMotor, transmisieAccesorii, sistemRacire, MAT } from "./motor3d.js?v=15";
 
 /* ------------------------------------------------------------------ utilitare */
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-/** interpolare netedă (cosinus) printre puncte de control [[x, v], …] */
+/** interpolare netedă printre puncte de control [[x, v], …]: spline cubică Hermite monotonă (Fritsch–Carlson) – derivata continuă,
+    fără „platouri” la fiecare punct (interpolarea cosinus făcea liniile caroseriei ondulate) și fără depășiri */
+const TANG = new WeakMap();
+function tangente(pts) {
+  let m = TANG.get(pts); if (m) return m;
+  const n = pts.length, d = []; m = new Array(n).fill(0);
+  for (let i = 0; i < n - 1; i++) d.push((pts[i + 1][1] - pts[i][1]) / (pts[i + 1][0] - pts[i][0]));
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i], h = a * a + b * b;
+    if (h > 9) { const t = 3 / Math.sqrt(h); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+  }
+  TANG.set(pts, m); return m;
+}
 function prof(pts, x) {
   if (x <= pts[0][0]) return pts[0][1];
-  for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) {
-    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; const t = (x - x0) / (x1 - x0);
-    return lerp(y0, y1, (1 - Math.cos(Math.PI * t)) / 2);
-  }
-  return pts[pts.length - 1][1];
+  const n = pts.length; if (x >= pts[n - 1][0]) return pts[n - 1][1];
+  const m = tangente(pts); let i = 1; while (x > pts[i][0]) i++;
+  const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], h = x1 - x0, t = (x - x0) / h, t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * h * m[i - 1] + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * h * m[i];
 }
 function eTemaIntunecata() {
   const t = document.documentElement.getAttribute("data-theme");
@@ -201,7 +215,14 @@ export function creeaza(gazda, optiuni = {}) {
   const ctx = new THREE.Group(); caroserie.add(ctx);
   const matCtx = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false });
   const contur = (geo, x, y, z, rx = 0, ry = 0, rz = 0) => { const l = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), matCtx); l.position.set(x, y, z); l.rotation.set(rx, ry, rz); ctx.add(l); return l; };
-  for (const [x, z] of [[0.15, -0.4], [0.15, 0.4], [-0.85, -0.4], [-0.85, 0.4]]) { contur(new THREE.BoxGeometry(0.5, 0.12, 0.48), x, 0.45, z); contur(new THREE.BoxGeometry(0.12, 0.62, 0.46), x - 0.27, 0.78, z, 0, 0, 0.18); contur(new THREE.BoxGeometry(0.1, 0.16, 0.26), x - 0.34, 1.16, z, 0, 0, 0.18); }
+  // scaunele: banchetei din spate i se limitează înălțimea după pavilion / lunetă (conturul nu trebuie să iasă prin caroserie)
+  for (const [x, z, sp] of [[0.15, -0.4, 0], [0.15, 0.4, 0], [-0.76, -0.4, 1], [-0.76, 0.4, 1]]) {
+    const hb = sp ? 0.5 : 0.62, xs = x - 0.27, xh = x - 0.34;
+    contur(new THREE.BoxGeometry(0.5, 0.12, 0.48), x, 0.45, z);
+    contur(new THREE.BoxGeometry(0.12, hb, 0.46), xs, 0.51 + hb / 2 - 0.04, z, 0, 0, 0.18);
+    const yh = Math.min(1.16, prof(P_TOP, xh - 0.06) - 0.17);
+    contur(new THREE.BoxGeometry(0.1, 0.16, 0.26), xh, yh, z, 0, 0, 0.18);
+  }
   const volan = contur(new THREE.TorusGeometry(0.19, 0.016, 8, 32), 0.66, 0.98, -0.4, 0, Math.PI / 2, 0); volan.rotation.z = -0.45;
   contur(new THREE.CylinderGeometry(0.02, 0.02, 0.45, 8), 0.86, 0.88, -0.4, 0, 0, 1.12);
   contur(new THREE.BoxGeometry(0.62, 0.48, 0.55), 1.82, 0.62, 0.05);     // motor
@@ -242,7 +263,7 @@ export function creeaza(gazda, optiuni = {}) {
 
   const motoare = REG_MOT; REG_MOT = null;
   // stilurile de vizualizare (realist / prezentare secționată / termic CFD); motorul unui autoturism „în mers” este cald
-  const viz = ataseazaViz({ renderer, scene, camera, cont: scena, decor: [asfalt, umbra, drum], pozitie: "jos",
+  const viz = ataseazaViz({ renderer, scene, camera, cont: scena, decor: [asfalt, umbra, drum], pozitie: "jos", faraPrezentare: true,
     profil: Object.assign({ titlu: "Temperatura suprafețelor", T0: 20, Tmin: 20, Tmax: sistem === "hibrid" ? 160 : 400 }, optiuni.vizProfil || {}),
     surse: () => { const L = []; motoare.forEach(m => { if (m.grup.visible) L.push(...m.surseTermice(true)); }); if (S.surseTermice) L.push(...S.surseTermice()); return L; } });
 
@@ -463,7 +484,7 @@ export function creeaza(gazda, optiuni = {}) {
   }
   raf = requestAnimationFrame(bucla);
   return {
-    stare: st, selecteaza: k => S.selecteaza && S.selecteaza(k),
+    stare: st, selecteaza: k => S.selecteaza && S.selecteaza(k), vedere(p, t) { camera.position.set(...p); ctl.target.set(...t); },
     distruge() { cancelAnimationFrame(raf); window.removeEventListener("keydown", tasta); window.removeEventListener("keyup", tasta); window.removeEventListener("schimbare-tema", laTema); renderer.dispose(); }
   };
 }
