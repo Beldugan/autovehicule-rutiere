@@ -358,6 +358,51 @@ const PASI = [
     prog: () => ["term", "canl"].filter(k => pe("t103", k, "err")).length, tot: 2, butoane: [["● Situația → Tabelul 10.3", inregDef, "primar"]] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giK = k => `#tk-svg [data-k="${k}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start", giPm = s => "#tk-pompa " + s, giO = s => "#tk-osc " + s;
+const giJ = (n, pus) => [[giK("j" + n), giPm(`[data-j="${n}"]`)], `${pus ? "Puneți" : "Scoateți"} <b>J1 la nodul ${n}</b>${sim.run ? " (cu simularea oprită)" : ""}`, sim["j" + n] === pus];
+const giStop = txt => [giS, `Opriți simularea (■)${txt ? " – " + txt : ""}`, !sim.run];
+const giCfgBus = () => [["#tk-cod [data-cf=\"BIT\"]", "În cod: <b>CAN_500KBPS</b> și <b>MCP_8MHZ</b>", sim.run ? busOk() : String(sim.camp.BIT) === "500" && sim.camp.XTAL === "MCP_8MHZ"]];
+const giStart = () => [giS, "Apăsați <b>▶ Pornește simularea</b> (alimentarea nodurilor)", busOk()];
+const giMag = () => [...(sim.canl ? [[[giK("canl"), giPm("[data-canl]")], "Refaceți <b>CAN-L</b> la nodul B", false]] : []), ...["A", "C"].filter(n => !sim["j" + n]).map(n => giJ(n, true)), ...(sim.jB ? [giJ("B", false)] : [])];
+const giMagCuStop = () => { const m = giMag(); return m.length && sim.run ? [giStop("pentru a reface magistrala"), ...m] : m; };
+const giAstept1s = () => ["#tk-serial", "Așteptați cel puțin 1 s (linia „1 s: …” a nodului C)", !!(sim.bus && sim.tS - sim.bus.tot.t0 >= 1)];
+const giObs = k => [giA(`[data-obs="${k}"]`), "Alegeți <b>observația</b> în comenzile pasului", !!sim.obs[k]];
+PASI[0].ind = () => [giStop("rezistența se măsoară fără alimentare"), ...giMag(), [[giPm("[data-mm]"), giK("dmm")], "Apăsați <b>Multimetru Ω</b> (sondele pe CAN-H și CAN-L)", sim.mm],
+  [giR(0), "Citiți ≈ 60 Ω și apăsați <b>„● R → Tabelul 10.2”</b>", pe("t102", "R", "mas")],
+  ...(pe("t102", "R", "mas") ? [[[giK("jC"), giPm('[data-j="C"]')], "Opțional: scoateți J1 la C (≈ 120 Ω), apoi puneți-l la loc și opriți multimetrul", !sim.mm && sim.jC]] : [])];
+PASI[1].ind = () => { const rx = sim.bus && sim.bus.rx;
+  return [...giMagCuStop(), [[giPm("[data-mm]"), giK("dmm")], "Opriți multimetrul", !sim.mm || sim.run], ...giCfgBus(), giStart(),
+    [[giA('[data-rpm2="875"]'), giPm('[data-rpm="875"]')], "Nodul A: turația <b>875</b> rot/min", sim.rpm === 875 || pe("t101", "rpm", "oct")],
+    [[giA('[data-ped2="20"]'), giPm('[data-ped="20"]')], "Nodul B: pedala <b>20 %</b>", sim.ped === 20 || pe("t101", "poz", "oct")],
+    ["#tk-serial", "Urmăriți octeții recepționați pe monitorul serial și pe OLED-ul nodului C", !!(rx && rx.C8 && rx.B4)],
+    [giR(0), "Apăsați <b>„● Octeții și valorile → Tabelul 10.1”</b>", pe("t101", "rpm", "oct") && pe("t101", "poz", "oct")]]; };
+PASI[2].ind = () => {
+  const m = sim.osc.acq && sim.osc.acq.m, o = [...giMagCuStop(), ...giCfgBus(), giStart()];
+  const trig = id => [[giA(`[data-oid2="${id}"]`), giO("[data-oid]")], `Declanșarea pe <b>CAN ID 0x0${id}</b>`, sim.osc.id === id];
+  if (!pe("t102", "nC8", "mas")) return [...o, trig("C8"), [giA('[data-tdv="0.000005"]'), "<b>5 µs/div</b>: priviți biții (SOF, ID, umplere)", sim.osc.tdiv >= 0.00005 || sim.osc.tdiv === 0.000005],
+    [giA('[data-tdv="0.00005"]'), "<b>50 µs/div</b>: cadrul întreg", sim.osc.tdiv >= 0.00005 && !!(m && m.n)], [giR(0), "Apăsați <b>„● Bitul și cadrul → Tabelul 10.2”</b> (0x0C8)", false]];
+  if (!pe("t102", "nB4", "mas")) return [...o, trig("B4"), ["#tk-svg", "Așteptați cadrul 0x0B4 pe ecran", !!(m && m.n && m.id === 0xB4)], [giR(0), "Apăsați <b>„● Bitul și cadrul → Tabelul 10.2”</b> (0x0B4)", false]];
+  return o;
+};
+PASI[3].ind = () => { const w = sim.bus && sim.bus.win;
+  return [...giMagCuStop(), ...giCfgBus(), giStart(), ["#tk-serial", "Așteptați linia „1 s: …” a nodului C (fără erori)", !!(w && !w.err)], [giR(0), "Apăsați <b>„● Încărcarea → Tabelul 10.2”</b>", pe("t102", "S", "mas")]]; };
+PASI[4].ind = () => { const b = sim.bus;
+  return [...giMagCuStop(), ...giCfgBus(), giStart(), [[giA("[data-r2]"), giPm("[data-r]")], "Apăsați <b>r</b> (resetează statisticile nodului C)", !!(b && b.arb) || pe("t103", "sim", "err")],
+    [[giA("[data-d32]"), giPm("[data-d3]"), giK("d3")], "Apăsați <b>🔘 Buton D3</b> (transmisie simultană)", !!(b && b.arb) || pe("t103", "sim", "err")],
+    giAstept1s(), giObs("sim"), [giR(0), "Apăsați <b>„● Situația → Tabelul 10.3”</b>", pe("t103", "sim", "err")]]; };
+PASI[5].ind = () => {
+  if (!pe("t103", "term", "err")) { const ok = !sim.jC && sim.jA && !sim.canl;
+    return [...(ok ? [] : [giStop("terminările se schimbă numai fără alimentare"), ...(sim.canl ? [[[giK("canl"), giPm("[data-canl]")], "Refaceți <b>CAN-L</b>", false]] : []), ...(sim.jA ? [] : [giJ("A", true)]), giJ("C", false)]),
+      ...giCfgBus(), giStart(), [[giA('[data-oid2="C8"]'), giO("[data-oid]")], "Osciloscop: declanșare pe <b>0x0C8</b>, 5 µs/div – priviți fronturile", sim.osc.id === "C8"],
+      giAstept1s(), giObs("term"), [giR(0), "Apăsați <b>„● Situația → Tabelul 10.3”</b> (fără o terminare)", false]]; }
+  if (!pe("t103", "canl", "err")) { const ok = sim.jA && sim.jC && sim.canl;
+    return [...(ok ? [] : [giStop("firele se desfac numai fără alimentare"), ...(sim.jC ? [] : [giJ("C", true)]), [[giK("canl"), giPm("[data-canl]")], "Apăsați <b>✂ CAN-L nod B</b> (întrerupt)", sim.canl]]),
+      ...giCfgBus(), giStart(), [[giA('[data-oid2="ERR"]'), giO("[data-oid]")], "Osciloscop: declanșare pe <b>cadru de eroare</b>; urmăriți TEC-ul nodului B pe monitorul serial", sim.osc.id === "ERR"],
+      giAstept1s(), giObs("canl"), [giR(0), "Apăsați <b>„● Situația → Tabelul 10.3”</b> (CAN-L întrerupt)", false]]; }
+  return [giStop("la final"), ...giMag()];
+};
+
 const VEDERI = { tot: [[0.0, 0.62, 0.86], [0.0, 0.05, -0.02]], osc: [[-0.15, 0.3, 0.45], [-0.15, 0.1, -0.2]] };
 function vedere3d(v) { if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
 function construiestePasi() {
@@ -374,7 +419,7 @@ function construiestePasi() {
   $$("#pasi [data-r2]").forEach(b => b.addEventListener("click", () => comanda("r")));
   $$("#pasi [data-d32]").forEach(b => b.addEventListener("click", declanseaza));
   $$("#pasi [data-obs]").forEach(s => s.addEventListener("change", () => { sim.obs[s.dataset.obs] = s.value; }));
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false);
 }
 function alegePas(i) {

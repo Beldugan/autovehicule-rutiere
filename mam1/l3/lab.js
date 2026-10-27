@@ -443,14 +443,14 @@ const pe = (t, r, c) => Cadru.D.t[t][r][c] !== "";
 const PASI = [
   { t: "Identificarea pinilor", tab: "Tabelul 3.0", zona: [20, 20, 700, 660], pini: ["p1", "p2", "p3", "p4", "p5", "p6"],
     banda: "Pasul 1 · Alimentarea oprită, X1 decuplat, multimetrul pe Ω. Măsurați rezistențele între borne: alimentare–masă = constantă, cu cursorul = variază cu pârghia, între piste = O.L.",
-    instr: [`Simularea trebuie să fie <b>oprită</b> (butonul din bara planșei arată „▶ Pornește simularea”).`, `Dați clic pe conectorul <b>X1</b> pentru a-l decupla (senzorul se deconectează de la placă).`, `Dați clic pe comutatorul rotativ al multimetrului până ajunge pe <b>Ω</b>.`, `Trageți sonda <b>+</b> (roșie) și sonda <b>−</b> (neagră) pe două borne ale senzorului și apăsați <b>„● R → jurnal”</b>. Măsurați toate perechile de borne (cel puțin 6 măsurători).`, `Trageți pârghia pedalei în altă poziție și remăsurați: rezistența dintre cursor și capete se schimbă, cea dintre capetele aceleiași piste rămâne constantă.`, `Interpretați: O.L. = borne din piste diferite; rezistența cea mai mare dintr-o pistă = capetele pistei (alimentare și masă). Pista 2 are rezistența totală ≈ dublă (rezistor în serie la +5 V).`, `În <b>Comenzi rapide</b> alegeți funcția fiecărui pin (Pin 1…6) și apăsați <b>„● Trece în Tabelul 3.0 și montează cablajul”</b>.`],
+    instr: [`Simularea trebuie să fie <b>oprită</b> (butonul din bara planșei arată „▶ Pornește simularea”).`, `Conectorul <b>X1</b> este <b>deja decuplat</b> la începutul lucrării (senzorul este separat de placă) – lăsați-l așa. Dacă l-ați cuplat, opriți simularea și dați clic pe X1 pentru a-l decupla.`, `Dați clic pe comutatorul rotativ al multimetrului până ajunge pe <b>Ω</b>.`, `Trageți sonda <b>+</b> (roșie) și sonda <b>−</b> (neagră) pe două borne ale senzorului și apăsați <b>„● R → jurnal”</b>. Măsurați toate perechile de borne (cel puțin 6 măsurători).`, `Trageți pârghia pedalei în altă poziție și remăsurați: rezistența dintre cursor și capete se schimbă, cea dintre capetele aceleiași piste rămâne constantă.`, `Interpretați: O.L. = borne din piste diferite; rezistența cea mai mare dintr-o pistă = capetele pistei (alimentare și masă). Pista 2 are rezistența totală ≈ dublă (rezistor în serie la +5 V).`, `În <b>Comenzi rapide</b> alegeți funcția fiecărui pin (Pin 1…6) și apăsați <b>„● Trece în Tabelul 3.0 și montează cablajul”</b>.`],
     ctl: () => `<div class="id-grila">${[1, 2, 3, 4, 5, 6].map(p => `<label>Pin ${p}<select id="id-p${p}"><option value=""></option>${MD.FUNCTII.map(f => `<option${sim.ident[p] === f ? " selected" : ""}>${f}</option>`).join("")}</select></label>`).join("")}</div>`,
     ver: () => [[!sim.run, "alimentarea oprită"], [sim.dec, "conectorul X1 decuplat"], [sim.dmm.mod === "R", "multimetrul pe Ω"], [/^p/.test(sim.dmm.s.dmmR) && /^p/.test(sim.dmm.s.dmmB), "sondele pe borne"], [nOhm() >= 6, `măsurători în jurnal: ${nOhm()}/6`]],
     prog: () => [1, 2, 3, 4, 5, 6].filter(p => pe("t30", "p" + p, "fn")).length, tot: 6,
     butoane: [["● R → jurnal", inregOhm, "secundar"], ["● Trece în Tabelul 3.0 și montează cablajul", inregIdent, "primar"]] },
   { t: "Caracteristicile pistelor", tab: "Tabelul 3.1", zona: [20, 20, 800, 720], pini: ["tA0", "tA1", "tGND"],
     banda: "Pasul 2 · Pârghia la 0, 12, 24, 36, 48, 60° (s = 0…100 %). Multimetrul V⎓: sonda − pe TP GND, sonda + pe TP A0 (U1), apoi pe TP A1 (U2).",
-    instr: [`Dați clic pe <b>X1</b> pentru a-l cupla și apăsați <b>▶ Pornește simularea</b> (placa alimentată prin USB alimentează și senzorul).`, `Comutatorul multimetrului pe <b>V⎓</b>; sonda <b>−</b> pe <b>TP GND</b>.`, `Pârghia la <b>0°</b> (butonul din Comenzi rapide sau tragere); sonda <b>+</b> pe <b>TP A0</b> și apăsați <b>„● U (multimetru) → Tabelul 3.1”</b> – se completează U1.`, `Mutați sonda <b>+</b> pe <b>TP A1</b> și apăsați din nou – se completează U2.`, `Repetați pentru <b>12°, 24°, 36°, 48° și 60°</b> (12 valori în total).`, `Măsurați și <b>TP 5V</b>: tensiunea USB nu este exact 5 V (de aici abaterile ADC).`],
+    instr: [`Cu simularea <b>oprită</b>, dați clic pe <b>X1</b> pentru a-l cupla (cablajul montat la pasul 1 leagă senzorul de placă), apoi apăsați <b>▶ Pornește simularea</b> (placa alimentată prin USB alimentează și senzorul). X1 se cuplează / decuplează numai fără alimentare.`, `Comutatorul multimetrului pe <b>V⎓</b>; sonda <b>−</b> pe <b>TP GND</b>.`, `Pârghia la <b>0°</b> (butonul din Comenzi rapide sau tragere); sonda <b>+</b> pe <b>TP A0</b> și apăsați <b>„● U (multimetru) → Tabelul 3.1”</b> – se completează U1.`, `Mutați sonda <b>+</b> pe <b>TP A1</b> și apăsați din nou – se completează U2.`, `Repetați pentru <b>12°, 24°, 36°, 48° și 60°</b> (12 valori în total).`, `Măsurați și <b>TP 5V</b>: tensiunea USB nu este exact 5 V (de aici abaterile ADC).`],
     ctl: () => `<div class="rand-mic">${[0, 12, 24, 36, 48, 60].map(a => `<button type="button" data-teta="${a}">${a}°</button>`).join("")}</div><div class="rand-mic"><button type="button" data-dteta="-0.5">−0,5°</button><button type="button" data-dteta="0.5">+0,5°</button></div>`,
     ver: () => [[sim.run, "placa alimentată"], [sim.dmm.mod === "V", "multimetrul pe V⎓"], [["tGND", "p3", "p5"].includes(sim.dmm.s.dmmB), "sonda − la masă"], [["tA0", "tA1"].includes(sim.dmm.s.dmmR), "sonda + pe TP A0 / TP A1"], [gridS() !== null, `pârghia la o poziție din tabel (θ = ${fx(sim.teta, 1)}°)`]],
     prog: () => MD.POZ.reduce((n, s) => n + (pe("t31", "s" + s, "U1") ? 1 : 0) + (pe("t31", "s" + s, "U2") ? 1 : 0), 0), tot: 12,
@@ -479,6 +479,81 @@ const PASI = [
     butoane: [["● rezultatele → Tabelul 3.3", inregCmp, "primar"]] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giP = p => `#tk-svg [data-pin="${p}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start";
+const giSd = k => `#tk-svg [data-sonda="${k}"]`, giDmm = m => `#tk-svg .dmm-poz[data-mod="${m}"]`;
+const giET = { tA0: "TP A0", tA1: "TP A1", tGND: "TP GND", t5V: "TP 5V" };
+function giX1Cuplat() { return sim.run ? [] : [["#x1", sim.as ? "Dați clic pe conectorul <b>X1</b> pentru a-l <b>cupla</b> (cu simularea oprită)" : "Montați întâi cablajul (pasul 1)", !sim.dec]]; }
+function giCfg(eps, n) {   // programul trebuie să ruleze cu (EPS; NCONF) dat
+  const ok = sim.run && sim.fw && sim.fw.eps === eps && sim.fw.n === n, e = eps.toFixed(2);
+  return [[giS, `Opriți simularea (■) pentru a modifica programul`, !sim.run || ok],
+    [`#tk-cod [data-cf="eps"]`, `Setați în cod <b>EPS = ${e.replace(".", ",")}</b>`, ok || (!sim.run && +sim.camp.eps === eps)],
+    [`#tk-cod [data-cf="n"]`, `Setați în cod <b>NCONF = ${n}</b>`, ok || (!sim.run && +sim.camp.n === n)],
+    ...giX1Cuplat(), [giS, "Apăsați <b>▶ Pornește simularea</b>", ok]];
+}
+function giFaraDefecte(pastreaza) { return ["s1", "s2", "s3"].filter(k => sim.f[k] && k !== pastreaza).map(k => [`#sw-${k}`, `Deschideți comutatorul <b>${k.toUpperCase()}</b> (clic)`, false]); }
+const GI_PER = [[1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [2, 3], [2, 4], [2, 5], [2, 6], [3, 4], [3, 5], [3, 6], [4, 5], [4, 6], [5, 6]];
+PASI[0].ind = () => {
+  const L = (Cadru.D.log || []).filter(l => l.m === "ohm"), are = (a, b) => L.some(l => (l.a === a && l.b === b) || (l.a === b && l.b === a));
+  const o = [[giS, "Opriți simularea – rezistențele se măsoară fără alimentare", !sim.run],
+    ["#x1", sim.dec ? "X1 este deja <b>decuplat</b> – lăsați-l așa" : "Dați clic pe <b>X1</b> pentru a-l <b>decupla</b>", sim.dec],
+    [giDmm("R"), "Rotiți comutatorul multimetrului pe <b>Ω</b> (clic pe „Ω”)", sim.dmm.mod === "R"]];
+  if (L.length < 6) { const [a, b] = GI_PER.find(([a, b]) => !are(a, b)) || [1, 2];
+    o.push([[giSd("dmmR"), giP("p" + a)], `Trageți sonda <b>+</b> (roșie) pe <b>borna ${a}</b>`, sim.dmm.s.dmmR === "p" + a],
+      [[giSd("dmmB"), giP("p" + b)], `Trageți sonda <b>−</b> (neagră) pe <b>borna ${b}</b>`, sim.dmm.s.dmmB === "p" + b],
+      [giR(0), `Apăsați <b>„● R → jurnal”</b> (măsurătoarea ${L.length + 1} din 6, perechea ${a}–${b})`, false]);
+  } else {
+    const s2 = new Set(L.map(l => l.s)).size > 1;
+    const sC = Math.round(sCur() * 100) / 100, alta = L.every(l => l.s !== sC);
+    o.push(["#parghie", "Trageți pârghia în altă poziție", s2 || !!sim.as || alta],
+      [giR(0), "Remăsurați o pereche cu pârghia mutată – <b>„● R → jurnal”</b> (cursorul se recunoaște după R variabil)", s2 || !!sim.as]);
+    const gol = [1, 2, 3, 4, 5, 6].find(p => !($(`#id-p${p}`) || {}).value);
+    o.push([gol ? `#id-p${gol}` : "#id-p6", `În Comenzi rapide alegeți funcția fiecărui pin${gol ? ` (acum: <b>Pin ${gol}</b>)` : ""}`, !gol || !!sim.as],
+      [giR(1), "Apăsați <b>„● Trece în Tabelul 3.0 și montează cablajul”</b>", !!sim.as && PASI[0].prog() >= 6]);
+  }
+  return o;
+};
+PASI[1].ind = () => {
+  const o = [...giX1Cuplat(), [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ...giFaraDefecte(),
+    [giDmm("V"), "Comutatorul multimetrului pe <b>V⎓</b>", sim.dmm.mod === "V"],
+    [[giSd("dmmB"), giP("tGND")], "Trageți sonda <b>−</b> (neagră) pe <b>TP GND</b>", ["tGND", "p3", "p5"].includes(sim.dmm.s.dmmB)]];
+  let urm = null; for (const s of MD.POZ) { for (const c of ["U1", "U2"]) if (!pe("t31", "s" + s, c)) { urm = [s, c]; break; } if (urm) break; }
+  if (urm) { const [s, c] = urm, tp = c === "U1" ? "tA0" : "tA1", t = s * 0.6;
+    o.push([giA(`[data-teta="${t}"]`), `Pârghia la <b>${t}°</b> (butonul din Comenzi rapide)`, gridS() === s],
+      [[giSd("dmmR"), giP(tp)], `Trageți sonda <b>+</b> (roșie) pe <b>${giET[tp]}</b> (${c})`, sim.dmm.s.dmmR === tp],
+      [giR(0), `Apăsați <b>„● U (multimetru) → Tabelul 3.1”</b> (s = ${s} %, ${c})`, false]); }
+  return o;
+};
+PASI[2].ind = () => {
+  const full = sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5;
+  return [...giCfg(0.2, 5), [giA("[data-auto]"), "Apăsați <b>„↔ Acționează pârghia (10 s)”</b> (sau trageți pârghia 0 → 60°)", full],
+    ["#tk-svg [data-comp=\"oled\"]", "Urmăriți pe OLED U1, U2, ΔU, s și starea; comparați U1 cu multimetrul", full]];
+};
+PASI[3].ind = () => {
+  const k = ["d1", "d2", "d3"].find(r => !pe("t32", r, "U1")); if (!k) return [[giR(0), "Toate cele 3 defecte sunt în tabel", true]];
+  const sw = { d1: "s1", d2: "s2", d3: "s3" }[k], x = sim.exp && sim.exp.k === sw ? sim.exp : null, t = MD.S_DEF * 0.6;
+  const fault = !!(sim.pr && sim.pr.fault) && !x;
+  return [...giCfg(0.2, 5), ...giFaraDefecte(x ? sw : null),
+    [giA(`[data-teta="${t}"]`), `Pârghia la <b>${t}°</b>`, !!x || Math.abs(sim.teta - t) < 1e-6],
+    [giA("[data-rst]"), "Lampa EPC este aprinsă: apăsați <b>RESET placă</b>", !fault],
+    [`#sw-${sw}`, `Dați clic pe comutatorul <b>${sw.toUpperCase()}</b> (închis)`, !!x],
+    ["#tk-svg [data-comp=\"epc\"]", "Așteptați reacția programului (OLED, lampa EPC, t_conf pe monitorul serial)", !!(x && x.rez)],
+    [giR(0), `Apăsați <b>„● U1, U2, t_conf → Tabelul 3.2”</b> (${sw.toUpperCase()}), apoi deschideți ${sw.toUpperCase()} și RESET`, false]];
+};
+PASI[4].ind = () => {
+  const k = Object.keys(MD.CONFIG).find(c => !pe("t33", c, "inv")); if (!k) return [[giR(0), "Toate cele 3 configurații sunt în tabel", true]];
+  const C = MD.CONFIG[k], fw = sim.fw || {}, T = sim.testRez, Tok = !!(T && T.eps === fw.eps && T.n === fw.n && T.dist >= 100 && fw.eps === C.eps && fw.n === C.n);
+  const x = sim.exp && sim.exp.k === "s3" && sim.exp.eps === C.eps && sim.exp.n === C.n ? sim.exp : null, t = MD.S_DEF * 0.6, fault = !!(sim.pr && sim.pr.fault) && !x;
+  return [...giCfg(C.eps, C.n), ...giFaraDefecte(x ? "s3" : null),
+    [giA("[data-ser]"), "Apăsați <b>„Trimite „t” (test 10 s)”</b>", Tok || !!(sim.pr && sim.pr.test)],
+    [giA("[data-auto]"), "Imediat apăsați <b>„↔ Acționează pârghia (10 s)”</b> și așteptați rezultatul testului", Tok],
+    [giA(`[data-teta="${t}"]`), `Pârghia la <b>${t}°</b>`, !!x || (Tok && Math.abs(sim.teta - t) < 1e-6)],
+    [giA("[data-rst]"), "Apăsați <b>RESET placă</b> (lampa EPC aprinsă)", !!x || (Tok && !fault)],
+    ["#sw-s3", "Dați clic pe <b>S3</b> (deriva de 2,2 kΩ)", !!x],
+    ["#tk-svg [data-comp=\"epc\"]", "Așteptați reacția programului (max. 1,5 s)", !!(x && x.rez)],
+    [giR(0), `Apăsați <b>„● rezultatele → Tabelul 3.3”</b> (ε = ${C.eps.toFixed(2).replace(".", ",")} V, N = ${C.n})`, false]];
+};
+
 function construiestePasi() {
   $("#pasi").innerHTML = PASI.map((p, i) => `<li class="pas" data-pas="${i}"><button type="button" class="pas-cap"><span class="pas-nr">${i + 1}</span><span>${p.t}<br><small style="font-weight:400;color:var(--text-sec)">${p.tab}</small></span><span class="pas-prog"></span></button>
     <div class="pas-corp"><ol>${p.instr.map(x => `<li>${x}</li>`).join("")}</ol>${p.ctl ? `<div class="pas-ctl">${p.ctl()}</div>` : ""}<ul class="pas-ver"></ul>
@@ -492,7 +567,7 @@ function construiestePasi() {
   $$("#pasi [data-rst]").forEach(b => b.addEventListener("click", resetMega));
   $$("#pasi [data-ser]").forEach(b => b.addEventListener("click", () => trimiteSerial(b.dataset.ser)));
   $$("#pasi .id-grila select").forEach(s => s.addEventListener("change", () => { sim.ident[+s.id.slice(4)] = s.value; }));
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false);
 }
 function alegePas(i, zoom) {

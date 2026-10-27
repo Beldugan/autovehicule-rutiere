@@ -469,6 +469,77 @@ const PASI = [
     prog: () => (pe("t95", "rad", "t0") ? 1 : 0) + (pe("t95", "rad", "t5") ? 1 : 0), tot: 2, butoane: [["● T inițial → Tabelul 9.5", inregT0, "secundar"], ["● T după 5 min → Tabelul 9.5", inregT5, "primar"]] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giK = k => `#tk-svg [data-k="${k}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start", giPm = s => "#tk-pompa " + s, giO = s => "#tk-osc " + s;
+const giSt = (k, svg) => [giK(svg), giPm(`[data-st="${k}"]`)];
+const giAlim = on => [giSt("alim", "psu"), on ? "Apăsați <b>12 V OFF</b> → <b>12 V ON</b>" : "Apăsați <b>12 V ON</b> → <b>12 V OFF</b>", on ? puntePutere() : !sim.alim];
+const giMotor = on => sim.motor === on ? [] : [giAlim(false), [giSt("motor", "conector"), on ? "Apăsați <b>Motor deconectat</b> → <b>conectat</b>" : "Apăsați <b>Motor conectat</b> → <b>deconectat</b>", false]];
+const giElib = () => sim.mana !== null ? [[[giA('[data-ma2="x"]'), giPm('[data-ma="x"]')], "Apăsați <b>eliberează</b> (clapeta revine pe arc)", false]] : [];
+const GI_CF = { MOD: "MOD", KP: "KP", KI: "KI", KD: "KD", FPWM: "FPWM" };
+function giCfg(camp, ok) {
+  const o = [[giS, "Opriți simularea (■) pentru a modifica programul", !sim.run || ok]];
+  Object.entries(camp).forEach(([k, v]) => o.push([`#tk-cod [data-cf="${k}"]`, `Setați în cod <b>${GI_CF[k]} = ${v}</b>`, ok || (!sim.run && String(sim.camp[k]) === String(v))]));
+  o.push([giS, "Apăsați <b>▶ Pornește simularea</b>", ok]); return o;
+}
+const giMm = k => [[giA(`[data-mm2="${k}"]`), giPm(`[data-mm="${k}"]`), giK("dmm")], `Multimetrul pe <b>${k}</b>`, sim.mm === k];
+const giDc = v => [[giA(`[data-dc2="${v}"]`), giPm(`[data-dc="${v}"]`)], `Apăsați <b>DC ${v}</b> %`, !!(sim.pr && sim.pr.dc === v)];
+const giFaraDefect = () => [...(sim.defP2 ? [[[giA("[data-p22]"), giPm("[data-p2]")], "Refaceți <b>pista 2</b> (clic pe ✂)", false]] : []),
+  ...(sim.pr && sim.pr.defect ? [[giK("rst"), "Apăsați <b>RESET</b> pe placă (sau Oprește / Pornește)", false]] : [])];
+PASI[0].ind = () => [[giSt("capac", "capac"), "Montați <b>capacul</b> de protecție", sim.capac], [giSt("tvs", "tvs"), "Montați dioda <b>TVS</b> (TVS lipsă → ✓)", sim.tvs],
+  [giSt("alim", "psu"), "Apăsați <b>12 V OFF</b> → <b>12 V ON</b>", sim.alim || sim.estopVerif], [giSt("estop", "estop"), "Apăsați <b>🛑 Urgență</b> – linia punții se întrerupe", sim.estopVerif],
+  [giSt("estop", "estop"), "Eliberați butonul de urgență (clic din nou)", sim.estopVerif && !sim.estop], giAlim(false), [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run]];
+PASI[1].ind = () => {
+  const o = [giAlim(false), [giS, "Apăsați <b>▶ Pornește simularea</b> (senzorii la 5 V)", sim.run]];
+  const p = MD.POZ.find(x => !(pe("t91", "p" + x, "u1") && pe("t91", "p" + x, "u2")));
+  if (p === undefined) return [...o, ...giElib()];
+  const c = pe("t91", "p" + p, "u1") ? "U2" : "U1", et = p === 0 ? "închisă" : p === 100 ? "deschisă" : p + " %";
+  return [...o, [[giA(`[data-ma2="${p}"]`), giPm(`[data-ma="${p}"]`)], `Rotire manuală: <b>${et}</b>`, sim.mana === p && Math.abs(sim.st.th - p) <= 0.05], giMm(c),
+    [giR(0), `Apăsați <b>„● U → Tabelul 9.1”</b> (${et}, ${c})`, false]];
+};
+PASI[2].ind = () => {
+  const m = sim.osc.acq && sim.osc.acq.m, o = [...giElib(), [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run]];
+  if (!sim.pwmOk) return [...o, ...giMotor(false), giAlim(true), giDc(20), [[giK("D11"), giO('[data-ch="0"]')], "Clic pe pinul <b>D11</b> (CH1)", sim.osc.ch[0].s === "D11"],
+    [[giA('[data-tdv="0.00002"]'), giO('[data-td="-1"]')], "Baza de timp <b>20 µs/div</b> – citiți Freq ≈ 20 kHz și Duty", !!(m && m.f === 20000)]];
+  if (!sim.pwmVazut) return [...o, ...giMotor(true), giAlim(true), giDc(20), [[giK("IS"), giO('[data-ch="1"]')], "Clic pe <b>IS</b> (CH2 – curentul)", sim.osc.ch[1].s === "IS"],
+    [[giA('[data-tdv="0.001"]'), giO('[data-td="1"]')], "Citiți curentul mediu și ondulația (Pk-Pk) pe CH2", false]];
+  return [...o, giDc(0)];
+};
+PASI[3].ind = () => {
+  const ok = sim.run && !!sim.fw && sim.fw.mod === "BD", d = MD.DCS.find(x => !pe("t92", "d" + x, "th"));
+  const o = [...giElib(), ...giCfg({ MOD: "BD" }, ok), ...giMotor(true), giAlim(true), giMm("Um")];
+  if (d === undefined) return [...o, giDc(0)];
+  return [...o, giDc(d), [giK("clapeta"), "Așteptați oprirea clapetei (poziția de echilibru)", !!(sim.pr && sim.pr.dc === d) && Math.abs(sim.st.w) <= 0.01],
+    [giR(0), `Apăsați <b>„● Um, θ, I → Tabelul 9.2”</b> (DC ${d} %)`, false]];
+};
+PASI[4].ind = () => {
+  const C = [["p", "0", "0"], ["pi", "20", "0"], ["pid", "20", "0.05"]].find(c => !pe("t93", c[0], "thMax")) || (pidOk() ? null : ["pid", "40", "0.05"]);
+  if (!C) return [[giR(0), "Tabelul 9.3 este complet (PID: Mp < 10 %, ts < 300 ms)", true]];
+  const [k, ki, kd] = C, f = sim.fw || {}, ok = sim.run && f.mod === "PID" && f.kp === 4 && f.ki === +ki && f.kd === +kd, r = ok && sim.pr && sim.pr.rez.t;
+  return [...giElib(), ...giCfg({ MOD: "PID", KP: "4", KI: ki, KD: kd }, ok), ...giMotor(true), giAlim(true),
+    [[giA("[data-tr2]"), giPm("[data-tr]")], "Apăsați <b>⤴ Treapta 0 → 40 %</b> și așteptați rezultatul (1,6 s)", !!(r && r.kp === 4 && r.ki === +ki && r.kd === +kd)],
+    [giR(0), `Apăsați <b>„● Răspunsul → Tabelul 9.3”</b> (${k.toUpperCase()})`, false]];
+};
+PASI[5].ind = () => {
+  const pr = sim.pr, ok = sim.run && !!sim.fw && sim.fw.mod === "PID";
+  if (pe("t94", "p2", "tr")) return giFaraDefect();
+  const def = !!(pr && pr.defect && pr.rez.defT !== undefined);
+  return [...giElib(), ...giCfg({ MOD: "PID" }, ok), ...giMotor(true), giAlim(true),
+    [[giA('[data-pot2="40"]'), giPm('[data-pot="40"]')], "Setpoint <b>40 %</b> și așteptați clapeta stabilă", sim.pot === 40 && (def || Math.abs(sim.st.w) <= 0.01)],
+    [[giA("[data-p22]"), giPm("[data-p2]")], "Apăsați <b>✂ Întrerupe pista 2</b>", sim.defP2],
+    ["#tk-serial", "Urmăriți monitorul serial (DEFECT PISTE) și revenirea clapetei pe arc", def && Math.abs(sim.st.w) <= 0.01 && sim.tS - pr.tDef >= 0.5],
+    [giR(0), "Apăsați <b>„● Reacția la defect → Tabelul 9.4”</b>", false]];
+};
+PASI[6].ind = () => {
+  const ok = sim.run && !!sim.fw && sim.fw.mod === "PID", c = sim.crono, irOk = !!(sim.ir && sim.tS - sim.ir.t <= 5);
+  const o = [...giFaraDefect(), ...giElib(), ...giCfg({ MOD: "PID" }, ok), ...giMotor(true), giAlim(true), [[giA('[data-pot2="40"]'), giPm('[data-pot="40"]')], "Setpoint <b>40 %</b>", sim.pot === 40]];
+  const ir = [[giA("[data-ir2]"), giPm("[data-ir]"), giK("ir")], "Apăsați <b>🌡 Termometru IR</b>"];
+  if (!pe("t95", "rad", "t0")) return [...o, [...ir, irOk], [giR(0), "Apăsați <b>„● T inițial → Tabelul 9.5”</b> (pornește cronometrul)", false]];
+  if (pe("t95", "rad", "t5")) return o;
+  return [...o, [[giA("[data-vit2]"), giPm("[data-vit]")], "Opțional: <b>⏩ Timp ×10</b>", sim.viteza > 1 || (c && sim.tS - c.t0 >= 300)],
+    ["#tk-serial", `Așteptați 5 minute${c ? ` (${fx((sim.tS - c.t0) / 60, 2)} / 5 min)` : ""}; nu atingeți radiatorul`, !!(c && sim.tS - c.t0 >= 300)],
+    [ir[0], "Apăsați din nou <b>🌡 Termometru IR</b>", !!(c && sim.ir && sim.ir.t >= c.t0 + 300)], [giR(1), "Apăsați <b>„● T după 5 min → Tabelul 9.5”</b>", false]];
+};
+
 const VEDERI = { tot: [[0.0, 0.62, 0.86], [0.0, 0.05, -0.02]], clapeta: [[-0.3, 0.3, 0.42], [-0.32, 0.08, -0.04]], osc: [[0.0, 0.3, 0.45], [0.0, 0.1, -0.2]], bts: [[-0.05, 0.3, 0.35], [-0.08, 0.04, -0.04]] };
 function vedere3d(v) { if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
 function construiestePasi() {
@@ -488,7 +559,7 @@ function construiestePasi() {
   $$("#pasi [data-p22]").forEach(b => b.addEventListener("click", taiePista));
   $$("#pasi [data-ir2]").forEach(b => b.addEventListener("click", masoaraIR));
   $$("#pasi [data-vit2]").forEach(b => b.addEventListener("click", comutaViteza));
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false);
 }
 function alegePas(i) {

@@ -660,6 +660,56 @@ const PASI = [
     butoane: [["● Întârzierea D2 → D13 → Tabelul 1.4", inregLat, "primar"]] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giP = p => `#tk-svg [data-pin="${p}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start", giSd = k => `#tk-svg [data-sonda="${k}"]`;
+const GI_NUME = { gH: "mega_gpio HIGH", gL: "mega_gpio LOW", sH: "stm32_gpio HIGH", sL: "stm32_gpio LOW", adc: "mega_adc", sadc: "stm32_adc", aw: "analogWrite(9, 128)", o199: "Timer1 OCR1A = 199", o399: "OCR1A = 399", o599: "OCR1A = 599", idw: "ISR cu digitalWrite()", ipt: "ISR cu PINB" };
+const GI_PIN = { pin13: "pinul 13", PB12: "pinul PB12", A0: "A0", PA0: "PA0", pin9: "pinul 9", pin11: "pinul 11", pin2: "pinul 2" };
+/** schița cerută rulează (ok) sau trebuie: oprire → comanda rapidă → pornire */
+function giSchita(k, ok) {
+  const [placa, prog, camp] = SK[k], gata = !sim.run && sim.sketch[placa] === prog && Object.entries(camp || {}).every(([a, v]) => String(sim.camp[a]) === String(v));
+  return [[giS, "Opriți simularea (■ Oprește simularea)", !sim.run || ok], [giA(`[data-sk="${k}"]`), `Apăsați <b>„${GI_NUME[k]}”</b> în Comenzi rapide`, ok || gata], [giS, "Apăsați <b>▶ Pornește simularea</b>", ok]];
+}
+const giSonda = (sd, pin, txt) => [[giSd(sd), giP(pin)], `${txt} pe <b>${GI_PIN[pin] || pin}</b>`, (sd === "dmm" ? sondaV() : ch(+sd.slice(2))) === pin];
+PASI[0].ind = () => {
+  const C = [["UOH", "mega", "gH", "pin13", true], ["UOL", "mega", "gL", "pin13", false], ["UOH", "stm", "sH", "PB12", true], ["UOL", "stm", "sL", "PB12", false]].find(c => !pe("t11", c[0], c[1]));
+  if (!C) return [[giR(0), "Tabelul 1.1 este complet", true]];
+  const [r, placa, k, pin, lv] = C, fw = placa === "mega" ? fwM() : fwS(), ok = sim.run && fw.prog === SK[k][1] && !!fw.stare === lv;
+  return [...giSchita(k, ok), giSonda("dmm", pin, "Trageți sonda roșie <b>V</b> a multimetrului"), [giR(0), `Apăsați <b>„● U<sub>OH</sub>/U<sub>OL</sub> → Tabelul 1.1”</b> (${r}, ${placa === "mega" ? "Mega" : "STM32"})`, false]];
+};
+function giADC(placa) {
+  const mega = placa === "mega", k = mega ? "adc" : "sadc", ok = sim.run && (mega ? fwM() : fwS()).prog === SK[k][1], tb = mega ? "t12" : "t12b";
+  const chei = mega ? ["p1", "p2", "p3", "p4", "p5"] : ["s1", "s2", "s3"], poz = mega ? [0.1, 0.3, 0.5, 0.7, 0.9] : [0.15, 0.5, 0.85], urm = chei.findIndex(c => !pe(tb, c, "N"));
+  const o = [...giSchita(k, ok), [giA("[data-ser]"), "Deschideți <b>Monitorul serial</b>", !$("#tk-serial").hidden]];
+  if (!mega) o.push(["#tk-placa", "În panoul de cod alegeți placa <b>2 (STM32 Blue Pill)</b>", sim.placaCod === "stm"]);
+  o.push(giSonda("dmm", mega ? "A0" : "PA0", "Trageți sonda roșie <b>V</b>"));
+  if (urm < 0) return o;
+  const a = poz[urm], alfa = mega ? sim.alfa : sim.alfaS, U = sim.dmm.v, alt = chei.map(c => num(Cadru.D.t[tb][c].U)).filter(Number.isFinite);
+  o.push([giA(`[data-${mega ? "pot" : "pots"}="${a}"]`), `Potențiometrul ${mega ? "" : "STM32 "}la <b>${Math.round(a * 100)} %</b> (sau trageți butonul lui)`, Math.abs(alfa - a) < 0.02 || (sim.run && alt.length > 0 && alt.every(u => Math.abs(u - U) >= 0.3))],
+    [`#sel-punct-${placa}`, `Alegeți <b>Punctul ${urm + 1}</b>`, $(`#sel-punct-${placa}`) && $(`#sel-punct-${placa}`).value === chei[urm]],
+    [giR(0), `Apăsați <b>„● U, N → Tabelul ${mega ? "1.2" : "1.2b"}”</b> (punctul ${urm + 1})`, false]);
+  return o;
+}
+PASI[1].ind = () => giADC("mega");
+PASI[2].ind = () => giADC("stm");
+PASI[3].ind = () => {
+  const r = ["aw", "o199", "o399", "o599"].find(k => !pe("t13", k, "f")); if (!r) return [[giR(0), "Tabelul 1.3 este complet", true]];
+  const f = fwM(), aw = r === "aw", ok = sim.run && (aw ? f.prog === "mega_aw" && f.val === 128 : f.prog === "mega_t1" && f.ocr === +r.slice(1) && f.top === 799 && f.P === 1);
+  const pin = aw ? "pin9" : "pin11", td = aw ? 0.0005 : 0.00001, a = sim.osc.acq, m = !!(a && a.m && a.m.f);
+  const o = [...giSchita(r, ok), giSonda("ch0", pin, "Trageți sonda <b>1</b> (CH1) a osciloscopului"),
+    [giA(`[data-tdiv="${td}"]`), `Baza de timp <b>${aw ? "500 µs" : "10 µs"}/div</b> (până apar f și DC)`, m && sim.osc.tdiv === td || (m && ok)]];
+  if (!aw) o.push(giSonda("dmm", "pin11", "Trageți sonda roșie <b>V</b> a multimetrului"));
+  o.push([giR(0), `Apăsați <b>„● f, DC${aw ? "" : ", U<sub>med</sub>"} → Tabelul 1.3”</b> (${aw ? "analogWrite" : "OCR1A = " + r.slice(1)})`, false]);
+  return o;
+};
+PASI[4].ind = () => {
+  const col = ["dw", "port"].find(c => ["m1", "m2", "m3"].some(k => !pe("t14", k, c))); if (!col) return [[giR(0), "Tabelul 1.4 este complet", true]];
+  const f = fwM(), ok = sim.run && f.prog === "mega_isr" && f.isr === col, n = ["m1", "m2", "m3"].filter(k => pe("t14", k, col)).length, a = sim.osc.acq;
+  return [...giSchita(col === "dw" ? "idw" : "ipt", ok), [["#gen-out", giA("[data-gen]")], "Porniți generatorul – butonul <b>OUTPUT</b>", sim.gen],
+    giSonda("ch0", "pin2", "Trageți sonda <b>1</b> (CH1)"), giSonda("ch1", "pin13", "Trageți sonda <b>2</b> (CH2)"),
+    [giA('[data-tdiv="0.000001"]'), "Baza de timp <b>1 µs/div</b>", !!(a && a.m && a.m.lat)],
+    [giR(0), `Apăsați <b>„● Întârzierea → Tabelul 1.4”</b> (${col === "dw" ? "digitalWrite" : "PINB"}, măsurarea ${n + 1} din 3)`, false]];
+};
+
 function construiestePasi() {
   $("#pasi").innerHTML = PASI.map((p, i) => `<li class="pas" data-pas="${i}"><button type="button" class="pas-cap"><span class="pas-nr">${i + 1}</span><span>${p.t}<br><small style="font-weight:400;color:var(--text-sec)">${p.tab}</small></span><span class="pas-prog"></span></button>
     <div class="pas-corp"><ol>${p.instr.map(x => `<li>${x}</li>`).join("")}</ol>${p.ctl ? `<div class="pas-ctl">${p.ctl()}</div>` : ""}<ul class="pas-ver"></ul>
@@ -672,7 +722,7 @@ function construiestePasi() {
   $$("#pasi [data-pots]").forEach(b => b.addEventListener("click", () => { sim.alfaS = +b.dataset.pots; potDesen(); }));
   $$("#pasi [data-tdiv]").forEach(b => b.addEventListener("click", () => { sim.osc.tdiv = +b.dataset.tdiv; achizitie(); deseneazaOsc(); }));
   $$("#pasi [data-gen]").forEach(b => b.addEventListener("click", () => { sim.gen = !sim.gen; genAfis(); achizitie(); deseneazaOsc(); }));
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false);
 }
 function alegePas(i) {

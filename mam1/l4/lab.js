@@ -616,7 +616,7 @@ const PASI = [
   { t: "Divizorul NTC în aer", tab: "Tabelul 4.3 – aer", v3: "dmm", zona: [540, 20, 560, 720], pini: ["tUs", "t5V", "tGND", "n1", "n2"],
     banda: "Pasul 2 · Multimetrul V⎓: sonda − pe TP GND, + pe TP Us (Us), apoi pe TP 5V (Uref). Apoi decuplați X2, Ω pe NTC 1 – NTC 2 (rezistența măsurată).",
     instr: [`Dați clic pe comutatorul rotativ al multimetrului până la <b>V⎓</b>; sonda <b>−</b> pe <b>TP GND</b>.`, `Sonda <b>+</b> pe <b>TP Us</b> (tensiunea pe NTC) și apăsați <b>„● Us → Tabelul 4.3”</b>.`, `Sonda <b>+</b> pe <b>TP 5V</b> și apăsați <b>„● Uref → Tabelul 4.3”</b> (alimentarea divizorului).`, `Dați clic pe conectorul <b>X2</b> (decuplat), comutatorul multimetrului pe <b>Ω</b>, sondele pe <b>NTC 1</b> și <b>NTC 2</b> și apăsați <b>„● R NTC → Tabelul 4.3”</b>. Observați ce afișează OLED-ul cu NTC-ul deconectat.`, `Dați clic din nou pe <b>X2</b> pentru a-l cupla la loc.`],
-    ctl: () => "",
+    ctl: ctlPoz,
     ver: () => [[sim.run, "programul rulează"], [stabil("aer"), "senzorii stabilizați în aer"], [sim.dmm.mod !== "OFF", "multimetrul pornit"], [peMasa(sim.dmm.s.dmmB) || [sim.dmm.s.dmmR, sim.dmm.s.dmmB].sort().join() === "n1,n2", "sonda − pe masă / sondele pe NTC"]],
     prog: () => ["us", "uref", "rm"].filter(c => pe("t43", "aer", c)).length, tot: 3,
     butoane: [["● Us → Tabelul 4.3", inregUs, "primar"], ["● Uref → Tabelul 4.3", inregUref, "secundar"], ["● R NTC → Tabelul 4.3", inregR, "secundar"]] },
@@ -647,6 +647,51 @@ const PASI = [
     butoane: [] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giP = p => `#tk-svg [data-pin="${p}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start";
+const giSd = k => `#tk-svg [data-sonda="${k}"]`, giDmm = m => `#tk-svg .dmm-poz[data-mod="${m}"]`, GI_TP = { tUs: "TP Us", t5V: "TP 5V", tGND: "TP GND", n1: "NTC 1", n2: "NTC 2" };
+const giSonda = (sd, pin, txt, ok) => [[giSd(sd), giP(pin)], `Trageți sonda <b>${sd === "dmmR" ? "+" : "−"}</b> (${sd === "dmmR" ? "roșie" : "neagră"}) pe <b>${GI_TP[pin]}</b>${txt || ""}`, ok !== undefined ? ok : sim.dmm.s[sd] === pin];
+const giX2 = cuplat => ["#x2", cuplat ? "Dați clic pe <b>X2</b> pentru a-l <b>cupla</b> (NTC-ul în divizor)" : "Dați clic pe <b>X2</b> pentru a-l <b>decupla</b> (NTC-ul separat)", cuplat ? !sim.dec : sim.dec];
+function giPoz(poz) {
+  const o = []; if ((poz === "apa" || sim.poz === "apa") && poz !== sim.poz) o.push([giA("[data-man]"), "Puneți <b>🧤 Mănușile</b> (NSSM – apa caldă)", sim.manusi]);
+  o.push([giA(`[data-poz="${poz}"]`), `Apăsați <b>${{ aer: "↑ Aer", apa: "Apă caldă", pahar: "Pahar" }[poz]}</b>`, sim.poz === poz]); return o;
+}
+function giStabil(sit) {
+  const t = sit === "aer" ? 300 : 60;
+  return [[giA('[data-vit="60"]'), "Accelerați timpul (<b>×30</b> sau <b>×60</b>)", sim.viteza >= 30 || stabil(sit)],
+    ["#tk-plot", `Așteptați până când curbele de pe plotter devin orizontale (≥ ${t / 60} min; acum ${fx(sim.poz === sit ? sim.tPoz / 60 : 0, 1)} min)`, stabil(sit)]];
+}
+function giDiv(sit, jUs, jUref, jR) {
+  const o = [], lips = c => !pe("t43", sit, c);
+  if (lips("us")) o.push(giX2(true), [giDmm("V"), "Comutatorul multimetrului pe <b>V⎓</b>", sim.dmm.mod === "V"], giSonda("dmmB", "tGND", "", peMasa(sim.dmm.s.dmmB)), giSonda("dmmR", "tUs"), [giR(jUs), "Apăsați <b>„● Us → Tabelul 4.3”</b>", false]);
+  else if (lips("uref")) o.push([giDmm("V"), "Comutatorul multimetrului pe <b>V⎓</b>", sim.dmm.mod === "V"], giSonda("dmmB", "tGND", "", peMasa(sim.dmm.s.dmmB)), giSonda("dmmR", "t5V"), [giR(jUref), "Apăsați <b>„● Uref → Tabelul 4.3”</b>", false]);
+  else if (lips("rm")) { const pr = [sim.dmm.s.dmmR, sim.dmm.s.dmmB].sort().join() === "n1,n2";
+    o.push(giX2(false), [giDmm("R"), "Comutatorul multimetrului pe <b>Ω</b>", sim.dmm.mod === "R"], giSonda("dmmR", "n1", "", pr || sim.dmm.s.dmmR === "n1"), giSonda("dmmB", "n2", "", pr), [giR(jR), "Apăsați <b>„● R NTC → Tabelul 4.3”</b> (priviți și OLED-ul)", false]); }
+  else o.push(giX2(true));
+  return o;
+}
+PASI[0].ind = () => [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], giX2(true), ...giPoz("aer"), ...giStabil("aer"), [giR(0), "Apăsați <b>„● citiri (OLED + etalon) → Tabelul 4.1”</b> (aer)", pe("t41", "aer", "et")]];
+PASI[1].ind = () => [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ...giPoz("aer"), ...(stabil("aer") ? [] : giStabil("aer")), ...giDiv("aer", 0, 1, 2)];
+PASI[2].ind = () => {
+  const o = [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], [giA("[data-man]"), "Apăsați <b>🧤 Mănuși</b>", sim.manusi], ...giPoz("apa").filter(x => !/Mănuș/.test(x[1])), ...giStabil("apa")];
+  if (!pe("t41", "apa", "et")) return [...o, giX2(true), [giR(0), "Apăsați <b>„● citiri (OLED + etalon) → Tabelul 4.1”</b> (apă)", false]];
+  return [...o, ...giDiv("apa", 1, 2, 3)];
+};
+PASI[3].ind = () => {
+  const r = sim.inreg, o = [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run]];
+  if (!r || sim.rec) {
+    if (String(sim.camp.res) !== "12" && !sim.rec) o.push([`#tk-cod [data-cf="res"]`, "Opriți simularea și setați în cod rezoluția DS18B20 = <b>12</b> biți", false]);
+    return [...o, giX2(true), ...(sim.rec ? [] : [[giA('[data-poz="pahar"]'), "Răciți senzorii: <b>Pahar</b> ≈ 1 min, apoi <b>↑ Aer</b>", sim.poz === "aer" && sim.tPoz >= 120 || stabil("aer")], ...giPoz("aer"), ...giStabil("aer")]),
+      [giA("[data-man]"), "Puneți <b>🧤 Mănușile</b>", sim.manusi], [giA("[data-trp]"), "Apăsați <b>„▶ Treaptă”</b> (timpul trece la ×1)", !!sim.rec],
+      ["#tk-plot", `Așteptați înregistrarea de 60 s${sim.rec ? ` (${fx(sim.rec.k * 0.5, 0)} s)` : ""}`, false]];
+  }
+  const k = SZ.find(x => !pe("t42", x, "tau")); if (!k) return [[giR(0), "Tabelul 4.2 este complet", true]];
+  const s = r.s[k], c = MD.trecere(s), i = Math.round(sim.cursor.t / MD.DT), bun = s[i] >= c.tt && !(i > 0 && s[i - 1] >= c.tt);
+  return [[giA(`[data-cur="${k}"]`), `Alegeți senzorul <b>${SCURT[k]}</b>`, sim.cursor.k === k],
+    [giA("#cur-t"), `Mutați cursorul (◀ ▶ 0,5 s) pe primul eșantion ≥ ϑ(τ) = ${fx(c.tt, 2)} °C`, sim.cursor.k === k && bun],
+    [giR(0), `Apăsați <b>„● ϑ0, ϑ∞, τ (cursor) → Tabelul 4.2”</b> (${SCURT[k]})`, false]];
+};
+
 function construiestePasi() {
   $("#pasi").innerHTML = PASI.map((p, i) => `<li class="pas" data-pas="${i}"><button type="button" class="pas-cap"><span class="pas-nr">${i + 1}</span><span>${p.t}<br><small style="font-weight:400;color:var(--text-sec)">${p.tab}</small></span><span class="pas-prog"></span></button>
     <div class="pas-corp"><ol>${p.instr.map(x => `<li>${x}</li>`).join("")}</ol>${p.ctl ? `<div class="pas-ctl">${p.ctl()}</div>` : ""}<ul class="pas-ver"></ul>
@@ -661,7 +706,7 @@ function construiestePasi() {
   $$("#pasi [data-cur]").forEach(b => b.addEventListener("click", () => { sim.cursor.k = b.dataset.cur; $$("#pasi [data-cur]").forEach(x => x.classList.toggle("activ", x === b)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   $$("#pasi [data-dcur]").forEach(b => b.addEventListener("click", () => { sim.cursor.t = Math.max(0, Math.min(60, sim.cursor.t + +b.dataset.dcur)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   const ct = $("#cur-t"); if (ct) ct.addEventListener("input", () => { sim.cursor.t = +ct.value; if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); });
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false); cursorAfis();
 }
 function alegePas(i, zoom) {

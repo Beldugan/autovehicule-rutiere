@@ -414,6 +414,67 @@ const PASI = [
     butoane: [["● p, ρ (OLED) → Tabelul 5.3", inregPg, "primar"]] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giK = k => `#tk-svg [data-k="${k}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start", giPm = s => "#tk-pompa " + s;
+function giPrep() {
+  return [[[giK("ochelari"), giPm("[data-och]")], "Puneți <b>ochelarii de protecție</b> (clic pe ei)", sim.ochelari],
+    ...["pompă", "MAP", "etalon"].map((t, i) => [[giK("colier" + i), giPm(`[data-col="${i}"]`)], `Strângeți colierul furtunului <b>${t}</b> (clic)`, sim.coliere[i] && sim.desprins !== i]),
+    [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run]];
+}
+const giDmm = () => [[["#tk-dmm [data-dm=\"V\"]", giK("dmmKnob")], "Multimetrul pe <b>V⎓</b>", sim.dmm.mod === "V"],
+  ["#tk-dmm [data-ds=\"dmmR\"]", "Sonda <b>+</b> pe <b>TP U MAP</b>", sim.dmm.s.dmmR === "tU"], ["#tk-dmm [data-ds=\"dmmB\"]", "Sonda <b>−</b> pe <b>TP GND</b>", sim.dmm.s.dmmB === "tGND"]];
+/** aducerea presiunii relative la ținta T [kPa] (±tol), apoi supapa închisă și stabilizarea */
+function giTinta(T, tol, cond) {
+  const pr = etalonTxt(), aici = Math.abs(pr - T) <= tol, o = [];
+  if (T === 0) o.push([[giPm("[data-lent]"), giK("lent")], `Deschideți <b>supapa lentă</b> până la 0,0 kPa (acum ${fx(pr, 1)} kPa)`, aici || (sim.lent && Math.abs(pr) < 0.6)]);
+  else {
+    const mod = T < 0 ? "vid" : "pres", peste = mod === "vid" ? pr < T - tol : pr > T + tol;
+    o.push([[giPm(`[data-pm="${mod}"]`), giK("selector")], `Selectorul pompei pe <b>${mod === "vid" ? "Vid" : "Presiune"}</b>`, sim.mod === mod || aici]);
+    if (peste && !sim.lent) o.push([[giPm("[data-lent]"), giK("lent")], `Ați depășit ținta (${fx(pr, 1)} kPa): deschideți scurt <b>supapa lentă</b>`, false]);
+    else o.push([[giPm('[data-cs="1"]'), giK("pompa")], `Pompați (cursă plină / ¼ cursă) până la ≈ <b>${T > 0 ? "+" : ""}${T} kPa</b> (acum ${fx(pr, 1)} kPa)`, aici || (cond && cond())]);
+  }
+  o.push([[giPm("[data-lent]"), giK("lent")], "Închideți <b>supapa lentă</b>", !sim.lent], [giK("etalon"), "Așteptați stabilizarea presiunii (câteva secunde)", stabil()]);
+  return o;
+}
+PASI[0].ind = () => {
+  const o = [...giPrep(), [giR(0), "Apăsați <b>„● p<sub>atm</sub> (BMP280) → Tabelul 5.2”</b>", pe("t52", "patm", "v")]], E = sim.etans;
+  if (E && E.gata && E.ok) return o;
+  if (E && !E.gata) return [...o, [giA('[data-vit="30"]'), `Așteptați 60 s (accelerați timpul ×30) – ${fx(sim.tS - E.t0, 0)} s`, false]];
+  const pr = etalonTxt();
+  return [...o, [[giPm('[data-pm="vid"]'), giK("selector")], "Selectorul pompei pe <b>Vid</b>", sim.mod === "vid" || pr <= -44],
+    [[giPm('[data-cs="1"]'), giK("pompa")], `Pompați până la ≈ <b>−50 kPa</b> pe manometrul etalon (acum ${fx(pr, 1)} kPa)`, pr <= -44],
+    [[giPm("[data-lent]"), giK("lent")], "Închideți <b>supapa lentă</b>", !sim.lent],
+    [giA("[data-et]"), E && E.gata ? `Pierdere ${fx(E.dp, 2)} kPa: verificați colierele și repetați <b>testul de etanșeitate</b>` : "Apăsați <b>Test de etanșeitate (60 s)</b>", false]];
+};
+PASI[1].ind = () => [...giPrep(), ...giTinta(0, 0.6), ...giDmm(), [giR(0), "Apăsați <b>„● p (etalon), U (multimetru) → Tabelul 5.1”</b>", pe("t51", "p4", "u")]];
+function giPuncte(idx) {
+  const i = idx.find(k => !pe("t51", "p" + k, "u")); if (!i) return [[giR(0), "Punctele sunt în tabel", true]];
+  const T = MD.TINTE[i - 1];
+  return [...giPrep(), ...giDmm(), ...giTinta(T, 5), [giR(0), `Apăsați <b>„● p (etalon), U (multimetru) → Tabelul 5.1”</b> (${T > 0 ? "+" : ""}${T} kPa)`, false]];
+}
+PASI[2].ind = () => giPuncte([3, 2, 1]);
+PASI[3].ind = () => giPuncte([5, 6, 7]);
+PASI[4].ind = () => {
+  const r = sim.inreg;
+  if (!r || sim.rec) return [...giPrep(), ...(sim.rec ? [] : giTinta(75, 15).slice(0, -2)),
+    [[giA("[data-rapid]"), giPm("[data-rap]")], "Apăsați <b>„▶ Eliberare rapidă + înregistrare”</b>", !!sim.rec], [giK("etalon"), "Așteptați sfârșitul înregistrării (1 s)", false]];
+  const c = MD.treceri(r.s);
+  return [[giA('[data-ck="t90"]'), "Alegeți <b>cursor 90 %</b>", sim.cur.k === "t90" || sim.cur.t90 === c.t90],
+    [giA("#cur-t"), "Mutați cursorul pe primul eșantion sub U<sub>90</sub> (◀ ▶ 10 ms)", sim.cur.t90 === c.t90],
+    [giA('[data-ck="t10"]'), "Alegeți <b>cursor 10 %</b>", sim.cur.k === "t10" || sim.cur.t10 === c.t10],
+    [giA("#cur-t"), "Mutați cursorul pe primul eșantion sub U<sub>10</sub>", sim.cur.t10 === c.t10],
+    [giR(0), "Apăsați <b>„● Δt (90 % → 10 %) → Tabelul 5.2”</b>", pe("t52", "tr", "v")]];
+};
+PASI[5].ind = () => {
+  const ex = sim.fw && Math.abs(sim.fw.A - 0.01851) < 1e-9 && Math.abs(sim.fw.B - 0.0246) < 1e-9, ok = sim.run && sim.fw && !ex;
+  const camp = String(sim.camp.A) !== "0.01851" || String(sim.camp.B) !== "0.0246";
+  const o = [[giS, "Opriți simularea (■) pentru a scrie A și B", !sim.run || ok], [`#tk-cod [data-cf="A"]`, "Scrieți în cod <b>A</b> și <b>B</b> din regresia voastră (fila Determinări)", ok || camp],
+    [giS, "Apăsați <b>▶ Pornește simularea</b>", ok]];
+  const k = ["ral", "atm", "sup"].find(x => !pe("t53", x, "pP")); if (!k) return o;
+  const patm = MD.bmpP(P()), T = k === "atm" ? 0 : k === "ral" ? Math.round(35 - patm) : Math.round(170 - patm);
+  return [...o, ...giPrep().slice(0, 4), ...giTinta(T, k === "atm" ? 0.6 : 8), [giR(0), `Apăsați <b>„● p, ρ (OLED) → Tabelul 5.3”</b> (${{ ral: "ralanti", atm: "atmosferic", sup: "supraalimentat" }[k]})`, false]];
+};
+
 const VEDERI = { tot: [[0.02, 0.4, 0.82], [-0.02, 0.07, 0]], pneu: [[-0.22, 0.26, 0.42], [-0.2, 0.04, 0.02]], placa: [[0.12, 0.22, 0.32], [0.1, 0.01, 0.03]] };
 function vedere3d(v) { if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
 function construiestePasi() {
@@ -429,7 +490,7 @@ function construiestePasi() {
   $$("#pasi [data-ck]").forEach(b => b.addEventListener("click", () => { sim.cur.k = b.dataset.ck; $$("#pasi [data-ck]").forEach(x => x.classList.toggle("activ", x === b)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   $$("#pasi [data-dc]").forEach(b => b.addEventListener("click", () => { sim.cur[sim.cur.k] = Math.max(0, Math.min(990, sim.cur[sim.cur.k] + +b.dataset.dc)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   const ct = $("#cur-t"); if (ct) ct.addEventListener("input", () => { sim.cur[sim.cur.k] = +ct.value; if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); });
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false);
 }
 function alegePas(i, zoom) {

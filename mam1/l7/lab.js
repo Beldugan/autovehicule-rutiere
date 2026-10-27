@@ -436,6 +436,48 @@ const PASI = [
     prog: nT74, tot: 4, butoane: [["● Zona → Tabelul 7.4", inregZona, "primar"]] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giK = k => `#tk-svg [data-k="${k}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start", giPm = s => "#tk-pompa " + s, giO = s => "#tk-osc " + s;
+const giStart = () => [giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run];
+const giTinta = (t, u) => [[giPm(`[data-ti="${t}"]`), `Ținta: <b>${MD.TINTE[t].et}</b>`, sim.tinta === t], [giPm(`[data-un="${u}"]`), `Unghiul <b>${u}°</b>`, sim.unghi === u]];
+const giDist = d => [[giA(`[data-di2="${d}"]`), giPm(`[data-di="${d}"]`), "#carut7"], `Mutați ținta la <b>${d} cm</b> (buton sau trageți căruciorul)`, sim.d === d];
+const giAero = () => [giPm("[data-aero]"), "Aeroterma <b>oprită</b> (așteptați revenirea aerului la temperatura camerei)", !sim.aero];
+const giAsteapta = () => ["#tk-serial", "Așteptați ≈ 1 s citirea stabilă a programului", !!ultimaOk()];
+PASI[0].ind = () => [[[giPm("[data-vol]"), giK("buzzer")], "Apăsați <b>🔈 Volum buzzer</b> până la <b>mic</b>", sim.vol === "mic"], giStart(), ...giTinta("lemn", 0), giDist(50), giAsteapta()];
+PASI[1].ind = () => { const a = sim.osc.acq, w = !!(a && a.m && Number.isFinite(a.m.w));
+  return [giStart(), giAero(), ...giTinta("lemn", 0).map(x => [x[0], x[1], x[2] || tintaStd()]), giDist(50),
+    [[giK("trigH"), giO('[data-ch="0"]')], "Clic pe pinul <b>D30 TRIG HC</b> (CH1)", sim.osc.ch[0].s === "trigH"],
+    [[giK("echoH"), giO('[data-ch="1"]')], "Clic pe pinul <b>D31 ECHO HC</b> (CH2)", sim.osc.ch[1].s === "echoH"],
+    [[giA('[data-tdv="0.0005"]'), giO('[data-td="1"]')], "Baza de timp <b>0,5 ms/div</b> (impulsul ECHO întreg, apare +Width)", w],
+    [giR(0), "Apăsați <b>„● Durata ECHO → Tabelul 7.0”</b>", pe("t70", "e50", "t")]]; };
+PASI[2].ind = () => { const d = MD.DIST.find(x => !pe("t71", "d" + x, "hc")); const o = [giStart(), giAero(), ...giTinta("lemn", 0).map(x => [x[0], x[1], x[2] || tintaStd()])];
+  return d === undefined ? o : [...o, giDist(d), giAsteapta(), [giR(0), `Apăsați <b>„● d HC, d JSN → Tabelul 7.1”</b> (${d} cm)`, false]]; };
+PASI[3].ind = () => {
+  const i = MD.CAZURI.findIndex((_, j) => !pe("t73", "c" + j, "det")), o = [giStart()];
+  if (i >= 0) { const [t, u] = MD.CAZURI[i];
+    return [...o, giDist(50), [[giA(`[data-caz="${t},${u}"]`), giPm(`[data-ti="${t}"]`)], `Alegeți ținta <b>${MD.TINTE[t].et}</b>, unghiul <b>${u}°</b>`, sim.tinta === t && sim.unghi === u],
+      ["#tk-serial", "Așteptați ≈ 2 s (16 măsurări HC-SR04)", detectie() !== null], [giR(0), `Apăsați <b>„● Ecoul țintei → Tabelul 7.3”</b> (${t} ${u}°)`, false]]; }
+  if (pe("t73", "jmin", "dr")) return o;
+  const v = sim.pr && sim.pr.last, urm = !!(v && Math.abs(v.dJ - sim.d) < 1.5), esec = sim.esecJ[sim.d - 1] === true;
+  return [...o, ...giTinta("lemn", 0), [[giA('[data-di2="30"]'), giPm('[data-di="30"]')], "Ținta la <b>30 cm</b>", sim.d <= 40],
+    [[giA('[data-dd2="-1"]'), giPm('[data-dd="-1"]')], "Apăsați <b>−1 cm</b> (așteptați ≈ 1 s după fiecare pas) până când JSN nu mai urmărește rigla", sim.d <= 40 && (esec || !urm)],
+    [[giA('[data-dd2="1"]'), giPm('[data-dd="1"]')], "Apăsați <b>+1 cm</b> – înapoi la ultima poziție corectă", sim.d <= 40 && esec && urm && !!ultimaOk()],
+    [giR(1), "Apăsați <b>„● Distanța minimă JSN → Tabelul 7.3”</b>", false]];
+};
+PASI[4].ind = () => {
+  const o = [giStart(), ...giTinta("lemn", 0).map(x => [x[0], x[1], x[2] || tintaStd()]), giDist(50)], p = P(), stab = Math.abs(sim.Tds - sim.Tp - p.eDS) < 0.15;
+  if (!pe("t72", "cam", "T")) return [...o, giAero(), ["#tk-serial", `Așteptați temperatura DS18B20 constantă (${fx(tDS(), 2)} °C)`, aerCamera() && stab], [giR(0), "Apăsați <b>„● ϑ, t, d → Tabelul 7.2”</b> (aerul camerei)", false]];
+  if (!pe("t72", "cald", "T")) return [...o, [[giA("[data-aero2]"), giPm("[data-aero]")], "<b>Cadrul didactic</b> pornește aeroterma (🔥)", sim.aero],
+    [[giA("[data-vit2]"), giPm("[data-vit]")], "Opțional: <b>⏩ Timp termic ×10</b>", sim.viteza > 1 || (sim.aero && Math.abs(sim.Tp - p.Tcald) < 0.3)],
+    ["#tk-serial", `Așteptați până când temperatura nu mai crește (${fx(tDS(), 2)} °C)`, sim.aero && Math.abs(sim.Tp - p.Tcald) < 0.3 && stab], [giR(0), "Apăsați <b>„● ϑ, t, d → Tabelul 7.2”</b> (aer încălzit)", false]];
+  return [...o, [[giA("[data-aero2]"), giPm("[data-aero]")], "Cadrul didactic oprește aeroterma", !sim.aero]];
+};
+PASI[5].ind = () => {
+  const i = MD.ZONE.findIndex((_, j) => !pe("t74", "z" + j, "dm")), o = [giStart(), giAero()]; if (i < 0) return o;
+  const d = [150, 75, 40, 15][i], z = sim.pr && sim.pr.last && sim.pr.last.zona;
+  return [...o, giDist(d), [giK("buzzer"), `Ascultați buzzerul și urmăriți LED-ul (zona „${MD.ZONE[i]}”)`, !!ultimaOk() && z === MD.ZONE[i]], [giR(0), `Apăsați <b>„● Zona → Tabelul 7.4”</b> (${MD.ZONE[i]})`, false]];
+};
+
 const VEDERI = { tot: [[0.05, 0.75, 1.15], [-0.05, 0.05, 0.05]], osc: [[-0.22, 0.3, 0.38], [-0.25, 0.1, -0.22]], rigla: [[-0.3, 0.45, 0.95], [-0.2, 0.05, 0.22]], aero: [[-0.5, 0.35, 0.75], [-0.55, 0.08, 0.15]], bb: [[0.0, 0.3, 0.45], [0.0, 0.0, 0.03]] };
 function vedere3d(v) { if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
 function construiestePasi() {
@@ -452,7 +494,7 @@ function construiestePasi() {
   $$("#pasi [data-sonde]").forEach(b => b.addEventListener("click", () => { sim.osc.ch[0].s = "trigH"; sim.osc.ch[1].s = "echoH"; oscCtl(); achizitie(); actualizeaza(); }));
   $$("#pasi [data-aero2]").forEach(b => b.addEventListener("click", comutaAero));
   $$("#pasi [data-vit2]").forEach(b => b.addEventListener("click", () => { sim.viteza = sim.viteza > 1 ? 1 : 10; panou(); }));
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false);
 }
 function alegePas(i) {

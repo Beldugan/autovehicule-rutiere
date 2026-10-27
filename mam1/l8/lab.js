@@ -366,6 +366,53 @@ const PASI = [
     prog: nT85, tot: 3, butoane: [["● Vârf, durată → Tabelul 8.5", inregSoc, "primar"]] }
 ];
 let pasActiv = 0;
+/* indiciile pas cu pas: ce se conectează / se apasă, în ordine (comun/ghid-pasi.js → ghidIndicii) */
+const giK = k => `#tk-svg [data-k="${k}"]`, giA = s => ".pas.activ " + s, giR = (j = 0) => `.pas.activ [data-inreg][data-j="${j}"]`, giS = "#tk-start", giPm = s => "#tk-pompa " + s;
+const GI_CF = { ALPHA: "ALPHA", COR: "CORECTIE", FS: "FS_ADXL" };
+function giCfg(camp, ok) {
+  const o = [[giS, "Opriți simularea (■) pentru a modifica programul", !sim.run || ok]];
+  Object.entries(camp).forEach(([k, v]) => o.push([`#tk-cod [data-cf="${k}"]`, `Setați în cod <b>${GI_CF[k]} = ${v}</b>`, ok || (!sim.run && String(sim.camp[k]) === String(v))]));
+  o.push([giS, "Apăsați <b>▶ Pornește simularea</b> și nu mișcați suportul 10 s (calibrarea gx0)", ok], ["#tk-serial", "Așteptați sfârșitul calibrării (10 s)", ok && !!sim.pr && !sim.pr.cal]);
+  return o;
+}
+const giCmd = (c, txt, gata) => [[giA(`[data-cmd2="${c}"]`), giPm(`[data-cmd="${c}"]`)], txt, gata];
+const giUnghi = u => [[giA(`[data-un2="${u}"]`), giPm(`[data-un="${u}"]`)], `Suportul la <b>${u}°</b> (înclinare lentă) și așteptați oprirea`, Math.abs(sim.phi - u) < 0.05 && repaus()];
+const giVit = () => [[giA("[data-vit2]"), giPm("[data-vit]")], "Opțional: <b>⏩ Timp ×10</b>", sim.viteza > 1];
+const giFaraVib = () => sim.vib ? [[giPm("[data-vib]"), "Opriți <b>〰 Vibrațiile</b>", false]] : [];
+const giCmdRul = c => !!(sim.pr && sim.pr.cmd && sim.pr.cmd.tip === c);
+PASI[0].ind = () => [[[giK("v33"), giPm("[data-v3]")], "Apăsați <b>ADXL377: neconectat</b> → <b>3,3 V ✓</b>", sim.v3],
+  [[giK("bratari"), giPm("[data-br]")], "Apăsați <b>Brățări cabluri</b>", sim.bratari], giUnghi(0),
+  [giS, "Apăsați <b>▶ Pornește simularea</b> și nu mișcați suportul 10 s", sim.run], ["#tk-serial", "Așteptați calibrarea gx0 (10 s), apoi urmăriți OLED-ul și plotterul", !!(sim.pr && !sim.pr.cal && sim.pr.last)]];
+PASI[1].ind = () => { const r = rez("s"), ok = !!(r && !r.miscat && Math.abs(r.phi) <= 0.05);
+  return [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ...giFaraVib(), giUnghi(0), giVit(), giCmd("s", "Apăsați <b>s – statistică 10 s</b> și nu atingeți suportul", ok || giCmdRul("s")),
+    ["#tk-serial", "Așteptați rezultatul pe monitorul serial", ok], [giR(0), "Apăsați <b>„● Medii și σ → Tabelul 8.1”</b>", pe("t81", "med", "az")]]; };
+PASI[2].ind = () => {
+  const u = MD.UNGHIURI.find(x => !pe("t82", "u" + x, "ay")), o = [[giS, "Apăsați <b>▶ Pornește simularea</b>", sim.run], ...giFaraVib()];
+  if (u === undefined) return [...o, [giPm("[data-vib]"), "Porniți <b>〰 Vibrații</b> câteva secunde, comparați φacc cu φ din filtru, apoi opriți-le", false]];
+  const r = rez("m"), ok = !!(r && !r.miscat && Math.abs(r.phiR - u) < 0.05);
+  return [...o, giUnghi(u), giCmd("m", "Apăsați <b>m – mediere 1 s</b>", ok || giCmdRul("m")), ["#tk-serial", "Așteptați ay, az, φacc pe monitorul serial", ok], [giR(0), `Apăsați <b>„● ay, az → Tabelul 8.2”</b> (${u}°)`, false]];
+};
+PASI[3].ind = () => {
+  const k = ["fara", "cu"].find(x => !pe("t84", x, "d")); if (!k) return [[giR(0), "Tabelul 8.4 este complet", true]];
+  const cor = k === "cu", ok = sim.run && !!sim.fw && sim.fw.cor === cor, r = rez("d"), gata = !!(ok && r && !r.miscat && r.cor === cor);
+  return [...giCfg({ COR: String(cor) }, ok), ...giFaraVib(), giUnghi(0), giVit(), giCmd("d", "Apăsați <b>d – derivă 60 s</b> și nu mișcați suportul", gata || giCmdRul("d")),
+    ["#tk-serial", "Așteptați rezultatul Δφg", gata], [giR(0), `Apăsați <b>„● Deriva 60 s → Tabelul 8.4”</b> (${cor ? "cu" : "fără"} corecție)`, false]];
+};
+PASI[4].ind = () => {
+  const a = MD.ALFE.find(x => !pe("t83", MD.cheieA(x), "t90")); if (a === undefined) return [[giR(0), "Tabelul 8.3 este complet", true]];
+  const ok = sim.run && !!sim.fw && !sim.fw.cor && sim.fw.alpha === a, r = rez("d"), t = rez("t"), dOk = !!(ok && r && !r.miscat && r.alpha === a), tOk = !!(ok && t && t.alpha === a && Math.abs(t.dA - 30) <= 0.1);
+  return [...giCfg({ ALPHA: String(a), COR: "false" }, ok), ...giFaraVib(), [[giA('[data-un2="0"]'), giPm('[data-un="0"]')], "Suportul la <b>0°</b>", Math.abs(sim.phi) < 0.05 || tOk], giVit(),
+    giCmd("d", "Apăsați <b>d – derivă 60 s</b> (repaus)", dOk || giCmdRul("d")), ["#tk-serial", "Așteptați rezultatul testului de derivă", dOk],
+    [[giA('[data-rap2="30"]'), giPm('[data-rap="30"]')], "Apăsați <b>⚡ Rapid 0 → 30°</b> și așteptați t90", tOk],
+    [giR(0), `Apăsați <b>„● σ, derivă, t90 → Tabelul 8.3”</b> (α = ${a}), apoi <b>⚡ Rapid → 0°</b>`, false]];
+};
+PASI[5].ind = () => {
+  const f = MD.FS.find(x => !pe("t85", MD.cheieF(x), "apk")); if (f === undefined) return [[giR(0), "Tabelul 8.5 este complet", true]];
+  const ok = sim.run && !!sim.fw && sim.fw.fs === f, r = rez("soc");
+  return [...giCfg({ FS: String(f) }, ok), [[giA("[data-cio2]"), giPm("[data-cio]"), giK("ciocan")], "Apăsați <b>🔨 Lovește suportul</b>", !!(ok && r && r.f === f)],
+    [giR(0), `Apăsați <b>„● Vârf, durată → Tabelul 8.5”</b> (${f} Hz)`, false]];
+};
+
 const VEDERI = { tot: [[0.0, 0.55, 0.8], [0.0, 0.08, -0.02]], suport: [[-0.18, 0.32, 0.42], [-0.18, 0.12, -0.02]], mega: [[0.22, 0.28, 0.38], [0.22, 0.0, 0.08]] };
 function vedere3d(v) { if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
 function construiestePasi() {
@@ -380,7 +427,7 @@ function construiestePasi() {
   $$("#pasi [data-cmd2]").forEach(b => b.addEventListener("click", () => comanda(b.dataset.cmd2)));
   $$("#pasi [data-vit2]").forEach(b => b.addEventListener("click", comutaViteza));
   $$("#pasi [data-cio2]").forEach(b => b.addEventListener("click", loveste));
-  ghidPasi(PASI, alegePas);
+  ghidPasi(PASI, alegePas); ghidIndicii(PASI, () => pasActiv);
   alegePas(0, false);
 }
 function alegePas(i) {
