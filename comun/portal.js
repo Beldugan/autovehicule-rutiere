@@ -12,19 +12,20 @@ function antetPortal(titlu, sub, inapoi) {
 function realizata(disc, n) { return PORTAL.realizate[`${PORTAL.discipline[disc].dosar}-l${n}`]; }
 
 function paginaPrincipala() {
-  const sem1 = Object.entries(PORTAL.discipline).filter(([, d]) => d.sem === 1);
+  const toate = Object.entries(PORTAL.discipline), ROM = ["II", "III", "IV"];
+  const card = ([k, d]) => { const tot = d.lucrari.length, gata = d.lucrari.filter((_, i) => realizata(k, i + 1)).length;
+    return `<a class="disc-card" href="${d.dosar}/index.html"><span class="tip">${d.tip} · ${d.cod}</span><h3>${esc(d.nume)}</h3>
+      <span class="meta">${tot ? `${tot} lucrări · ${gata} disponibile în laboratorul virtual` : "proiect · aplicațiile de calcul și etapele"}</span>
+      ${tot ? `<span class="progres"><i style="width:${Math.round(gata / tot * 100)}%"></i></span>` : ""}</a>`; };
+  const ani = ROM.map(an => {
+    const sem = [1, 2].map(s => { const l = toate.filter(([, d]) => String(d.an).toLowerCase() === "anul " + an.toLowerCase() && d.sem === s);
+      return `<section class="semestru"><h3>Semestrul ${s === 1 ? "I" : "II"}</h3>${l.length ? `<div class="grila-discipline">${l.map(card).join("")}</div>` : `<p class="semestru-gol">Disciplinele vor fi adăugate pe parcurs.</p>`}</section>`; }).join("");
+    return `<section class="an-studiu"><h2>Anul ${an} <small>${esc(PORTAL.program)}</small></h2><div class="an-semestre">${sem}</div></section>`;
+  }).join("");
   document.body.innerHTML = antetPortal(`${esc(PORTAL.program)} – laboratoare și proiecte`, `Laboratoare virtuale · ${esc(PORTAL.cadru)}`) + `
   <main class="pagina">
-    <section class="semestru"><h2>Semestrul I</h2><div class="grila-discipline">
-      ${sem1.map(([k, d]) => {
-        const tot = d.lucrari.length, gata = d.lucrari.filter((_, i) => realizata(k, i + 1)).length;
-        return `<a class="disc-card" href="${d.dosar}/index.html"><span class="tip">${d.tip} · ${d.an} · ${d.cod}</span><h3>${esc(d.nume)}</h3>
-          <span class="meta">${tot ? `${tot} lucrări · ${gata} disponibile în laboratorul virtual` : "proiect · aplicațiile de calcul și etapele"}</span>
-          ${tot ? `<span class="progres"><i style="width:${Math.round(gata / tot * 100)}%"></i></span>` : ""}</a>`;
-      }).join("")}
-    </div></section>
-    <section class="semestru"><h2>Semestrul II</h2><p class="nota">Disciplinele semestrului al II-lea vor fi adăugate pe parcurs.</p></section>
-    <section class="card" style="margin-top:1.4rem">
+    ${ani}
+    <section class="card" style="margin-top:1.6rem">
       <h2>Cum se lucrează</h2>
       <ol>
         <li>Deschideți lucrarea zilei; în sală introduceți numele, e-mailul din Classroom, grupa și <b>codul de sesiune</b> afișat pe proiector – prezența se înregistrează automat.</li>

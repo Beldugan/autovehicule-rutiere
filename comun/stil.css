@@ -1,5 +1,5 @@
 /* ===== Interfața Fluent (Windows 11) – specificația UI/UX „Autovehicule Rutiere” v2.0: fundal #F3F3F3, carduri albe cu umbre fine și colțuri
-   de 8 px, accent #0067C0 (hover #004E92), text #1E293B, tipografie Segoe UI Variable; tema întunecată echivalentă */
+   de 8 px, accent #1D4F91 (hover #163D72), text #1E293B, tipografie Segoe UI Variable; tema întunecată echivalentă */
 :root {
   --fundal: #f3f3f3;
   --suprafata: #ffffff;
@@ -10,16 +10,16 @@
   --text-sec: #475569;
   --linie: #e2e8f0;
   --linie-tare: #cbd5e1;
-  --accent: #0067c0;
-  --accent-hover: #004e92;
-  --accent-slab: #e8f1fb;
+  --accent: #1d4f91;
+  --accent-hover: #163d72;
+  --accent-slab: #eaf0f8;
   --ok: #107c10;
   --ok-fundal: #e7f4e4;
   --atentie: #9d5d00;
   --atentie-fundal: #fff4ce;
   --pericol: #c42b1c;
   --pericol-fundal: #fde7e9;
-  --serie-0: #0067c0;
+  --serie-0: #1d4f91;
   --serie-1: #e8590c;
   --serie-2: #107c10;
   --serie-3: #8764b8;
@@ -34,8 +34,8 @@
   --pe-accent: #ffffff;
   --umbra: 0 1px 2px rgba(15, 23, 42, .06), 0 2px 8px rgba(15, 23, 42, .05);
   --umbra-ridicata: 0 4px 16px rgba(15, 23, 42, .1), 0 1px 3px rgba(15, 23, 42, .08);
-  --antet-1: #0067c0;
-  --antet-2: #004e92;
+  --antet-1: #1d4f91;
+  --antet-2: #0f2b55;
   --raza: 8px;
   --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", "Helvetica Neue", sans-serif;
   --font-titlu: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
@@ -52,9 +52,9 @@
     --text-sec: #a7b0bd;
     --linie: #3b3b3b;
     --linie-tare: #4a4a4a;
-    --accent: #4ca6f0;
-    --accent-hover: #7cbdf4;
-    --accent-slab: #1e3347;
+    --accent: #7fa8e0;
+    --accent-hover: #a3c1ea;
+    --accent-slab: #1c2a3d;
     --ok: #6ccb5f;
     --ok-fundal: #1e3a1c;
     --atentie: #fce100;
@@ -75,8 +75,8 @@
     --pe-accent: #04192c;
     --umbra: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 8px rgba(0, 0, 0, .22);
     --umbra-ridicata: 0 4px 16px rgba(0, 0, 0, .45);
-    --antet-1: #005a9e;
-    --antet-2: #003a6b;
+    --antet-1: #1a3f73;
+    --antet-2: #0d2242;
     color-scheme: dark;
   }
 }
@@ -90,9 +90,9 @@
   --text-sec: #a7b0bd;
   --linie: #3b3b3b;
   --linie-tare: #4a4a4a;
-  --accent: #4ca6f0;
-  --accent-hover: #7cbdf4;
-  --accent-slab: #1e3347;
+  --accent: #7fa8e0;
+  --accent-hover: #a3c1ea;
+  --accent-slab: #1c2a3d;
   --ok: #6ccb5f;
   --ok-fundal: #1e3a1c;
   --atentie: #fce100;
@@ -113,8 +113,8 @@
   --pe-accent: #04192c;
   --umbra: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 8px rgba(0, 0, 0, .22);
   --umbra-ridicata: 0 4px 16px rgba(0, 0, 0, .45);
-  --antet-1: #005a9e;
-  --antet-2: #003a6b;
+  --antet-1: #1a3f73;
+  --antet-2: #0d2242;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -534,10 +534,10 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
   background: rgba(255, 255, 255, .86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 2px 8px rgba(0, 0, 0, .14), 0 0 0 1px rgba(0, 0, 0, .06); max-width: calc(100% - 1rem); flex-wrap: wrap; justify-content: center; }
 .vz-bara button { font-size: .74rem; padding: .22rem .6rem; border: 0; border-radius: 6px; background: transparent; color: #1e293b; line-height: 1.3; white-space: nowrap; }
 .vz-bara button:hover { background: rgba(0, 103, 192, .1); }
-.vz-bara button[aria-pressed="true"] { background: #0067c0; color: #fff; }
+.vz-bara button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .vz-bara .vz-sect { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; color: #475569; padding: 0 .35rem; }
 .vz-bara .vz-sect[hidden] { display: none; }
-.vz-bara .vz-sect input { width: 7rem; padding: 0; accent-color: #0067c0; }
+.vz-bara .vz-sect input { width: 7rem; padding: 0; accent-color: var(--accent); }
 .vz-legenda { position: absolute; z-index: 4; right: .6rem; top: 3rem; background: rgba(255, 255, 255, .88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #1e293b; border-radius: 8px; padding: .4rem .55rem; font-size: .7rem; box-shadow: 0 2px 8px rgba(0, 0, 0, .14); pointer-events: none; }
 .vz-legenda b { display: block; margin-bottom: .25rem; font-weight: 600; max-width: 9rem; }
 .vz-scala { display: flex; gap: .35rem; height: 150px; }
@@ -688,3 +688,18 @@ th[data-formula] { text-decoration: underline dotted color-mix(in srgb, var(--ac
 .taburi { z-index: 20; }
 .v3d-scena:has(.vz-jos) .v3d-ajutor { display: none; }
 .vz-bara { left: 0; right: 0; margin: 0 auto; width: max-content; transform: none; }
+
+/* pagina principală: anii de studiu, cu cele două semestre alăturate */
+.an-studiu { margin: 1.4rem 0 0; background: var(--suprafata); border: 1px solid var(--linie); border-radius: 14px; overflow: hidden; box-shadow: var(--umbra); }
+.an-studiu > h2 { margin: 0; padding: .7rem 1.1rem; font-size: 1.15rem; letter-spacing: .02em; color: #fff; background: linear-gradient(120deg, var(--antet-1) 0%, var(--antet-2) 100%); display: flex; align-items: baseline; gap: .6rem; }
+.an-studiu > h2 small { font-size: .8rem; font-weight: 500; opacity: .85; }
+.an-semestre { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.an-semestre .semestru { padding: .9rem 1.1rem 1.1rem; min-width: 0; }
+.an-semestre .semestru + .semestru { border-left: 1px solid var(--linie); }
+.an-semestre .semestru > h3 { margin: 0 0 .7rem; font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); display: flex; align-items: center; gap: .5rem; }
+.an-semestre .semestru > h3::after { content: ""; flex: 1; height: 1px; background: var(--linie); }
+.an-semestre .grila-discipline { grid-template-columns: 1fr; gap: .7rem; }
+.an-semestre .disc-card { background: var(--fundal, var(--suprafata)); border-left: 3px solid var(--accent); }
+.an-semestre .disc-card h3 { font-size: 1.05rem; color: var(--titlu); }
+.semestru-gol { margin: 0; padding: .9rem 1rem; border: 1px dashed var(--linie-tare); border-radius: 10px; color: var(--text-sec); font-size: .88rem; }
+@media (max-width: 760px) { .an-semestre { grid-template-columns: 1fr; } .an-semestre .semestru + .semestru { border-left: 0; border-top: 1px solid var(--linie); } }
