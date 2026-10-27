@@ -568,31 +568,31 @@ const sonda = (id, netw) => net(sursaSonda(id)) === netw;
 const PASI = [
   { t: "Divizoarele de tensiune", tab: "Tabelul 2.1", zona: [20, 20, 1080, 760], pini: ["v12", "v5", "div12", "div5"], schita: "stm_div",
     banda: "Pasul 1 · Multimetrul (sonda roșie V) măsoară U<sub>in</sub> la bornele sursei și U<sub>out</sub> pe nodurile divizoarelor (marcate cu portocaliu).",
-    instr: ["Porniți simularea (schița <i>stm32_divizor</i>).", "Trageți sonda <b>V</b> pe borna <b>+12 V</b> → înregistrați U<sub>in</sub>.", "Mutați sonda pe nodul divizorului 12 V (între R1 și R2) → înregistrați U<sub>out</sub>.", "Repetați pentru +5 V și divizorul 5 V. Verificați că nodurile nu depășesc 3,3 V; pentru alt rezistor opriți simularea și dați clic pe el."],
+    instr: [`Apăsați <b>▶ Pornește simularea</b> (bara de sus a planșei). Schița implicită <i>stm32_divizor</i> afișează pe monitorul serial și codurile ADC ale pinilor PA2 și PA3.`, `Trageți vârful sondei roșii <b>V</b> a multimetrului pe borna <b>+12 V</b> a sursei; citiți tensiunea și apăsați <b>„● U (multimetru) → Tabelul 2.1”</b> – se completează U<sub>in</sub> pentru divizorul de 12 V.`, `Mutați sonda <b>V</b> pe nodul divizorului de 12 V (punctul dintre R1 și R2) și apăsați din nou butonul – se completează U<sub>out</sub>.`, `Repetați pentru borna <b>+5 V</b> și nodul divizorului de 5 V.`, `Verificați că tensiunea nodurilor rămâne sub 3,3 V (limita pinilor STM32). Pentru a încerca alt rezistor: opriți simularea și dați clic pe el.`],
     ver: () => [[sim.run, "simularea pornită"], [["v12", "v5", "div12", "div5"].includes(net(sim.dmm.s)), "sonda V pe o bornă a sursei sau pe nodul unui divizor"]],
     prog: () => [["d12", "Uin"], ["d12", "Um"], ["d5", "Uin"], ["d5", "Um"]].filter(([r, c]) => pe("t21", r, c)).length, tot: 4,
     buton: ["● U (multimetru) → Tabelul 2.1", () => inregDiv] },
   { t: "Filtrul RC", tab: "Tabelul 2.2", zona: [20, 20, 960, 700], pini: ["genBB", "rc"], schita: null,
     banda: "Pasul 2 · CH1 (galben) pe intrarea filtrului, CH2 (albastru) pe condensator. Osciloscopul măsoară automat Vpp pe ambele canale.",
-    instr: ["Generatorul pornit (OUTPUT), frecvența cu ◀ ▶.", "Sonda <b>1</b> pe intrarea filtrului (capătul din stânga al R), sonda <b>2</b> pe condensator.", "Alegeți T/div astfel încât să se vadă 1–3 perioade (apare „Freq”).", "Înregistrați la 20, 100, 159, 500 și 2000 Hz. Urmăriți cum scade și se întârzie semnalul de pe CH2."],
+    instr: [`Pe generatorul de semnal apăsați <b>OUTPUT</b> (pornit) și reglați frecvența cu <b>◀ ▶</b> la <b>20 Hz</b>.`, `Trageți sonda <b>1</b> (CH1) a osciloscopului pe intrarea filtrului (capătul din stânga al rezistorului R = 10 kΩ) și sonda <b>2</b> (CH2) pe condensatorul C = 100 nF.`, `Apăsați <b>T/div +</b> / <b>T/div −</b> pe osciloscop până se văd 1–3 perioade și apar măsurătorile automate (Freq, Vpp).`, `Apăsați <b>„● U<sub>in</sub>, U<sub>out</sub> Vpp → Tabelul 2.2”</b>.`, `Repetați la <b>100, 159, 500 și 2000 Hz</b>, reajustând de fiecare dată T/div. Observați cum semnalul de pe CH2 scade și rămâne în urmă față de CH1.`],
     ver: () => [[sim.run && sim.gen, "simularea și generatorul pornite"], [sonda("ch0", "gen"), "CH1 pe intrarea filtrului"], [sonda("ch1", "rc"), "CH2 pe condensator"], [MD.FREC.includes(fGen()), `frecvența ${fGen()} Hz este una din cele 5 cerute`], [!!(sim.osc.acq && Number.isFinite(sim.osc.acq.m[0].f)), "cel puțin o perioadă pe ecran (Freq afișat)"]],
     prog: () => MD.FREC.filter(f => pe("t22", "f" + f, "Uout")).length, tot: 5,
     buton: ["● U<sub>in</sub>, U<sub>out</sub> Vpp → Tabelul 2.2", () => inregRC] },
   { t: "Aliasing", tab: "Tabelul 2.3", zona: [20, 190, 1280, 600], pini: ["genO", "sw0o", "PA0"], schita: "stm_alias",
     banda: "Pasul 3 · Generatorul → S1 (pe GEN) → PA0. STM32 eșantionează cu 1 kHz; plotterul de sub planșă arată cele 200 de eșantioane: semnalul pare de altă frecvență.",
-    instr: ["Opriți simularea, alegeți schița <i>stm32_esantionare</i> (FS = 1000) și porniți-o.", "Comutatorul S1 pe <b>GEN</b>.", "La 100, 900 și 1100 Hz: în plotter trageți cursorul A pe un maxim și B pe un maxim mai depărtat; indicați câte perioade cuprind.", "Înregistrați frecvența aparentă și comparați-o cu |f − k·f<sub>s</sub>|."],
+    instr: [`Apăsați <b>■ Oprește simularea</b>; în panoul de cod alegeți schița <i>stm32_esantionare</i> (FS = 1000) și apăsați <b>▶ Pornește simularea</b>.`, `Dați clic pe comutatorul <b>S1</b> până ajunge pe poziția <b>GEN</b> (semnalul generatorului ajunge direct la PA0).`, `Reglați generatorul la <b>100 Hz</b> (◀ ▶).`, `Pe <b>plotterul serial</b> dați clic / trageți: cursorul <b>A</b> pe un maxim al semnalului eșantionat, cursorul <b>B</b> pe un maxim mai depărtat; în lista „Perioade între cursoare” alegeți câte perioade cuprind.`, `Apăsați <b>„● f aparentă (cursoare) → Tabelul 2.3”</b>.`, `Repetați la <b>900 Hz</b> și <b>1100 Hz</b> și comparați cu f<sub>a</sub> = |f − k·f<sub>s</sub>|.`],
     ver: () => [[sim.run && (sim.fw || {}).prog === "stm_alias", "rulează stm32_esantionare"], [(sim.fw || {}).fs === 1000, "FS = 1000 Hz"], [sim.sw0 === "gen", "S1 pe GEN"], [MD.FAL.includes(fGen()), `frecvența ${fGen()} Hz este 100, 900 sau 1100 Hz`]],
     prog: () => MD.FAL.filter(f => pe("t23", "f" + f, "fap")).length, tot: 3,
     buton: ["● f aparentă (cursoare) → Tabelul 2.3", () => inregAlias] },
   { t: "Filtrul RC înaintea ADC", tab: "Tabelul 2.3 (ultima coloană)", zona: [20, 190, 1280, 600], pini: ["rc", "sw0o", "PA0"], schita: "stm_alias",
     banda: "Pasul 4 · S1 pe RC: ADC-ul primește semnalul filtrat. Comparați amplitudinea eșantioanelor (Vpp în plotter) la 100, 900 și 1100 Hz.",
-    instr: ["Aceeași schiță (FS = 1000); comutați S1 pe <b>RC</b>.", "La 100, 900 și 1100 Hz așteptați setul nou de eșantioane și înregistrați amplitudinea vârf-vârf.", "Observați: aliasul de 100 Hz rămâne vizibil, doar atenuat – filtrul RC de ordinul 1 nu este suficient ca anti-aliasing."],
+    instr: [`Lăsați schița <i>stm32_esantionare</i> pornită și dați clic pe <b>S1</b> până ajunge pe <b>RC</b> (semnalul trece prin filtrul RC înainte de PA0).`, `Generatorul la <b>100 Hz</b>; așteptați pe plotter un set nou de eșantioane.`, `Apăsați <b>„● amplitudine (plotter) → Tabelul 2.3”</b> (amplitudinea vârf-vârf a eșantioanelor).`, `Repetați la <b>900 Hz</b> și <b>1100 Hz</b>. Observați: aliasul de 100 Hz rămâne vizibil, doar atenuat – un filtru RC de ordinul 1 nu este suficient ca filtru anti-aliasing.`],
     ver: () => [[sim.run && (sim.fw || {}).prog === "stm_alias" && (sim.fw || {}).fs === 1000, "rulează stm32_esantionare cu FS = 1000"], [sim.sw0 === "rc", "S1 pe RC"], [MD.FAL.includes(fGen()), `frecvența ${fGen()} Hz este 100, 900 sau 1100 Hz`]],
     prog: () => MD.FAL.filter(f => pe("t23", "f" + f, "amp")).length, tot: 3,
     buton: ["● amplitudine (plotter) → Tabelul 2.3", () => inregAlias] },
   { t: "Filtre numerice", tab: "Tabelul 2.4", zona: [370, 380, 930, 420], pini: ["pa1n", "PA1"], schita: "stm_filtre",
     banda: "Pasul 5 · Motorul (S2) cuplează zgomot pe firul PA1; S3 aplică o treaptă de 1 V. Plotterul: gri = brut, albastru = medie mobilă, portocaliu = exponențial.",
-    instr: ["Opriți simularea, alegeți <i>stm32_filtre</i> cu T<sub>s</sub> = 10, fixați N și α, porniți.", "Porniți motorul (S2) și așteptați ≈ 6 s fără să atingeți nimic.", "Comutați treapta (S3), așteptați ≈ 2 s și înregistrați: se completează rândurile „fără filtru”, media N și exponențialul α.", "Repetați pentru (N; α) = (4; 0,5), (8; 0,2), (16; 0,05)."],
+    instr: [`Apăsați <b>■ Oprește simularea</b>, alegeți schița <i>stm32_filtre</i> și setați în cod T<sub>s</sub> = 10 ms, <b>N = 4</b>, <b>α = 0,5</b>; apăsați <b>▶ Pornește simularea</b>.`, `Dați clic pe comutatorul <b>S2</b> (pornește motorul – semnalul cu zgomot) și așteptați ≈ 6 s fără să atingeți nimic.`, `Dați clic pe <b>S3</b> (treapta de semnal) și așteptați încă ≈ 2 s.`, `Apăsați <b>„● σ și întârzierea → Tabelul 2.4”</b>: se completează rândurile „fără filtru”, media pe N eșantioane și filtrul exponențial α.`, `Repetați pentru (N; α) = <b>(8; 0,2)</b> și <b>(16; 0,05)</b>: oprire, modificare în cod, pornire, S2, așteptare, S3, înregistrare.`],
     ver: () => { const fw = sim.fw || {}; const a = fw.prog === "stm_filtre" ? analizaFiltre() : { er: "x" }; return [[sim.run && fw.prog === "stm_filtre", "rulează stm32_filtre"], [fw.Ts === 10, "T<sub>s</sub> = 10 ms"], [sim.motor, "motorul pornit (S2)"], [!a.er, a.er && fw.prog === "stm_filtre" ? a.er : "zgomot înregistrat și treaptă aplicată"]]; },
     prog: () => Object.keys(MD.FILTRE).filter(k => pe("t24", k, "sig")).length, tot: 7,
     buton: ["● σ și întârzierea → Tabelul 2.4", () => inregFiltre] }
@@ -605,6 +605,7 @@ function construiestePasi() {
   $$("#pasi .pas-cap").forEach(b => b.addEventListener("click", () => alegePas(+b.closest(".pas").dataset.pas, true)));
   $$("#pasi [data-vezi]").forEach(b => b.addEventListener("click", () => alegePas(+b.dataset.vezi, true)));
   $$("#pasi [data-inreg]").forEach(b => b.addEventListener("click", e => { PASI[+b.dataset.inreg].buton[1]()(e); actualizeazaPasi(); }));
+  ghidPasi(PASI, alegePas);
   alegePas(0, false);
 }
 function alegePas(i, zoom) {
@@ -891,6 +892,7 @@ Cadru.porneste({
   sim: {
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena tk">
+      ${ghidSectiune()}
       <div class="tk-bara">
         <span class="tk-logo">⚡ <b>Circuite</b> · Stand MAM I – Lucrarea 2</span>
         <button type="button" id="tk-fit" title="Încadrează tot">⤢ Încadrează</button>
@@ -916,9 +918,8 @@ Cadru.porneste({
       </div>
     </div>
     <aside class="card sim-comenzi tk-pasi">
-      <h2>Desfășurarea lucrării</h2>
+      <h2>Programul și mesajele</h2>
       <p class="fw">Program încărcat: <b id="fw-stm">—</b></p>
-      <ol class="pasi" id="pasi"></ol>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
       <p class="nota">Valorile intră în tabele numai din aparate, cu simularea pornită. „Arată pe planșă” mărește zona de lucru și marchează punctele de măsură.</p>
     </aside>

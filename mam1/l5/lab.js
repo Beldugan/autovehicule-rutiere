@@ -369,35 +369,35 @@ const ctlVit = () => `<div class="rand-mic"><span class="nota" style="align-self
 const PASI = [
   { t: "p<sub>atm</sub> și etanșeitatea", tab: "Tabelul 5.2 – p<sub>atm</sub>", v3: "pneu",
     banda: "Pasul 1 · Ochelarii, colierele strânse; programul pornit citește presiunea atmosferică cu BMP280. Testul de etanșeitate: vid de ≈ −50 kPa, apoi 60 s fără pompare.",
-    instr: ["Puneți ochelarii de protecție și strângeți cele trei coliere (clic pe ele sau butoanele de sub stand).", "Porniți simularea; înregistrați p<sub>atm</sub> citit de BMP280.", "Pompa pe <b>Vid</b>, câteva curse până la ≈ −50 kPa, apoi „Test de etanșeitate” și urmăriți etalonul 60 s (scădere admisă &lt; 0,5 kPa)."],
+    instr: [`Dați clic pe <b>ochelarii de protecție</b> și pe cele <b>trei coliere</b> ale furtunurilor (sau pe butoanele de sub stand) – colierele se strâng.`, `Apăsați <b>▶ Pornește simularea</b>: BMP280 afișează presiunea atmosferică pe OLED.`, `Apăsați <b>„● p<sub>atm</sub> (BMP280) → Tabelul 5.2”</b>.`, `Dați clic pe selectorul galben al pompei până la <b>Vid</b>, apoi dați clic pe pompă (fiecare clic = o cursă) până la ≈ −50 kPa pe manometrul etalon.`, `Apăsați <b>Test de etanșeitate (60 s)</b> și urmăriți etalonul: scăderea admisă este sub 0,5 kPa în 60 s.`],
     ctl: () => `<div class="rand-mic"><button type="button" data-et="1">Test de etanșeitate (60 s)</button></div>${ctlVit()}`,
     ver: () => [[sim.ochelari, "ochelarii puși"], [strans(), "colierele strânse"], [sim.run, "programul rulează"], [!!(sim.etans && sim.etans.gata && sim.etans.ok), sim.etans && sim.etans.gata ? `etanșeitate: ${fx(sim.etans.dp, 2)} kPa în 60 s` : "testul de etanșeitate"]],
     prog: () => (pe("t52", "patm", "v") ? 1 : 0) + (sim.etans && sim.etans.ok ? 1 : 0), tot: 2,
     butoane: [["● p<sub>atm</sub> (BMP280) → Tabelul 5.2", inregPatm, "primar"]] },
   { t: "U la presiunea atmosferică", tab: "Tabelul 5.1 – punctul 4", v3: "placa",
     banda: "Pasul 2 · Supapa deschisă (presiune relativă 0), multimetrul V⎓: sonda − pe TP GND, sonda + pe TP U MAP.",
-    instr: ["Deschideți supapa lentă până când etalonul arată 0,0 kPa, apoi închideți-o.", "Multimetrul pe <b>V⎓</b>, sondele pe TP U MAP (+) și TP GND (−).", "„● p, U → Tabelul 5.1”."],
+    instr: [`Dați clic pe <b>supapa lentă</b> până când manometrul etalon arată <b>0,0 kPa</b>, apoi închideți-o.`, `Comutatorul multimetrului pe <b>V⎓</b>; sonda <b>+</b> pe <b>TP U MAP</b>, sonda <b>−</b> pe <b>TP GND</b>.`, `Apăsați <b>„● p (etalon), U (multimetru) → Tabelul 5.1”</b>.`],
     ctl: () => "",
     ver: () => [[sim.run, "senzorul alimentat"], [sim.dmm.mod === "V" && sim.dmm.s.dmmR === "tU" && sim.dmm.s.dmmB === "tGND", "multimetrul pe U MAP / GND"], [Math.abs(etalonTxt()) < 0.6, "presiunea relativă ≈ 0"]],
     prog: () => pe("t51", "p4", "u") ? 1 : 0, tot: 1,
     butoane: [["● p (etalon), U (multimetru) → Tabelul 5.1", inregPt, "primar"]] },
   { t: "Vid în trepte", tab: "Tabelul 5.1 – punctele 1…3", v3: "pneu",
     banda: "Pasul 3 · Pompa pe Vid: curse (plină sau ¼) până la −30, −50, −70 kPa relativ (±6 kPa); după fiecare treaptă așteptați stabilizarea și înregistrați.",
-    instr: ["Pompa pe <b>Vid</b>. Cu curse plină / ¼ ajungeți aproape de −30 kPa; ajustați cu supapa lentă.", "Așteptați câteva secunde (aerul destins se încălzește înapoi) și înregistrați.", "Repetați la −50 și −70 kPa (≈ 30 kPa absolut, ca la ralanti în decelerare)."],
+    instr: [`Selectorul pompei pe <b>Vid</b>. Dați clic pe pompă (curse pline sau ¼) până aproape de <b>−30 kPa</b>; ajustați fin cu supapa lentă.`, `Așteptați câteva secunde: aerul destins se reîncălzește și presiunea se stabilizează.`, `Apăsați <b>„● p (etalon), U (multimetru) → Tabelul 5.1”</b>.`, `Repetați la <b>−50 kPa</b> și <b>−70 kPa</b> (≈ 30 kPa absolut, ca la ralanti în decelerare).`],
     ctl: () => "",
     ver: () => [[strans(), "montaj etanș"], [stabil(), "presiunea stabilizată"], [sim.dmm.mod === "V" && sim.dmm.s.dmmR === "tU", "multimetrul pe U MAP"]],
     prog: () => [1, 2, 3].filter(i => pe("t51", "p" + i, "u")).length, tot: 3,
     butoane: [["● p (etalon), U (multimetru) → Tabelul 5.1", inregPt, "primar"]] },
   { t: "Suprapresiune în trepte", tab: "Tabelul 5.1 – punctele 5…7", v3: "pneu",
     banda: "Pasul 4 · Pompa pe Presiune: +30, +60, +90 kPa relativ. Presiunea absolută = p<sub>atm</sub> + p<sub>rel</sub> (≈ 190 kPa la +90).",
-    instr: ["Eliberați vidul (supapa lentă), pompa pe <b>Presiune</b>.", "Treptele +30, +60, +90 kPa relativ (nu se depășește +100 kPa).", "La fiecare treaptă: stabilizare, apoi înregistrare."],
+    instr: [`Eliberați vidul cu supapa lentă (etalonul la 0) și treceți selectorul pompei pe <b>Presiune</b>.`, `Pompați până la <b>+30 kPa</b>, așteptați stabilizarea și apăsați <b>„● p (etalon), U (multimetru) → Tabelul 5.1”</b>.`, `Repetați la <b>+60 kPa</b> și <b>+90 kPa</b> (nu depășiți +100 kPa).`],
     ctl: () => "",
     ver: () => [[sim.mod === "pres", "pompa pe presiune"], [strans(), "colierele strânse (altfel furtunul sare!)"], [stabil(), "presiunea stabilizată"]],
     prog: () => [5, 6, 7].filter(i => pe("t51", "p" + i, "u")).length, tot: 3,
     butoane: [["● p (etalon), U (multimetru) → Tabelul 5.1", inregPt, "primar"]] },
   { t: "Eliberarea bruscă", tab: "Tabelul 5.2 – timpul de răspuns", v3: "pneu",
     banda: "Pasul 5 · Suprapresiune ≥ +40 kPa, apoi „Eliberare rapidă + înregistrare”: programul eșantionează U la 10 ms. Pe înregistrare: timpul de la 90 % la 10 % din treaptă.",
-    instr: ["Pompați la ≈ +60…+90 kPa, programul pornit.", "„Eliberare rapidă + înregistrare” (butonul albastru al pompei).", "Pe plotter: cursorul 90 % pe primul eșantion sub U<sub>90</sub>, cursorul 10 % pe primul eșantion sub U<sub>10</sub>; înregistrați Δt."],
+    instr: [`Cu programul pornit, pompați la ≈ +60…+90 kPa.`, `Apăsați <b>„Eliberare rapidă + înregistrare”</b> (butonul albastru al pompei): presiunea scade brusc, iar programul înregistrează răspunsul senzorului.`, `Pe plotter: cursorul <b>90 %</b> pe primul eșantion sub U<sub>90</sub>, cursorul <b>10 %</b> pe primul eșantion sub U<sub>10</sub>.`, `Apăsați <b>„● Δt (90 % → 10 %) → Tabelul 5.2”</b>.`],
     ctl: () => `<div class="rand-mic"><button type="button" data-rapid="1" class="primar">▶ Eliberare rapidă + înregistrare</button></div>
       <div class="rand-mic">${[["t90", "cursor 90 %"], ["t10", "cursor 10 %"]].map(([k, t]) => `<button type="button" data-ck="${k}" class="${sim.cur.k === k ? "activ" : ""}">${t}</button>`).join("")}</div>
       <label class="cur-l">t [ms] <input type="range" id="cur-t" min="0" max="990" step="10" value="${sim.cur[sim.cur.k]}"></label>
@@ -407,7 +407,7 @@ const PASI = [
     butoane: [["● Δt (90 % → 10 %) → Tabelul 5.2", inregTr, "primar"]] },
   { t: "Calibrarea în program, densitatea", tab: "Tabelul 5.3", v3: "placa",
     banda: "Pasul 6 · Opriți simularea, introduceți în cod A și B din regresia voastră, porniți. Comparați p calculat de program cu etalonul la ralanti, la p<sub>atm</sub> și supraalimentat; notați ρ.",
-    instr: ["Calculați a și b (fila Determinări) și treceți-le în Tabelul 5.2.", "Opriți simularea, scrieți A = a și B = b în program, porniți.", "Ralanti: vid până la ≈ 35 kPa absolut; atmosferic: supapa deschisă; supraalimentat: ≈ 170 kPa absolut. Înregistrați de pe OLED p și ρ."],
+    instr: [`În fila <b>Determinări</b> citiți a, b și eroarea de liniaritate din regresie și treceți-le în Tabelul 5.2.`, `Apăsați <b>■ Oprește simularea</b>, scrieți în program <b>A = a</b> și <b>B = b</b>, apoi <b>▶ Pornește simularea</b>.`, `<b>Ralanti:</b> vid până la ≈ 35 kPa absolut, apoi <b>„● p, ρ (OLED) → Tabelul 5.3”</b>.`, `<b>Atmosferic:</b> supapa deschisă (0 kPa relativ), apoi înregistrați.`, `<b>Supraalimentat:</b> presiune până la ≈ 170 kPa absolut (≈ +70 kPa relativ), apoi înregistrați.`],
     ctl: () => "",
     ver: () => [[sim.run && sim.fw && !(Math.abs(sim.fw.A - 0.01851) < 1e-9), "programul cu A, B proprii"], [strans() && stabil(), "presiunea stabilizată"]],
     prog: () => Object.keys(MD.PG).filter(k => pe("t53", k, "pP")).length, tot: 3,
@@ -429,6 +429,7 @@ function construiestePasi() {
   $$("#pasi [data-ck]").forEach(b => b.addEventListener("click", () => { sim.cur.k = b.dataset.ck; $$("#pasi [data-ck]").forEach(x => x.classList.toggle("activ", x === b)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   $$("#pasi [data-dc]").forEach(b => b.addEventListener("click", () => { sim.cur[sim.cur.k] = Math.max(0, Math.min(990, sim.cur[sim.cur.k] + +b.dataset.dc)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   const ct = $("#cur-t"); if (ct) ct.addEventListener("input", () => { sim.cur[sim.cur.k] = +ct.value; if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); });
+  ghidPasi(PASI, alegePas);
   alegePas(0, false);
 }
 function alegePas(i, zoom) {
@@ -694,6 +695,7 @@ Cadru.porneste({
   sim: {
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena tk">
+      ${ghidSectiune()}
       <div class="tk-bara">
         <span class="tk-logo">⚡ <b>Stand</b> · MAM I – Lucrarea 5</span>
         <button type="button" id="tk-fit" title="Încadrează tot">⤢ Încadrează</button>
@@ -719,9 +721,8 @@ Cadru.porneste({
       </div>
     </div>
     <aside class="card sim-comenzi tk-pasi">
-      <h2>Desfășurarea lucrării</h2>
+      <h2>Programul și mesajele</h2>
       <p class="fw">Program încărcat: <b id="fw-mega">—</b></p>
-      <ol class="pasi" id="pasi"></ol>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
       <p class="nota">Valorile intră în tabele numai din aparate și din program. „Arată pe stand” orientează vederea 3D.</p>
     </aside>

@@ -608,28 +608,28 @@ const SIT = s => s === "aer" ? "aer" : "apa";
 const PASI = [
   { t: "Stabilizarea în aer", tab: "Tabelul 4.1 – aer", v3: "tot", zona: [0, 0, 1300, 800], pini: [],
     banda: "Pasul 1 · Senzorii au fost ținuți în mână la montare (sunt mai calzi). Lăsați-i în aer cel puțin 5 minute (accelerați timpul) și înregistrați indicațiile de pe OLED și ale etalonului.",
-    instr: ["Porniți simularea (programul afișează cele patru temperaturi pe OLED și pe monitorul serial).", "Stativul ridicat: senzorii în aer. Accelerați timpul (×10…×60) și urmăriți plotterul până când curbele devin orizontale.", "După cel puțin 5 minute: „● citiri → Tabelul 4.1”."],
+    instr: [`Apăsați <b>▶ Pornește simularea</b>: programul <i>temperaturi</i> afișează NTC, LM35, DS18B20 și termocuplul K pe OLED și pe monitorul serial.`, `Senzorii trebuie să fie în aer: butonul <b>↑ Aer</b> (stativul ridicat). La montare au fost ținuți în mână, deci sunt mai calzi.`, `Accelerați timpul cu <b>×30</b> sau <b>×60</b> și urmăriți plotterul până când toate curbele devin orizontale (cel puțin 5 minute simulate).`, `Apăsați <b>„● citiri (OLED + etalon) → Tabelul 4.1”</b> (rândul „aer”).`],
     ctl: ctlPoz,
     ver: () => [[sim.run, "programul rulează"], [!sim.dec, "X2 cuplat"], [sim.poz === "aer", "senzorii în aer"], [sim.poz === "aer" && sim.tPoz >= 300, `≥ 5 min în aer (${fx(sim.tPoz / 60, 1)} min)`], [sim.poz === "aer" && abatere() < 0.3, "indicațiile stabilizate"]],
     prog: () => ["et", ...SZ].filter(c => pe("t41", "aer", c)).length, tot: 5,
     butoane: [["● citiri (OLED + etalon) → Tabelul 4.1", inregSt, "primar"]] },
   { t: "Divizorul NTC în aer", tab: "Tabelul 4.3 – aer", v3: "dmm", zona: [540, 20, 560, 720], pini: ["tUs", "t5V", "tGND", "n1", "n2"],
     banda: "Pasul 2 · Multimetrul V⎓: sonda − pe TP GND, + pe TP Us (Us), apoi pe TP 5V (Uref). Apoi decuplați X2, Ω pe NTC 1 – NTC 2 (rezistența măsurată).",
-    instr: ["Multimetrul pe <b>V⎓</b>, sonda − pe TP GND, sonda + pe TP Us → „● Us”.", "Sonda + pe TP 5V → „● Uref” (alimentarea divizorului).", "Decuplați X2 (clic pe conector), multimetrul pe <b>Ω</b>, sondele pe NTC 1 și NTC 2 → „● R”. Observați pe OLED ce afișează programul cu NTC-ul deconectat.", "Cuplați X2 la loc."],
+    instr: [`Dați clic pe comutatorul rotativ al multimetrului până la <b>V⎓</b>; sonda <b>−</b> pe <b>TP GND</b>.`, `Sonda <b>+</b> pe <b>TP Us</b> (tensiunea pe NTC) și apăsați <b>„● Us → Tabelul 4.3”</b>.`, `Sonda <b>+</b> pe <b>TP 5V</b> și apăsați <b>„● Uref → Tabelul 4.3”</b> (alimentarea divizorului).`, `Dați clic pe conectorul <b>X2</b> (decuplat), comutatorul multimetrului pe <b>Ω</b>, sondele pe <b>NTC 1</b> și <b>NTC 2</b> și apăsați <b>„● R NTC → Tabelul 4.3”</b>. Observați ce afișează OLED-ul cu NTC-ul deconectat.`, `Dați clic din nou pe <b>X2</b> pentru a-l cupla la loc.`],
     ctl: () => "",
     ver: () => [[sim.run, "programul rulează"], [stabil("aer"), "senzorii stabilizați în aer"], [sim.dmm.mod !== "OFF", "multimetrul pornit"], [peMasa(sim.dmm.s.dmmB) || [sim.dmm.s.dmmR, sim.dmm.s.dmmB].sort().join() === "n1,n2", "sonda − pe masă / sondele pe NTC"]],
     prog: () => ["us", "uref", "rm"].filter(c => pe("t43", "aer", c)).length, tot: 3,
     butoane: [["● Us → Tabelul 4.3", inregUs, "primar"], ["● Uref → Tabelul 4.3", inregUref, "secundar"], ["● R NTC → Tabelul 4.3", inregR, "secundar"]] },
   { t: "Apă caldă, după stabilizare", tab: "Tabelele 4.1 și 4.3 – apă", v3: "senzori", zona: [0, 300, 900, 500], pini: ["tUs", "t5V", "tGND", "n1", "n2"],
     banda: "Pasul 3 · Mănușile, apoi senzorii în recipientul cu apă caldă. După stabilizare: citirile (Tabelul 4.1) și măsurătorile divizorului (Tabelul 4.3).",
-    instr: ["Puneți mănușile termoizolante (clic pe ele sau butonul de mai jos).", "„Apă caldă”: stativul coboară senzorii în recipient (conexiunile rămân deasupra apei).", "Așteptați stabilizarea (≥ 1 min, indicațiile constante) și înregistrați: citirile → Tabelul 4.1; Us, Uref, R → Tabelul 4.3."],
+    instr: [`Dați clic pe <b>🧤 Mănuși</b> (protecția la apa caldă).`, `Apăsați <b>Apă caldă</b>: stativul coboară senzorii în recipient (conexiunile rămân deasupra apei).`, `Accelerați timpul și așteptați stabilizarea (cel puțin 1 min, indicațiile constante pe plotter).`, `Apăsați <b>„● citiri (OLED + etalon) → Tabelul 4.1”</b> (rândul „apă”).`, `Refaceți măsurătorile divizorului: <b>Us</b> și <b>Uref</b> (V⎓, X2 cuplat), apoi <b>R NTC</b> (Ω, X2 decuplat) → Tabelul 4.3; la final cuplați X2 la loc.`],
     ctl: ctlPoz,
     ver: () => [[sim.manusi, "mănușile puse"], [sim.poz === "apa", "senzorii în apa caldă"], [stabil("apa"), "indicațiile stabilizate"]],
     prog: () => ["et", ...SZ].filter(c => pe("t41", "apa", c)).length + ["us", "uref", "rm"].filter(c => pe("t43", "apa", c)).length, tot: 8,
     butoane: [["● citiri (OLED + etalon) → Tabelul 4.1", inregSt, "primar"], ["● Us → Tabelul 4.3", inregUs, "secundar"], ["● Uref → Tabelul 4.3", inregUref, "secundar"], ["● R NTC → Tabelul 4.3", inregR, "secundar"]] },
   { t: "Treapta de temperatură", tab: "Tabelul 4.2", v3: "senzori", zona: [0, 150, 900, 650], pini: [],
     banda: "Pasul 4 · Senzorii, stabilizați în aer, se introduc simultan în apa caldă; programul înregistrează 121 de eșantioane (60 s). Pe înregistrare: ϑ0, ϑ∞, ϑ(τ) = ϑ0 + 0,632(ϑ∞ − ϑ0) și τ.",
-    instr: ["Răciți senzorii: ≈ 1 min în pahar, apoi în aer până se stabilizează (≥ 3…5 min, accelerați timpul).", "Timp ×1, mănușile puse: „▶ Treaptă” (trimite „r” și coboară senzorii la t = 0).", "După 60 s: alegeți senzorul, mutați cursorul pe primul eșantion care atinge ϑ(τ) și înregistrați (repetați pentru toți cei patru).", "Comparați: termocuplul cel mai rapid, NTC-ul auto cel mai lent; DS18B20 are în plus întârzierea conversiei."],
+    instr: [`Răciți senzorii: <b>Pahar</b> ≈ 1 min, apoi <b>↑ Aer</b> până se stabilizează (3…5 min, cu timpul accelerat).`, `Timpul la <b>×1</b> și mănușile puse.`, `Apăsați <b>„▶ Treaptă”</b>: programul primește „r”, iar senzorii coboară în apa caldă la t = 0; înregistrarea durează 60 s.`, `După 60 s alegeți senzorul, mutați cursorul pe primul eșantion care atinge ϑ(τ) = ϑ0 + 0,632·(ϑ∞ − ϑ0) și apăsați <b>„● ϑ0, ϑ∞, τ (cursor) → Tabelul 4.2”</b>.`, `Repetați pentru toți cei patru senzori. Comparați: termocuplul este cel mai rapid, NTC-ul auto cel mai lent; DS18B20 are în plus întârzierea conversiei.`],
     ctl: () => `${ctlPoz()}<div class="rand-mic"><button type="button" data-trp="1" class="primar">▶ Treaptă (r + introducere)</button></div>
       <div class="rand-mic">${SZ.map(k => `<button type="button" data-cur="${k}" class="${sim.cursor.k === k ? "activ" : ""}" style="border-left:4px solid ${CUL[k]}">${SCURT[k]}</button>`).join("")}</div>
       <label class="cur-l">cursor t [s] <input type="range" id="cur-t" min="0" max="60" step="0.5" value="${sim.cursor.t}"></label>
@@ -661,6 +661,7 @@ function construiestePasi() {
   $$("#pasi [data-cur]").forEach(b => b.addEventListener("click", () => { sim.cursor.k = b.dataset.cur; $$("#pasi [data-cur]").forEach(x => x.classList.toggle("activ", x === b)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   $$("#pasi [data-dcur]").forEach(b => b.addEventListener("click", () => { sim.cursor.t = Math.max(0, Math.min(60, sim.cursor.t + +b.dataset.dcur)); if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); }));
   const ct = $("#cur-t"); if (ct) ct.addEventListener("input", () => { sim.cursor.t = +ct.value; if (sim.inreg) { sim.vedere = "rec"; comutaVedere(); } cursorAfis(); });
+  ghidPasi(PASI, alegePas);
   alegePas(0, false); cursorAfis();
 }
 function alegePas(i, zoom) {
@@ -917,6 +918,7 @@ Cadru.porneste({
   sim: {
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena tk">
+      ${ghidSectiune()}
       <div class="tk-bara">
         <span class="tk-logo">⚡ <b>Circuite</b> · Stand MAM I – Lucrarea 4</span>
         <button type="button" id="tk-fit" title="Încadrează tot">⤢ Încadrează</button>
@@ -943,9 +945,8 @@ Cadru.porneste({
       </div>
     </div>
     <aside class="card sim-comenzi tk-pasi">
-      <h2>Desfășurarea lucrării</h2>
+      <h2>Programul și mesajele</h2>
       <p class="fw">Program încărcat: <b id="fw-mega">—</b></p>
-      <ol class="pasi" id="pasi"></ol>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
       <p class="nota">Valorile intră în tabele numai din aparate și din înregistrarea programului. „Arată pe planșă” mărește zona de lucru și marchează punctele de măsură.</p>
     </aside>

@@ -577,6 +577,117 @@ function inregLat(e) {
   if (ok) msg(`Tabelul 1.4 (${col === "dw" ? "digitalWrite" : "PINB"}), măsurarea ${r.slice(1)}: ${fx(v, 2)} µs.`);
 }
 
+/* ------------------------------------------------------------------ pașii lucrării (ghidul pas cu pas) */
+const pe = (t, r, c) => Cadru.D.t[t][r][c] !== "";
+/** pregătește în editor schița cerută (cu simularea oprită) */
+function pregatesteSchita(placa, k, camp) {
+  if (sim.run) return Cadru.mesajTemporar("Opriți întâi simularea (■ Oprește simularea), apoi alegeți schița.", "atentie");
+  sim.placaCod = placa; sim.sketch[placa] = k; sim.editor = k; Object.assign(sim.camp, camp || {});
+  $("#tk-placa").value = placa; afiseazaCod(); const p = $("#tk-codp"); if (p.hidden) $("#tk-codb").click();
+  Cadru.mesajTemporar(`Schița ${PROG[k].titlu} este pregătită în editor. Apăsați ▶ Pornește simularea (programul se compilează și se încarcă în placă).`, "");
+  actualizeazaPasi();
+}
+function potDesen() {
+  const u = a => (-135 + 270 * a) * Math.PI / 180, a1 = u(sim.alfa), a2 = u(sim.alfaS);
+  $("#potAc").setAttribute("d", `M643,476 l${(Math.sin(a1) * 19).toFixed(1)},${(-Math.cos(a1) * 19).toFixed(1)}`);
+  $("#potSAc").setAttribute("d", `M1095,623 l${(Math.sin(a2) * 14).toFixed(1)},${(-Math.cos(a2) * 14).toFixed(1)}`);
+}
+const fwM = () => sim.fw.mega || {}, fwS = () => sim.fw.stm || {};
+const sondaV = () => net(sim.dmm.s), ch = i => net(sim.osc.ch[i].s);
+const nT12 = () => ["p1", "p2", "p3", "p4", "p5"].filter(k => pe("t12", k, "N")).length, nT12b = () => ["s1", "s2", "s3"].filter(k => pe("t12b", k, "N")).length;
+const bS = (t, cod) => `<button type="button" data-sk="${cod}">${t}</button>`;
+const SK = {
+  gH: ["mega", "mega_gpio", { stare: "HIGH" }], gL: ["mega", "mega_gpio", { stare: "LOW" }], sH: ["stm", "stm_gpio", { stareS: "HIGH" }], sL: ["stm", "stm_gpio", { stareS: "LOW" }],
+  adc: ["mega", "mega_adc"], sadc: ["stm", "stm_adc"], aw: ["mega", "mega_aw", { val: 128 }],
+  o199: ["mega", "mega_t1", { cs: "1", icr: 799, ocr: 199 }], o399: ["mega", "mega_t1", { cs: "1", icr: 799, ocr: 399 }], o599: ["mega", "mega_t1", { cs: "1", icr: 799, ocr: 599 }],
+  idw: ["mega", "mega_isr", { isr: "dw" }], ipt: ["mega", "mega_isr", { isr: "port" }]
+};
+const PASI = [
+  { t: "Ieșirea digitală", tab: "Tabelul 1.1 – U<sub>OH</sub>, U<sub>OL</sub>", pini: ["pin13", "PB12"],
+    instr: ["Apăsați <b>„mega_gpio HIGH”</b> (Comenzi rapide) – schița se deschide în editor cu <code>digitalWrite(13, HIGH)</code>.",
+      "Apăsați <b>▶ Pornește simularea</b> (bara de sus a planșei): programul se încarcă în Arduino Mega, LED-ul de pe D13 se aprinde.",
+      "Trageți vârful sondei roșii <b>V</b> a multimetrului pe pinul <b>13</b> al plăcii Mega (pinul se colorează în albastru când sonda este pe el). Sonda neagră COM este deja la masă.",
+      "Citiți tensiunea pe afișajul multimetrului și apăsați <b>„● U<sub>OH</sub>/U<sub>OL</sub> → Tabelul 1.1”</b>.",
+      "Apăsați <b>■ Oprește simularea</b>, apoi <b>„mega_gpio LOW”</b>, porniți din nou simularea și înregistrați U<sub>OL</sub> (LED-ul stins).",
+      "Repetați pentru STM32: <b>„stm32_gpio HIGH”</b> / <b>„LOW”</b>, sonda V pe pinul <b>PB12</b> al plăcii Blue Pill, înregistrați de fiecare dată."],
+    ctl: () => `<div class="rand-mic">${bS("mega_gpio HIGH", "gH")}${bS("mega_gpio LOW", "gL")}</div><div class="rand-mic">${bS("stm32_gpio HIGH", "sH")}${bS("stm32_gpio LOW", "sL")}</div>`,
+    ver: () => [[sim.run, "simularea pornită"], [fwM().prog === "mega_gpio" || fwS().prog === "stm_gpio", "rulează mega_gpio / stm32_gpio"], [["pin13", "PB12"].includes(sondaV()), "sonda V pe pinul 13 (Mega) sau PB12 (STM32)"],
+      [pe("t11", "UOH", "mega") && pe("t11", "UOL", "mega"), "Mega: U<sub>OH</sub> și U<sub>OL</sub> înregistrate"], [pe("t11", "UOH", "stm") && pe("t11", "UOL", "stm"), "STM32: U<sub>OH</sub> și U<sub>OL</sub> înregistrate"]],
+    prog: () => ["UOH", "UOL"].reduce((n, r) => n + ["mega", "stm"].filter(c => pe("t11", r, c)).length, 0), tot: 4,
+    butoane: [["● U<sub>OH</sub>/U<sub>OL</sub> (multimetru) → Tabelul 1.1", inregGPIO, "primar"]] },
+  { t: "Convertorul A/D – Arduino Mega", tab: "Tabelul 1.2 – 5 puncte", pini: ["pot", "A0"],
+    instr: ["Opriți simularea și apăsați <b>„mega_adc”</b>; porniți simularea.",
+      "Apăsați <b>Monitor serial</b> (panoul de cod): apar codurile N citite de ADC (10 biți).",
+      "Trageți sonda <b>V</b> a multimetrului pe <b>A0</b> (sau pe cursorul potențiometrului de pe placa de test).",
+      "Rotiți potențiometrul (tragere pe buton sau comenzile rapide 10 %…90 %) într-o poziție; alegeți <b>Punctul</b> 1 și apăsați <b>„● U, N → Tabelul 1.2”</b>: U vine de la multimetru, N de pe monitorul serial.",
+      "Repetați pentru 5 poziții distanțate pe tot domeniul (cel puțin 0,3 V între ele); punctul următor se alege automat."],
+    ctl: () => `<div class="rand-mic">${bS("mega_adc", "adc")}<button type="button" data-ser="1">Monitor serial</button></div><div class="rand-mic">${[0.1, 0.3, 0.5, 0.7, 0.9].map(a => `<button type="button" data-pot="${a}">${a * 100} %</button>`).join("")}</div>
+      <label class="camp" style="margin:.2rem 0">Punctul <select id="sel-punct-mega">${[1, 2, 3, 4, 5].map(i => `<option value="p${i}">${i}</option>`).join("")}</select></label>`,
+    ver: () => [[sim.run && fwM().prog === "mega_adc", "rulează mega_adc"], [!$("#tk-serial").hidden, "monitorul serial deschis"], [sondaV() === "A0", "sonda V pe A0"], [sim.nMega !== undefined, sim.nMega !== undefined ? `N = ${sim.nMega} pe monitor` : "N citit pe monitorul serial"], [nT12() >= 5, `puncte înregistrate: ${nT12()}/5`]],
+    prog: nT12, tot: 5, butoane: [["● U, N (Mega) → Tabelul 1.2", e => inregADC(e, "mega"), "primar"]] },
+  { t: "Convertorul A/D – STM32", tab: "Tabelul 1.2b – 3 puncte", pini: ["PA0"],
+    instr: ["Opriți simularea și apăsați <b>„stm32_adc”</b> (placa 2 – STM32 Blue Pill, ADC de 12 biți, referința 3,3 V); porniți simularea.",
+      "Deschideți monitorul serial și alegeți în panoul de cod placa <b>2 (STM32 Blue Pill)</b> pentru a-i vedea mesajele.",
+      "Trageți sonda <b>V</b> pe pinul <b>PA0</b> al plăcii Blue Pill (cursorul potențiometrului mic).",
+      "Rotiți potențiometrul STM32 în 3 poziții distanțate; pentru fiecare alegeți punctul și apăsați <b>„● U, N STM32 → Tabelul 1.2b”</b>.",
+      "Comparați rezoluția: 3,3 V/4096 = 0,81 mV față de 5 V/1024 = 4,88 mV la Mega."],
+    ctl: () => `<div class="rand-mic">${bS("stm32_adc", "sadc")}<button type="button" data-ser="1">Monitor serial</button></div><div class="rand-mic">${[0.15, 0.5, 0.85].map(a => `<button type="button" data-pots="${a}">${Math.round(a * 100)} %</button>`).join("")}</div>
+      <label class="camp" style="margin:.2rem 0">Punctul <select id="sel-punct-stm">${[1, 2, 3].map(i => `<option value="s${i}">${i}</option>`).join("")}</select></label>`,
+    ver: () => [[sim.run && fwS().prog === "stm_adc", "rulează stm32_adc"], [sondaV() === "PA0", "sonda V pe PA0"], [sim.nStm !== undefined, sim.nStm !== undefined ? `N = ${sim.nStm} pe monitor` : "N citit pe monitorul serial"], [nT12b() >= 3, `puncte înregistrate: ${nT12b()}/3`]],
+    prog: nT12b, tot: 3, butoane: [["● U, N (STM32) → Tabelul 1.2b", e => inregADC(e, "stm"), "primar"]] },
+  { t: "Semnalul PWM", tab: "Tabelul 1.3 – analogWrite + OCR1A", pini: ["pin9", "pin11"],
+    instr: ["<b>PWM implicit:</b> opriți simularea, apăsați <b>„analogWrite(9, 128)”</b>, porniți. Trageți sonda <b>1</b> (CH1, galbenă) a osciloscopului pe pinul <b>9</b>, baza de timp <b>500 µs/div</b>; când apar măsurătorile automate (f, DC) apăsați <b>„● f, DC → Tabelul 1.3”</b>.",
+      "<b>PWM configurat (Timer1):</b> opriți, apăsați <b>„Timer1 OCR1A = 199”</b> (P = 1, ICR1 = 799), porniți.",
+      "Mutați sonda <b>1</b> pe pinul <b>11</b> (OC1A), baza de timp <b>10 µs/div</b>, și sonda <b>V</b> a multimetrului tot pe pinul 11 (tensiunea medie).",
+      "Apăsați <b>„● f, DC, U<sub>med</sub> → Tabelul 1.3”</b>.",
+      "Repetați cu <b>OCR1A = 399</b> și <b>OCR1A = 599</b> (de fiecare dată: oprire, comanda rapidă, pornire, înregistrare)."],
+    ctl: () => `<div class="rand-mic">${bS("analogWrite(9, 128)", "aw")}${bS("Timer1 OCR1A = 199", "o199")}${bS("= 399", "o399")}${bS("= 599", "o599")}</div><div class="rand-mic"><button type="button" data-tdiv="0.0005">500 µs/div</button><button type="button" data-tdiv="0.00001">10 µs/div</button></div>`,
+    ver: () => { const f = fwM(), a = sim.osc.acq; return [[sim.run && (f.prog === "mega_aw" || f.prog === "mega_t1"), f.prog === "mega_t1" ? `rulează Timer1 (OCR1A = ${f.ocr})` : "rulează mega_pwm_implicit / mega_timer1_pwm"],
+      [ch(0) === (f.prog === "mega_t1" ? "pin11" : "pin9"), f.prog === "mega_t1" ? "CH1 pe pinul 11" : "CH1 pe pinul 9"], [!!(a && a.m && a.m.f), "măsurătorile automate afișate (baza de timp potrivită)"], [f.prog !== "mega_t1" || sondaV() === "pin11", "sonda V pe pinul 11 (doar la Timer1)"]]; },
+    prog: () => (pe("t13", "aw", "f") ? 1 : 0) + MD.OCR.filter(k => pe("t13", "o" + k, "f")).length, tot: 4,
+    butoane: [["● f, DC (osciloscop), U<sub>med</sub> → Tabelul 1.3", inregPWM, "primar"]] },
+  { t: "Latența întreruperii", tab: "Tabelul 1.4 – 3 + 3 măsurări", pini: ["pin2", "pin13"],
+    instr: ["Opriți simularea, apăsați <b>„ISR cu digitalWrite()”</b>, porniți.",
+      "Generatorul de semnal: butonul <b>OUTPUT</b> pornit (semnal dreptunghiular de 1 kHz pe D2).",
+      "Sonda <b>1</b> (CH1) pe pinul <b>2</b>, sonda <b>2</b> (CH2) pe pinul <b>13</b>; baza de timp <b>1 µs/div</b>. Osciloscopul măsoară întârzierea dintre frontul de pe D2 și comutarea lui D13.",
+      "Apăsați de <b>3 ori</b> <b>„● Întârzierea → Tabelul 1.4”</b> (trei achiziții diferite).",
+      "Opriți, apăsați <b>„ISR cu PINB”</b> (scriere directă în registru), porniți și înregistrați încă 3 măsurări; comparați.",
+      "Opțional: opriți generatorul (OUTPUT) și apăsați butonul de pe placa de test – vibrația contactelor produce mai multe întreruperi (n crește cu mai mult de 1)."],
+    ctl: () => `<div class="rand-mic">${bS("ISR cu digitalWrite()", "idw")}${bS("ISR cu PINB", "ipt")}</div><div class="rand-mic"><button type="button" data-tdiv="0.000001">1 µs/div</button><button type="button" data-gen="1">Generator OUTPUT</button></div>`,
+    ver: () => { const f = fwM(), a = sim.osc.acq; return [[sim.run && f.prog === "mega_isr" && f.isr !== "ser", f.prog === "mega_isr" ? `rulează mega_intrerupere (ISR ${f.isr === "port" ? "PINB" : "digitalWrite"})` : "rulează mega_intrerupere"], [sim.gen, "generatorul pornit (OUTPUT)"],
+      [ch(0) === "pin2" && ch(1) === "pin13", "CH1 pe pinul 2, CH2 pe pinul 13"], [!!(a && a.m && a.m.lat), "întârzierea măsurată (baza de timp 1…2 µs/div)"]]; },
+    prog: () => ["m1", "m2", "m3"].reduce((n, k) => n + (pe("t14", k, "dw") ? 1 : 0) + (pe("t14", k, "port") ? 1 : 0), 0), tot: 6,
+    butoane: [["● Întârzierea D2 → D13 → Tabelul 1.4", inregLat, "primar"]] }
+];
+let pasActiv = 0;
+function construiestePasi() {
+  $("#pasi").innerHTML = PASI.map((p, i) => `<li class="pas" data-pas="${i}"><button type="button" class="pas-cap"><span class="pas-nr">${i + 1}</span><span>${p.t}<br><small style="font-weight:400;color:var(--text-sec)">${p.tab}</small></span><span class="pas-prog"></span></button>
+    <div class="pas-corp"><ol>${p.instr.map(x => `<li>${x}</li>`).join("")}</ol>${p.ctl ? `<div class="pas-ctl">${p.ctl()}</div>` : ""}<ul class="pas-ver"></ul>
+    <div class="pas-but">${p.butoane.map(([t, , c], j) => `<button type="button" class="${c} lat" data-inreg="${i}" data-j="${j}">${t}</button>`).join("")}</div></div></li>`).join("");
+  $$("#pasi .pas-cap").forEach(b => b.addEventListener("click", () => alegePas(+b.closest(".pas").dataset.pas, true)));
+  $$("#pasi [data-inreg]").forEach(b => b.addEventListener("click", e => { PASI[+b.dataset.inreg].butoane[+b.dataset.j][1](e); actualizeazaPasi(); }));
+  $$("#pasi [data-sk]").forEach(b => b.addEventListener("click", () => pregatesteSchita(...SK[b.dataset.sk])));
+  $$("#pasi [data-ser]").forEach(b => b.addEventListener("click", () => { if ($("#tk-codp").hidden) $("#tk-codb").click(); if ($("#tk-serial").hidden) $("#tk-serb").click(); }));
+  $$("#pasi [data-pot]").forEach(b => b.addEventListener("click", () => { sim.alfa = +b.dataset.pot; potDesen(); }));
+  $$("#pasi [data-pots]").forEach(b => b.addEventListener("click", () => { sim.alfaS = +b.dataset.pots; potDesen(); }));
+  $$("#pasi [data-tdiv]").forEach(b => b.addEventListener("click", () => { sim.osc.tdiv = +b.dataset.tdiv; achizitie(); deseneazaOsc(); }));
+  $$("#pasi [data-gen]").forEach(b => b.addEventListener("click", () => { sim.gen = !sim.gen; genAfis(); achizitie(); deseneazaOsc(); }));
+  ghidPasi(PASI, alegePas);
+  alegePas(0, false);
+}
+function alegePas(i) {
+  if (i < 0 || i >= PASI.length) return;
+  pasActiv = i; const p = PASI[i];
+  $$("#pasi .pas").forEach(el => el.classList.toggle("activ", +el.dataset.pas === i));
+  $$("#tk-svg .tk-pin").forEach(r => r.classList.toggle("tinta", p.pini.includes(r.dataset.pin)));
+  actualizeazaPasi();
+}
+function actualizeazaPasi() {
+  if (!$("#pasi .pas")) return;
+  PASI.forEach((p, i) => { const el = $(`#pasi [data-pas="${i}"]`), n = p.prog(); el.querySelector(".pas-prog").textContent = `${n}/${p.tot}`; el.classList.toggle("gata", n >= p.tot); });
+  $(`#pasi [data-pas="${pasActiv}"] .pas-ver`).innerHTML = PASI[pasActiv].ver().map(([ok, t]) => `<li class="${ok ? "ok" : ""}">${t}</li>`).join("");
+}
+
 /* ------------------------------------------------------------------ calculele determinărilor */
 function calculeazaMAM1(D) {
   const t = D.t, o = MD.prelucreaza(t, { num }), cel = { t12: {}, t12b: {}, t13: {}, t14: {} }, rele = { t12: {} };
@@ -692,6 +803,11 @@ const TEST = [
 
 /* ------------------------------------------------------------------ definiția lucrării */
 const CSS = `<style>
+.tk-pin.tinta { fill:rgba(255,152,0,.35); stroke:#ff6d00; stroke-width:2; animation:pulsPin 1.1s ease-in-out infinite; } @keyframes pulsPin { 50% { stroke-width:4.5; fill:rgba(255,152,0,.7); } }
+.rand-mic { display:flex; flex-wrap:wrap; gap:.3rem; margin:.25rem 0; } .rand-mic button { padding:.25rem .55rem; font-size:.8rem; }
+.pas-cap { width:100%; display:flex; gap:.5rem; align-items:center; text-align:left; font:600 .9rem system-ui,sans-serif; color:var(--text); cursor:pointer; }
+.pas-nr { flex:0 0 1.6rem; height:1.6rem; border-radius:50%; display:grid; place-items:center; background:var(--suprafata-2); font-size:.8rem; } .pas.gata .pas-nr { background:#2e9e44; color:#fff; } .pas.activ .pas-nr { background:var(--accent); color:#fff; }
+.pas-prog { margin-left:auto; font:600 .75rem system-ui; color:var(--text-sec); white-space:nowrap; }
 .tk { padding:0 !important; overflow:hidden; background:#fff; color:#222; }
 .tk-bara { display:flex; flex-wrap:wrap; align-items:center; gap:.45rem; padding:.45rem .6rem; background:#fff; border-bottom:1px solid #e3e3e3; }
 .tk-logo { font:600 .9rem system-ui,sans-serif; color:#333; margin-right:auto; } .tk-logo b { color:#1477d1; }
@@ -799,6 +915,7 @@ Cadru.porneste({
   sim: {
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena tk">
+      ${ghidSectiune()}
       <div class="tk-bara">
         <span class="tk-logo">⚡ <b>Circuite</b> · Stand MAM I – Lucrarea 1</span>
         <span class="tk-unelte" aria-hidden="true"><i title="Rotire">⟳</i><i title="Ștergere">🗑</i><i title="Anulare">↶</i><i title="Refacere">↷</i><i title="Notițe">✎</i></span>
@@ -826,14 +943,9 @@ Cadru.porneste({
     <aside class="card sim-comenzi">
       <h2>Programele în execuție</h2>
       <p class="fw">Arduino Mega: <b id="fw-mega">—</b><br>STM32F103: <b id="fw-stm">—</b></p>
-      <h2>Înregistrare în tabele</h2>
-      <button type="button" class="primar lat" id="btn-t11">● U<sub>OH</sub>/U<sub>OL</sub> (multimetru) → Tabelul 1.1</button>
-      <div class="rand-butoane"><label class="camp" style="margin:0">Punct <select id="sel-punct-mega">${[1, 2, 3, 4, 5].map(i => `<option value="p${i}">${i}</option>`).join("")}</select></label><button type="button" class="primar" id="btn-t12">● U, N Mega → Tabelul 1.2</button></div>
-      <div class="rand-butoane"><label class="camp" style="margin:0">Punct <select id="sel-punct-stm">${[1, 2, 3].map(i => `<option value="s${i}">${i}</option>`).join("")}</select></label><button type="button" class="primar" id="btn-t12b">● U, N STM32 → Tabelul 1.2b</button></div>
-      <button type="button" class="primar lat" id="btn-t13">● f, DC (osciloscop), U<sub>med</sub> → Tabelul 1.3</button>
-      <button type="button" class="primar lat" id="btn-t14">● Întârzierea D2→D13 → Tabelul 1.4</button>
+      <h2>Mesajele înregistrării</h2>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
-      <p class="nota">Valorile se trec în tabele numai din aparate (multimetru, monitorul serial, măsurătorile osciloscopului), cu simularea pornită.</p>
+      <p class="nota">Lucrați în ordinea pașilor din chenarul albastru de deasupra planșei. Valorile se trec în tabele numai din aparate (multimetru, monitorul serial, măsurătorile osciloscopului), cu simularea pornită.</p>
     </aside>
   </div>`,
     init(C) {
@@ -845,14 +957,10 @@ Cadru.porneste({
       $("#tk-serb").addEventListener("click", () => { const s = $("#tk-serial"); s.hidden = !s.hidden; $("#tk-serb").classList.toggle("activ", !s.hidden); afiseazaSerial(); });
       $("#tk-serc").addEventListener("click", () => { sim.serial[sim.placaCod] = []; afiseazaSerial(); });
       $("#tk-fit").addEventListener("click", () => seteazaVB(VB0.slice()));
-      $("#btn-t11").addEventListener("click", inregGPIO);
-      $("#btn-t12").addEventListener("click", e => inregADC(e, "mega"));
-      $("#btn-t12b").addEventListener("click", e => inregADC(e, "stm"));
-      $("#btn-t13").addEventListener("click", inregPWM);
-      $("#btn-t14").addEventListener("click", inregLat);
+      construiestePasi();
       ecranComplet($(".sim-grila"), $("#btn-ecran"));
       deseneazaOsc(); citesteDMM();
-      C.mesaj("Alegeți schița mega_gpio (HIGH) în panoul de cod, porniți simularea și trageți sonda roșie a multimetrului pe pinul 13.", "");
+      C.mesaj("Urmați pașii din chenarul „Desfășurarea lucrării – pas cu pas” de deasupra planșei; începeți cu Pasul 1.", "");
     },
     reset() { if (sim.run && $("#tk-start")) opresteSim(); Object.assign(sim, { serial: { mega: [], stm: [] }, n: 0, led13: false, nMega: undefined, nStm: undefined }); },
     cadru(dt, C, vizibil) {
@@ -863,7 +971,7 @@ Cadru.porneste({
       if (acum - sim.dmm.tA > 330) { sim.dmm.tA = acum; citesteDMM(); }
       actualizeazaLeduri(acum);
       if (acum - (this._ts || 0) > 300) {
-        this._ts = acum;
+        this._ts = acum; actualizeazaPasi();
         if (sim.run) { const t = Math.floor((acum - sim.t0) / 1000); $("#tk-timp").textContent = `Timp de simulare: ${String(Math.floor(t / 3600)).padStart(2, "0")}:${String(Math.floor(t / 60) % 60).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; }
         C.stare(1, sim.run ? "simulare pornită" : "simulare oprită", sim.run ? "inc" : ""); C.stare(2, sim.run && sim.fw.mega ? `Mega: ${PROG[sim.fw.mega.prog].titlu} · STM32: ${PROG[sim.fw.stm.prog].titlu}` : "");
       }

@@ -443,35 +443,35 @@ const pe = (t, r, c) => Cadru.D.t[t][r][c] !== "";
 const PASI = [
   { t: "Identificarea pinilor", tab: "Tabelul 3.0", zona: [20, 20, 700, 660], pini: ["p1", "p2", "p3", "p4", "p5", "p6"],
     banda: "Pasul 1 · Alimentarea oprită, X1 decuplat, multimetrul pe Ω. Măsurați rezistențele între borne: alimentare–masă = constantă, cu cursorul = variază cu pârghia, între piste = O.L.",
-    instr: ["Simularea oprită, conectorul X1 decuplat (clic pe el), multimetrul pe <b>Ω</b>.", "Sondele pe două borne → „● R → jurnal”. Măsurați perechile și repetați cu pârghia în altă poziție: rezistența dintre cursor și capete se modifică.", "Perechile cu O.L. aparțin unor piste diferite; perechea cu rezistența cea mai mare dintr-o pistă = capetele pistei (alimentare și masă).", "Alegeți funcția fiecărui pin și apăsați „Trece în Tabelul 3.0 și montează cablajul”. Atenție: pista 2 are rezistența totală ≈ dublă (rezistor în serie la +5 V)."],
+    instr: [`Simularea trebuie să fie <b>oprită</b> (butonul din bara planșei arată „▶ Pornește simularea”).`, `Dați clic pe conectorul <b>X1</b> pentru a-l decupla (senzorul se deconectează de la placă).`, `Dați clic pe comutatorul rotativ al multimetrului până ajunge pe <b>Ω</b>.`, `Trageți sonda <b>+</b> (roșie) și sonda <b>−</b> (neagră) pe două borne ale senzorului și apăsați <b>„● R → jurnal”</b>. Măsurați toate perechile de borne (cel puțin 6 măsurători).`, `Trageți pârghia pedalei în altă poziție și remăsurați: rezistența dintre cursor și capete se schimbă, cea dintre capetele aceleiași piste rămâne constantă.`, `Interpretați: O.L. = borne din piste diferite; rezistența cea mai mare dintr-o pistă = capetele pistei (alimentare și masă). Pista 2 are rezistența totală ≈ dublă (rezistor în serie la +5 V).`, `În <b>Comenzi rapide</b> alegeți funcția fiecărui pin (Pin 1…6) și apăsați <b>„● Trece în Tabelul 3.0 și montează cablajul”</b>.`],
     ctl: () => `<div class="id-grila">${[1, 2, 3, 4, 5, 6].map(p => `<label>Pin ${p}<select id="id-p${p}"><option value=""></option>${MD.FUNCTII.map(f => `<option${sim.ident[p] === f ? " selected" : ""}>${f}</option>`).join("")}</select></label>`).join("")}</div>`,
     ver: () => [[!sim.run, "alimentarea oprită"], [sim.dec, "conectorul X1 decuplat"], [sim.dmm.mod === "R", "multimetrul pe Ω"], [/^p/.test(sim.dmm.s.dmmR) && /^p/.test(sim.dmm.s.dmmB), "sondele pe borne"], [nOhm() >= 6, `măsurători în jurnal: ${nOhm()}/6`]],
     prog: () => [1, 2, 3, 4, 5, 6].filter(p => pe("t30", "p" + p, "fn")).length, tot: 6,
     butoane: [["● R → jurnal", inregOhm, "secundar"], ["● Trece în Tabelul 3.0 și montează cablajul", inregIdent, "primar"]] },
   { t: "Caracteristicile pistelor", tab: "Tabelul 3.1", zona: [20, 20, 800, 720], pini: ["tA0", "tA1", "tGND"],
     banda: "Pasul 2 · Pârghia la 0, 12, 24, 36, 48, 60° (s = 0…100 %). Multimetrul V⎓: sonda − pe TP GND, sonda + pe TP A0 (U1), apoi pe TP A1 (U2).",
-    instr: ["Cuplați X1 și porniți simularea (placa alimentată prin USB alimentează și senzorul).", "Multimetrul pe <b>V⎓</b>, sonda − pe TP GND.", "Pentru fiecare poziție: pârghia la unghiul cerut (tragere sau butoanele de mai jos), sonda + pe TP A0 → înregistrare, apoi pe TP A1 → înregistrare.", "Măsurați și TP 5V: tensiunea USB nu este exact 5 V."],
+    instr: [`Dați clic pe <b>X1</b> pentru a-l cupla și apăsați <b>▶ Pornește simularea</b> (placa alimentată prin USB alimentează și senzorul).`, `Comutatorul multimetrului pe <b>V⎓</b>; sonda <b>−</b> pe <b>TP GND</b>.`, `Pârghia la <b>0°</b> (butonul din Comenzi rapide sau tragere); sonda <b>+</b> pe <b>TP A0</b> și apăsați <b>„● U (multimetru) → Tabelul 3.1”</b> – se completează U1.`, `Mutați sonda <b>+</b> pe <b>TP A1</b> și apăsați din nou – se completează U2.`, `Repetați pentru <b>12°, 24°, 36°, 48° și 60°</b> (12 valori în total).`, `Măsurați și <b>TP 5V</b>: tensiunea USB nu este exact 5 V (de aici abaterile ADC).`],
     ctl: () => `<div class="rand-mic">${[0, 12, 24, 36, 48, 60].map(a => `<button type="button" data-teta="${a}">${a}°</button>`).join("")}</div><div class="rand-mic"><button type="button" data-dteta="-0.5">−0,5°</button><button type="button" data-dteta="0.5">+0,5°</button></div>`,
     ver: () => [[sim.run, "placa alimentată"], [sim.dmm.mod === "V", "multimetrul pe V⎓"], [["tGND", "p3", "p5"].includes(sim.dmm.s.dmmB), "sonda − la masă"], [["tA0", "tA1"].includes(sim.dmm.s.dmmR), "sonda + pe TP A0 / TP A1"], [gridS() !== null, `pârghia la o poziție din tabel (θ = ${fx(sim.teta, 1)}°)`]],
     prog: () => MD.POZ.reduce((n, s) => n + (pe("t31", "s" + s, "U1") ? 1 : 0) + (pe("t31", "s" + s, "U2") ? 1 : 0), 0), tot: 12,
     butoane: [["● U (multimetru) → Tabelul 3.1", inregU, "primar"]] },
   { t: "Programul de verificare", tab: "OLED · monitor serial", zona: [440, 0, 860, 520], pini: [],
     banda: "Pasul 3 · Programul citește A0 și A1 la ≈ 10 ms, verifică domeniul și plauzibilitatea și afișează pe OLED U1, U2, ΔU, cursa s și starea.",
-    instr: ["Programul are EPS = 0,20 V și NCONF = 5 (cu simularea oprită se pot schimba în cod).", "Parcurgeți toată cursa pârghiei (0 → 60°) și urmăriți pe OLED ΔU și cursa calculată s.", "Comparați U1 de pe OLED cu U1 măsurat cu multimetrul: diferența provine din referința ADC (5 V al plăcii)."],
+    instr: [`Cu simularea pornită rulează programul <i>pedala_app</i> cu EPS = 0,20 V și NCONF = 5 (valorile se pot schimba în cod doar cu simularea oprită).`, `Apăsați <b>„↔ Acționează pârghia (10 s)”</b> sau trageți pârghia pe toată cursa 0 → 60°.`, `Urmăriți pe OLED U1, U2, ΔU, cursa calculată s și starea; pe monitorul serial – mesajele programului.`, `Comparați U1 de pe OLED cu U1 măsurat cu multimetrul: diferența provine din referința ADC (5 V al plăcii).`],
     ctl: () => `<div class="rand-mic"><button type="button" data-auto="1">↔ Acționează pârghia (10 s)</button></div>`,
     ver: () => [[sim.run && sim.fw && sim.fw.eps === 0.2 && sim.fw.n === 5, "rulează programul cu EPS = 0,20 V, NCONF = 5"], [sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5, "cursa completă parcursă"], [!(sim.pr && sim.pr.fault), "fără defect confirmat"]],
     prog: () => (sim.p3.mn <= 0.5 && sim.p3.mx >= 59.5 ? 1 : 0) + (sim.run && sim.fw && sim.fw.eps === 0.2 ? 1 : 0), tot: 2,
     butoane: [] },
   { t: "Defectele simulate", tab: "Tabelul 3.2", zona: [440, 0, 860, 700], pini: [],
     banda: `Pasul 4 · Pârghia la ${MD.S_DEF * 0.6}° (s = ${MD.S_DEF} %). RESET, apoi închideți un singur comutator S1, S2 sau S3. Monitorul serial afișează t_conf; OLED-ul și lampa EPC – reacția.`,
-    instr: [`Pârghia la <b>${MD.S_DEF * 0.6}°</b>; programul fără defect (RESET dacă EPC este aprinsă).`, "Închideți <b>un</b> comutator (S1, S2 sau S3) și așteptați reacția.", "Înregistrați: U1, U2 și t<sub>conf</sub> intră automat; în tabel alegeți verificarea care a detectat și reacția.", "Deschideți comutatorul, apăsați RESET (defectul rămâne memorat, ca în ECU, până la repornire) și treceți la următorul."],
+    instr: [`Pârghia la <b>${MD.S_DEF * 0.6}°</b> (s = ${MD.S_DEF} %) – butonul din Comenzi rapide.`, `Dacă lampa EPC este aprinsă, apăsați <b>RESET placă</b>.`, `Dați clic pe <b>un singur</b> comutator de defect – <b>S1</b>, <b>S2</b> sau <b>S3</b> – și așteptați reacția programului (OLED, lampa EPC, t<sub>conf</sub> pe monitorul serial).`, `Apăsați <b>„● U1, U2, t_conf → Tabelul 3.2”</b>; în tabel alegeți verificarea care a detectat defectul și reacția.`, `Deschideți comutatorul (clic din nou), apăsați <b>RESET placă</b> (defectul rămâne memorat, ca în ECU, până la repornire) și treceți la următorul – 3 defecte în total.`],
     ctl: () => `<div class="rand-mic"><button type="button" data-teta="${MD.S_DEF * 0.6}">${MD.S_DEF * 0.6}°</button><button type="button" data-rst="1">RESET placă</button></div>`,
     ver: () => [[sim.run && sim.fw && sim.fw.eps === 0.2 && sim.fw.n === 5, "EPS = 0,20 V, NCONF = 5"], [Math.abs(sim.teta - MD.S_DEF * 0.6) < 1e-6, `pârghia la ${MD.S_DEF * 0.6}°`], [!!sim.exp, sim.exp ? `defect ${sim.exp.k.toUpperCase()} aplicat` : "un comutator închis după RESET"], [!!(sim.exp && sim.exp.rez), sim.exp && sim.exp.rez ? (sim.exp.rez === "da" ? `confirmat în ${fx(sim.exp.tc, 1)} ms` : "nedetectat în 1,5 s") : "reacția programului"]],
     prog: () => ["d1", "d2", "d3"].filter(k => pe("t32", k, "U1")).length, tot: 3,
     butoane: [["● U1, U2, t_conf → Tabelul 3.2", inregDef, "primar"]] },
   { t: "Compromisul ε – N", tab: "Tabelul 3.3", zona: [440, 0, 860, 700], pini: [],
     banda: "Pasul 5 · Pentru fiecare configurație: testul de 10 s cu pedala acționată (alarme false din uzura pistei), apoi deriva de 2,2 kΩ (S3) – detectare și timp.",
-    instr: ["Opriți simularea, setați în cod (EPS; NCONF) = (0,10; 1), (0,20; 5) sau (0,40; 10), porniți.", "Trimiteți „t” pe monitorul serial și acționați pârghia 10 s (butonul de mai jos).", `Apoi pârghia la ${MD.S_DEF * 0.6}°, RESET, închideți S3 și așteptați reacția; înregistrați.`, "Comparați: pragul mic și confirmarea scurtă dau alarme false; pragul mare nu mai vede deriva."],
+    instr: [`Apăsați <b>■ Oprește simularea</b>, setați în cod (EPS; NCONF) = <b>(0,10; 1)</b> și porniți simularea.`, `Apăsați <b>„Trimite „t” (test 10 s)”</b> și imediat <b>„↔ Acționează pârghia (10 s)”</b>: programul numără eșantioanele invalide și alarmele false din uzura pistei.`, `Pârghia la <b>${MD.S_DEF * 0.6}°</b>, <b>RESET placă</b>, clic pe <b>S3</b> (deriva de 2,2 kΩ) și așteptați reacția.`, `Apăsați <b>„● rezultatele → Tabelul 3.3”</b>.`, `Repetați pentru <b>(0,20; 5)</b> și <b>(0,40; 10)</b>. Comparați: pragul mic și confirmarea scurtă dau alarme false; pragul mare nu mai vede deriva.`],
     ctl: () => `<div class="rand-mic"><button type="button" data-ser="t">Trimite „t” (test 10 s)</button><button type="button" data-auto="1">↔ Acționează pârghia (10 s)</button></div><div class="rand-mic"><button type="button" data-teta="${MD.S_DEF * 0.6}">${MD.S_DEF * 0.6}°</button><button type="button" data-rst="1">RESET placă</button></div>`,
     ver: () => { const fw = sim.fw || {}, k = Object.keys(MD.CONFIG).find(c => MD.CONFIG[c].eps === fw.eps && MD.CONFIG[c].n === fw.n), T = sim.testRez;
       return [[!!k, k ? `configurația (${fw.eps.toFixed(2)}; ${fw.n})` : "o configurație din tabel"], [!!(T && T.eps === fw.eps && T.n === fw.n && T.dist >= 100), T ? `testul de 10 s: ${T.inv} invalide, ${T.al} alarme` : "testul de 10 s"], [!!(sim.exp && sim.exp.k === "s3" && sim.exp.rez), "deriva (S3) verificată"]]; },
@@ -492,6 +492,7 @@ function construiestePasi() {
   $$("#pasi [data-rst]").forEach(b => b.addEventListener("click", resetMega));
   $$("#pasi [data-ser]").forEach(b => b.addEventListener("click", () => trimiteSerial(b.dataset.ser)));
   $$("#pasi .id-grila select").forEach(s => s.addEventListener("change", () => { sim.ident[+s.id.slice(4)] = s.value; }));
+  ghidPasi(PASI, alegePas);
   alegePas(0, false);
 }
 function alegePas(i, zoom) {
@@ -761,6 +762,7 @@ Cadru.porneste({
   sim: {
     html: `${CSS}<div class="sim-grila">
     <div class="card sim-scena scena tk">
+      ${ghidSectiune()}
       <div class="tk-bara">
         <span class="tk-logo">⚡ <b>Circuite</b> · Stand MAM I – Lucrarea 3</span>
         <button type="button" id="tk-fit" title="Încadrează tot">⤢ Încadrează</button>
@@ -782,9 +784,8 @@ Cadru.porneste({
       </div>
     </div>
     <aside class="card sim-comenzi tk-pasi">
-      <h2>Desfășurarea lucrării</h2>
+      <h2>Programul și mesajele</h2>
       <p class="fw">Program încărcat: <b id="fw-mega">—</b></p>
-      <ol class="pasi" id="pasi"></ol>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
       <p class="nota">Valorile intră în tabele numai din aparate. „Arată pe planșă” mărește zona de lucru și marchează punctele de măsură.</p>
     </aside>
