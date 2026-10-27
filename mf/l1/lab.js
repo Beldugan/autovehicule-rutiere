@@ -524,7 +524,8 @@ Cadru.porneste({
   parametriDemo() { return Object.assign(M1.parametri(20261001), { uleiA: sim.cheieA, fA: 1, fU: 1, rA: ULEI[sim.cheieA].r15, rU: ULEI.UZAT.r15, dT: 0, tc: 21.0 }); },
   sim: {
     html: `<div class="sim-grila">
-    <div class="card sim-scena scena">
+    <div class="card sim-scena scena scena-foto">
+      <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <svg id="svg-hoppler" viewBox="0 0 900 520" role="img" aria-label="Baie termostatată, vâscozimetru cu bilă Höppler cu manta și cronometru"></svg>
       <div class="afisaje">
         <div class="afisaj"><span>Temperatura probei</span><b id="af-ts">—</b><small>°C (termometrul mantalei)</small></div>
@@ -575,6 +576,7 @@ Cadru.porneste({
     </aside>
   </div>`,
     init(C) {
+      ecranComplet($(".sim-grila"), $("#btn-ecran"));
       construiesteSVG();
       $("#sel-proba").addEventListener("change", e => schimbaProba(e.target.value));
       $("#in-uleiA").addEventListener("change", e => { sim.cheieA = e.target.value; C.D.date.uleiA = sim.cheieA; C.P = C.parametri(); schimbaProba("A"); $("#sel-proba").value = "A"; deseneazaAreometru(); C.recalculeaza(); notaUlei(); });

@@ -673,7 +673,7 @@ Cadru.porneste({
   animatie: {
     titluTab: "Montajul real (3D)", titlu: "Montajul real al lucrării – aceleași legături ca în planșa Tinkercad",
     intro: `<p>Standul de calibrare la scară reală: pompa manuală de vid / presiune cu manometru, furtunurile de 6 mm cu coliere, teul de alamă, manometrul etalon digital, senzorul MAP pe colțarul de aluminiu, placa de test cu BMP280 și punctele de test, Arduino Mega cu OLED, multimetrul, ochelarii de protecție și cronometrul. Montajul urmărește simulatorul; clic pe pompă = o cursă, clic pe selector, supape, coliere, ochelari, puncte de test și comutatorul multimetrului ca pe planșă. Rotiți, apropiați sau depărtați vederea.</p>`,
-    modul: "aparate3d.js?v=9", functie: "creeazaStandMAP", optiuni: { laClic: k => laClic3d(k) },
+    modul: "aparate3d.js?v=10", functie: "creeazaStandMAP", optiuni: { laClic: k => laClic3d(k) },
     dupa: `<div class="tk-vederi" style="border:0;padding:.5rem 0 0"><span>Vedere:</span>${[["tot", "Ansamblu"], ["pneu", "Pompa, teul și etalonul"], ["placa", "Placa de test"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>`
   },
   vehicul3d: {

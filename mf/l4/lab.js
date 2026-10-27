@@ -670,7 +670,8 @@ Cadru.porneste({
   },
   sim: {
     html: `<div class="sim-grila">
-    <div class="card sim-scena scena">
+    <div class="card sim-scena scena scena-foto">
+      <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <svg id="svg-venturi" viewBox="0 0 1536 790" role="img" aria-label="Banc hidraulic: pompă, robinet de reglare, tub Venturi cu 6 prize piezometrice, panou de piezometre, tub Pitot cu micromanometru înclinat, vas volumetric și cronometru"></svg>
       <div class="afisaje">
         <div class="afisaj"><span>Robinet de reglare</span><b id="af-a">0,0</b><small>% deschidere</small></div>
@@ -732,6 +733,7 @@ Cadru.porneste({
     </aside>
   </div>`,
     init(C) {
+      ecranComplet($(".sim-grila"), $("#btn-ecran"));
       if (!MOD.eval && M4.GATURI.includes(num(C.D.date.d2))) { sim.d2Demo = num(C.D.date.d2); C.P = C.parametri(); }
       construiesteSVG();
       const tine = (btn, dir) => {

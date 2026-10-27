@@ -895,7 +895,7 @@ Cadru.porneste({
   animatie: {
     titluTab: "Montajul real (3D)", titlu: "Montajul real al lucrării – aceleași legături ca în planșa Tinkercad",
     intro: `<p>Standul de lucru la scară reală: stativul cu mănunchiul de senzori (NTC, LM35, DS18B20, termocuplul K și termometrul etalon), vasul Dewar cu apă caldă și paharul cu apă la temperatura camerei, placa de test cu divizorul NTC, conectorul X2, rezistorul de 4,7 kΩ al magistralei 1-Wire și modulul MAX6675, Arduino Mega cu OLED, multimetrul cu sondele și cronometrul. Montajul urmărește simulatorul; clic pe pahar / vasul Dewar / stativ mută senzorii, clic pe punctele de test mută sondele. Rotiți, apropiați sau depărtați vederea.</p>`,
-    modul: "aparate3d.js?v=9", functie: "creeazaStandTemp", optiuni: { laClic: k => laClic3d(k) },
+    modul: "aparate3d.js?v=10", functie: "creeazaStandTemp", optiuni: { laClic: k => laClic3d(k) },
     dupa: `<div class="tk-vederi" style="border:0;padding:.5rem 0 0"><span>Vedere:</span>${[["tot", "Ansamblu"], ["senzori", "Senzori și recipiente"], ["placa", "Placa de test"], ["dmm", "Multimetru"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>`
   },
   vehicul3d: {

@@ -1,5 +1,5 @@
 /* MF – Lucrarea 6. Pierderi de sarcină longitudinale și locale într-un circuit de răcire.
-   Simulator: standul de podea 3D realist (ca în Fig. 6.1) – rezervorul, pompa centrifugă cu cutia de comandă, robinetul de reglare,
+   Simulator: fotografia standului de podea (randată din modelul 3D, ca în Fig. 6.1) cu suprapuneri animate; modelul 3D separat în fila „Standul (3D)” – rezervorul, pompa centrifugă cu cutia de comandă, robinetul de reglare,
    conducta d = 17 mm cu prizele 1–2 la 1,5 m, lărgirea 17/26 mm transparentă (prizele 3–4), îngustarea, priza 5, cotul 90°, priza 6,
    robinetul cu bilă, priza 7, rotametrul, debitmetrul cu turbină; panoul cu 7 piezometre (colector presurizat, supapă, pompă de mână),
    furtunurile cu robinete de aerisire; pompa electrică de 12 V cu sursa de laborator și manometrul pentru punctul de funcționare.
@@ -12,7 +12,7 @@ const fx = (v, n) => fmt(v, n);
 /* ------------------------------------------------------------------ starea standului */
 const sim = {
   t: 0, viteza: 1, pompa: false, a: 40, bila: true, aer: [false, false, false, false, false, false, false], erAer: [], off: 500,
-  p12: false, sursa: false, q: 0, tStab: 0, niv: [500, 500, 500, 500, 500, 500, 500], zg: [0, 0, 0, 0, 0, 0, 0], kPa: 0
+  p12: false, sursa: false, q: 0, tStab: 0, niv: [500, 500, 500, 500, 500, 500, 500], zg: [0, 0, 0, 0, 0, 0, 0], kPa: 0, etichete: true, nssm1: false, nssm2: false
 };
 for (let i = 0; i < 7; i++) sim.erAer[i] = (Math.random() < 0.5 ? -1 : 1) * (25 + Math.random() * 45);
 let SV3 = null;
@@ -38,6 +38,7 @@ const citire = () => sim.niv.map((v, i) => Math.round(v + sim.zg[i]));
 function pornestePompa() {
   if (sim.p12) return Cadru.mesajTemporar("Pompa standului este demontată (circuitul lucrează cu pompa de 12 V).", "atentie");
   if (sim.pompa) return;
+  if (!sim.nssm1 || !sim.nssm2) return Cadru.mesajTemporar("Bifați verificările NSSM înainte de a porni pompa.", "atentie");
   if (sim.a < 15 || sim.a > 85) Cadru.mesajTemporar("NSSM: pompa se pornește cu robinetul de reglare parțial deschis (≈ 30…60 %).", "atentie");
   sim.pompa = true; actualizeaza();
 }
@@ -113,83 +114,181 @@ function inregPF(e, k) {
   if (ok) msg(`Tabelul 6.5 (${k === "d" ? "robinet deschis" : "parțial închis"}): Q = ${fx(Q, 3)} L/s, p = ${fx(p, 1)} kPa (H = ${fx(H, 2)} m).`);
 }
 
-/* ------------------------------------------------------------------ pașii */
-const pe = (t, r, c) => Cadru.D.t[t][r][c] !== "";
-const nRand = () => [1, 2, 3, 4, 5].filter(i => pe("t62", "r" + i, "Q")).length;
-const ctlPompa = `<div class="rand-butoane"><button type="button" class="b-start">I Pornire pompă</button><button type="button" class="b-stop">0 Oprire pompă</button></div>`;
-const ctlRob = `<div class="rand-butoane"><span class="nota">Robinet de reglare:</span><button type="button" data-da="-10">−10 %</button><button type="button" data-da="-5">−5 %</button><button type="button" data-da="-1">−1 %</button><button type="button" data-da="1">+1 %</button><button type="button" data-da="5">+5 %</button><button type="button" data-da="10">+10 %</button><b class="af-a"></b></div>`;
-const ctlAer = `<div class="rand-butoane"><span class="nota">Colector piezometre:</span><button type="button" data-off="50">Pompa de mână (+50 mm)</button><button type="button" data-off="-50">Supapa de aer (−50 mm)</button></div>`;
-const ctlBila = `<div class="rand-butoane"><button type="button" class="b-bila">Robinetul cu bilă: deschis</button></div>`;
-const PASI = [
-  { t: "Pregătirea și aerisirea", tab: "Tabelul 6.0 – temperatura", v3: "tot",
-    instr: ["NSSM: priza cu protecție diferențială; mâinile uscate; furtunurile nu se desfac sub presiune.", "Porniți pompa cu robinetul de reglare parțial deschis.", "Aerisiți prizele 1…7: deschideți pe rând robinetele de aerisire (bilele albastre) până iese apă fără bule; apoi citiți temperatura apei."],
-    ver: () => [[sim.pompa, "pompa pornită"], [aerisit(), `prize aerisite: ${sim.aer.filter(Boolean).length}/7`]],
-    prog: () => (pe("t60", "T", "v") ? 1 : 0) + (aerisit() ? 1 : 0), tot: 2,
-    ctl: ctlPompa + ctlRob + `<div class="rand-butoane"><button type="button" class="b-aer">Aerisește toate prizele</button><label class="bifa"><input type="checkbox" class="ck-rapid"> Timp ×5</label></div>`,
-    buton: [["● Temperatura apei → Tabelul 6.0", inregT]] },
-  { t: "Debitul maxim", tab: "Tabelul 6.2 – determinarea 1", v3: "piezo",
-    instr: ["Deschideți complet robinetul de reglare (100 %); robinetul cu bilă deschis.", "Dacă un nivel iese din scală, reglați perna de aer din colector (pompa de mână / supapa); diferențele nu se schimbă.", "După stabilizare citiți debitul și cele 7 niveluri."],
-    ver: () => [[sim.a === 100, `robinet de reglare: ${sim.a} %`], [sim.bila, "robinetul cu bilă deschis"], [stabil(), "debit stabilizat"], [citire().every(x => x >= 5 && x <= 995), "nivelurile în scală"]],
-    prog: () => Math.min(1, nRand()), tot: 1, ctl: ctlRob + ctlAer, buton: [["● Q și nivelurile → Tabelul 6.2", inregRand]] },
-  { t: "Debite micșorate", tab: "Tabelul 6.2 – determinările 2…5", v3: "piezo",
-    instr: ["Micșorați debitul cu robinetul de reglare în 4 trepte (de ex. 75, 55, 40, 30 % din deschidere).", "La fiecare treaptă așteptați stabilizarea și înregistrați.", "Observați: toate diferențele scad aproximativ cu pătratul debitului."],
-    ver: () => [[stabil(), "debit stabilizat"], [nRand() >= 5, `determinări: ${nRand()}/5`]],
-    prog: () => Math.max(0, nRand() - 1), tot: 4, ctl: ctlRob + ctlAer, buton: [["● Q și nivelurile → Tabelul 6.2", inregRand]] },
-  { t: "Robinetul parțial închis", tab: "Tabelul 6.4", v3: "vertical",
-    instr: ["Rotiți pârghia robinetului cu bilă la ≈ 35° (parțial închis).", "Observați creșterea diferenței 6–7 și scăderea debitului; înregistrați.", "Readuceți robinetul în poziția deschis."],
-    ver: () => [[!sim.bila, "robinetul cu bilă parțial închis"], [stabil(), "debit stabilizat"]],
-    prog: () => pe("t64", "p", "Q") ? 1 : 0, tot: 1, ctl: ctlBila + ctlRob + ctlAer, buton: [["● Q, Δh₁₋₂ și Δh₆₋₇ → Tabelul 6.4", inregPartial]] },
-  { t: "Pompa electrică de 12 V", tab: "Tabelul 6.5 – punctul de funcționare", v3: "p12",
-    instr: ["Opriți pompa standului (robinetul de reglare închis lent), montați pompa de 12 V cu manometrul pe refulare.", "Robinetul de reglare 100 %, porniți sursa de laborator (12 V): citiți Q și presiunea de refulare.", "Repetați cu robinetul cu bilă parțial închis (circuit cu rezistență mărită, ca la un termostat parțial închis)."],
-    ver: () => [[sim.p12, "pompa de 12 V montată"], [sim.sursa, "sursa pornită"], [sim.a === 100, `robinet de reglare: ${sim.a} %`], [stabil(), "debit stabilizat"]],
-    prog: () => ["d", "p"].filter(k => pe("t65", k, "Q")).length, tot: 2,
-    ctl: `<div class="rand-butoane"><button type="button" class="b-p12">Montează pompa de 12 V</button><button type="button" class="b-sursa">Sursa 12 V: pornește</button></div>` + ctlBila + ctlRob,
-    buton: [["● Q și p – robinet deschis → Tabelul 6.5", e => inregPF(e, "d")], ["● Q și p – parțial închis → Tabelul 6.5", e => inregPF(e, "p")]] },
-  { t: "Prelucrarea", tab: "Tabelul 6.3, diagrama Moody", v3: "largire",
-    instr: ["Fila Determinări calculează v, Re, λ măsurat, λ Blasius și Colebrook și coeficienții ξ (Tabelul 6.3).", "Comparați λ cu diagrama Moody și ξ cu Tabelul 6.1; calculați M și punctul de funcționare (întrebările)."],
-    ver: () => [[nRand() >= 5, "Tabelul 6.2 complet"], [pe("t64", "p", "Q"), "Tabelul 6.4"], [pe("t65", "d", "Q") && pe("t65", "p", "Q"), "Tabelul 6.5"]], prog: () => (nRand() >= 5 ? 1 : 0), tot: 1, ctl: "", buton: [] }
-];
-let pasActiv = 0;
-const VEDERI = { tot: [[0.2, 1.55, 4.7], [0.2, 1.0, -0.2]], pompa: [[-0.45, 0.75, 1.35], [-0.75, 0.35, 0]], piezo: [[0.45, 1.6, 1.55], [0.39, 1.55, -0.62]],
-  largire: [[1.15, 1.2, 0.85], [1.2, 0.9, 0]], vertical: [[2.1, 0.75, 1.0], [1.65, 0.6, 0]], p12: [[0.0, 0.75, 1.6], [-0.25, 0.25, 0.3]] };
-function vedere3d(v) { if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
-function construiestePasi() {
-  $("#pasi").innerHTML = PASI.map((p, i) => `<li class="pas" data-pas="${i}"><button type="button" class="pas-cap"><span class="pas-nr">${i + 1}</span><span>${p.t}<br><small>${p.tab}</small></span><span class="pas-prog"></span></button>
-    <div class="pas-corp"><ol>${p.instr.map(x => `<li>${x}</li>`).join("")}</ol><ul class="pas-ver"></ul><div class="pas-ctl">${p.ctl}</div>${p.buton.map(([t], j) => `<button type="button" class="primar lat" data-inreg="${i}" data-j="${j}">${t}</button>`).join("")}</div></li>`).join("");
-  $$("#pasi .pas-cap").forEach(b => b.addEventListener("click", () => alegePas(+b.closest(".pas").dataset.pas)));
-  $$("#pasi [data-inreg]").forEach(b => b.addEventListener("click", e => { PASI[+b.dataset.inreg].buton[+b.dataset.j][1](e); actualizeazaPasi(); }));
-  $$(".ck-rapid").forEach(c => c.addEventListener("change", e => { sim.viteza = e.target.checked ? 5 : 1; }));
-  $$(".b-start").forEach(b => b.addEventListener("click", pornestePompa)); $$(".b-stop").forEach(b => b.addEventListener("click", oprestePompa));
-  $$("[data-da]").forEach(b => b.addEventListener("click", () => seteazaA(sim.a + +b.dataset.da)));
-  $$("[data-off]").forEach(b => b.addEventListener("click", () => aerColector(+b.dataset.off)));
-  $$(".b-aer").forEach(b => b.addEventListener("click", () => aeriseste(null))); $$(".b-bila").forEach(b => b.addEventListener("click", comutaBila));
-  $$(".b-p12").forEach(b => b.addEventListener("click", comutaP12)); $$(".b-sursa").forEach(b => b.addEventListener("click", comutaSursa));
-  alegePas(0);
+/* ------------------------------------------------------------------ fotografia standului + suprapunerile animate */
+const FOTO = {
+  pa: [[719.8, 346.7], [758.1, 346.7], [796.4, 346.7], [834.6, 346.7], [872.9, 346.7], [911.2, 346.7], [949.5, 346.7]],
+  pb: [[718.6, 45.5], [757.8, 45.5], [797.1, 45.5], [836.3, 45.5], [875.5, 45.5], [914.7, 45.5], [953.9, 45.5]],
+  pr: [[549.6, 429.2], [1053.6, 429.2], [1097.3, 427.5], [1147.7, 427.5], [1218.2, 429.2], [1266.6, 478.9], [1263.9, 544.6]],
+  db: [1240.3, 653], tm: [284, 535.9], led: [602.9, 579.3], bStart: [590.4, 588.4], bStop: [590.7, 609.2], roata: [475.7, 575.1],
+  bv: [1271.6, 508.5], rot0: [1260.7, 622.5], rot1: [1262.8, 570.7], lar: [1077.2, 1167.8, 423, 435.4], sup: [987.5, 26.9], pm: [673.3, 121.4],
+  pompa: [532.6, 659.5], rez: [233.8, 394.4, 576.4, 718.3], sr: [718.1, 780.9], md: [500.7, 603], p12: [534.6, 765.5], cot: [1268.6, 429.2], ret: [869.6, 693.2]
+};
+const pzXY = (i, mm) => { const a = FOTO.pa[i], b = FOTO.pb[i], f = mm / 1000; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; };
+const SV = {};
+function etichetaFoto(parent, x, y, x2, y2, text, ancora) {
+  mk("line", { x1: x, y1: y, x2, y2, stroke: "#1b2a3a", "stroke-width": 1.2 }, parent);
+  mk("circle", { cx: x, cy: y, r: 3, fill: "#1b2a3a" }, parent);
+  const t = mk("text", { x: x2 + (ancora === "end" ? -5 : 5), y: y2 + 5, "text-anchor": ancora || "start", "font-size": 15, "font-weight": 600, fill: "#10202f", "font-family": "system-ui, sans-serif" }, parent);
+  t.textContent = text;
+  requestAnimationFrame(() => { try { const b = t.getBBox(); const r = mk("rect", { x: b.x - 5, y: b.y - 2, width: b.width + 10, height: b.height + 4, rx: 5, fill: "#ffffff", opacity: 0.88, stroke: "#c5ced8" }, parent); parent.insertBefore(r, t); } catch (e) { } });
 }
-function alegePas(i) { pasActiv = i; $$("#pasi .pas").forEach(el => el.classList.toggle("activ", +el.dataset.pas === i)); $("#banda").innerHTML = `Pasul ${i + 1} · ${PASI[i].instr[0]}`; vedere3d(PASI[i].v3); actualizeazaPasi(); }
-function actualizeazaPasi() {
-  if (!$("#pasi .pas")) return;
-  PASI.forEach((p, i) => { const el = $(`#pasi [data-pas="${i}"]`), n = p.prog(); el.querySelector(".pas-prog").textContent = `${n}/${p.tot}`; el.classList.toggle("gata", n >= p.tot); });
-  $(`#pasi [data-pas="${pasActiv}"] .pas-ver`).innerHTML = PASI[pasActiv].ver().map(([ok, t]) => `<li class="${ok ? "ok" : ""}">${t}</li>`).join("");
+const txt = (parent, x, y, s, o = {}) => { const t = mk("text", Object.assign({ x, y, "font-size": 14, fill: "#10202f", "font-family": "system-ui, sans-serif", "font-weight": 700 }, o), parent); t.textContent = s; return t; };
+function zonaClic(parent, el, attrs, k, titlu) {
+  const r = mk(el, Object.assign({ fill: "transparent", style: "cursor:pointer" }, attrs), parent);
+  mk("title", {}, r).textContent = titlu; r.addEventListener("click", e => laClic3d(k, e)); return r;
+}
+function lcd(parent, x, y, w, h, fs, culoare) {
+  mk("rect", { x: x - 2, y: y - 2, width: w + 4, height: h + 4, rx: 3, fill: "#111" }, parent);
+  mk("rect", { x, y, width: w, height: h, rx: 2, fill: culoare === "verde" ? "#0e1a14" : "url(#gLCDf)" }, parent);
+  return txt(parent, x + w - 4, y + h * 0.78, "", { "text-anchor": "end", "font-size": fs, "font-family": "'Courier New', monospace", fill: culoare === "verde" ? "#7dff8a" : "#1f2a12" });
+}
+function construiesteSVG() {
+  const svg = $("#svg-pierderi"); svg.innerHTML = "";
+  const defs = mk("defs", {}, svg); defsComune(defs);
+  grad(defs, "gLCDf", [[0, "#b9c7b0"], [1, "#a3b39a"]]);
+  grad(defs, "gApaTub", [[0, "#3f86c4", 0.9], [0.35, "#8fc3ea", 0.85], [0.65, "#7fb8e4", 0.85], [1, "#2f74b3", 0.9]], { x1: 0, y1: 0, x2: 1, y2: 0 });
+  const g = mk("g", {}, svg); SV.g = g;
+  SV.img = mk("image", { href: "img/sim_stand.jpg", x: 0, y: 0, width: 1536, height: 790, preserveAspectRatio: "none" }, g);
+  const F = FOTO;
+  // coloanele piezometrelor, meniscurile și bulele de aer
+  SV.col = []; SV.men = []; SV.bule = [];
+  for (let i = 0; i < 7; i++) {
+    SV.col.push(mk("polygon", { points: "", fill: "url(#gApaTub)" }, g));
+    SV.men.push(mk("line", { stroke: "#0b3a63", "stroke-width": 2 }, g));
+    SV.bule.push([0, 1].map(() => mk("ellipse", { rx: 2.6, ry: 4, fill: "url(#gBula)", opacity: 0 }, g)));
+  }
+  SV.citiri = F.pb.map(([x, y]) => txt(g, x, y - 8, "", { "text-anchor": "middle", "font-size": 11, fill: "#0b3a63" }));
+  // particulele din tronsonul transparent (lărgirea 17/26 mm)
+  const [xl0, xl1, yls, ylj] = F.lar;
+  SV.part = []; for (let k = 0; k < 26; k++) SV.part.push({ s: Math.random(), r: Math.random() * 2 - 1, el: mk("circle", { r: 1.6, fill: "#ffffff", opacity: 0 }, g) });
+  // debitmetrul cu turbină (afișaj) + afișajul mărit
+  SV.dbTxt = lcd(g, F.db[0] - 36, F.db[1] - 13, 70, 24, 16, "verde");
+  const dbx = 1330, dby = 600;
+  mk("line", { x1: F.db[0] + 36, y1: F.db[1], x2: dbx, y2: dby + 30, stroke: "#4a6276", "stroke-dasharray": "4 3" }, g);
+  mk("rect", { x: dbx, y: dby, width: 180, height: 70, rx: 10, fill: "#263238", stroke: "#0f1417" }, g);
+  txt(g, dbx + 10, dby + 16, "DEBITMETRU CU TURBINĂ", { "font-size": 10, fill: "#cfd6dd", "font-weight": 600 });
+  SV.dbMare = lcd(g, dbx + 10, dby + 24, 160, 38, 28, "verde");
+  txt(g, dbx + 172, dby + 84, "L/s", { "text-anchor": "end", "font-size": 12, fill: "#33414e" });
+  // termometrul digital al rezervorului
+  SV.tmTxt = lcd(g, F.tm[0] - 24, F.tm[1] - 9, 48, 18, 13);
+  // LED-ul cutiei de comandă
+  SV.led = mk("circle", { cx: F.led[0], cy: F.led[1], r: 4.5, fill: "#223322", stroke: "#111" }, g);
+  // robinetul de reglare: deschiderea
+  mk("rect", { x: F.roata[0] - 44, y: F.roata[1] - 58, width: 88, height: 22, rx: 5, fill: "#ffffff", opacity: 0.92, stroke: "#9aa6b1" }, g);
+  SV.aTxt = txt(g, F.roata[0], F.roata[1] - 42, "", { "text-anchor": "middle", "font-size": 13 });
+  // robinetul cu bilă: pârghia
+  SV.maner = mk("g", {}, g);
+  mk("rect", { x: 0, y: -4, width: 46, height: 8, rx: 3, fill: "#1f5aa6", stroke: "#0b2c5a" }, SV.maner);
+  mk("circle", { cx: 0, cy: 0, r: 4.5, fill: "url(#gCrom)", stroke: "#555" }, SV.maner);
+  // rotametrul: plutitorul
+  SV.plut = mk("path", { d: "", fill: "#c62828", stroke: "#7f1010" }, g);
+  // pompa de 12 V: manometrul și sursa
+  SV.p12 = mk("g", {}, g);
+  mk("circle", { cx: F.md[0], cy: F.md[1], r: 13, fill: "url(#gLCDf)", stroke: "#333" }, SV.p12);
+  SV.mdTxt = txt(SV.p12, F.md[0], F.md[1] + 4.5, "", { "text-anchor": "middle", "font-size": 11, "font-family": "'Courier New', monospace", fill: "#1d2414" });
+  SV.srTxt = lcd(SV.p12, F.sr[0] - 46, F.sr[1] - 10, 92, 17, 11, "verde");
+  etichetaFoto(SV.p12, F.p12[0] - 20, F.p12[1], 400, 770, "Pompă electrică 12 V", "end");
+  etichetaFoto(SV.p12, F.sr[0] - 46, F.sr[1] - 4, 660, 742, "Sursă de laborator", "end");
+  const mdx = 160, mdy = 640;
+  mk("line", { x1: F.md[0] - 13, y1: F.md[1], x2: mdx + 150, y2: mdy + 30, stroke: "#4a6276", "stroke-dasharray": "4 3" }, SV.p12);
+  mk("rect", { x: mdx - 140, y: mdy, width: 150, height: 66, rx: 10, fill: "#eef1f3", stroke: "#4b5259" }, SV.p12);
+  txt(SV.p12, mdx - 130, mdy + 16, "MANOMETRU REFULARE", { "font-size": 10, fill: "#33414e", "font-weight": 600 });
+  SV.mdMare = lcd(SV.p12, mdx - 130, mdy + 24, 110, 34, 24);
+  txt(SV.p12, mdx + 6, mdy + 52, "kPa", { "text-anchor": "end", "font-size": 11, fill: "#33414e" });
+  // zonele de clic
+  zonaClic(g, "circle", { cx: F.bStart[0], cy: F.bStart[1], r: 10 }, "start", "Pornire pompă (I)");
+  zonaClic(g, "circle", { cx: F.bStop[0], cy: F.bStop[1], r: 11 }, "stop", "Oprire pompă (0)");
+  zonaClic(g, "circle", { cx: F.roata[0], cy: F.roata[1], r: 18 }, "reglare", "Robinetul de reglare: clic = −5 %, Shift+clic = +5 %");
+  zonaClic(g, "rect", { x: F.bv[0] - 12, y: F.bv[1] - 20, width: 64, height: 40 }, "bila", "Robinetul cu bilă: deschis / parțial închis");
+  F.pr.forEach(([x, y], i) => zonaClic(g, "rect", i < 5 ? { x: x - 12, y: y - 46, width: 24, height: 40 } : { x: x + 4, y: y - 14, width: 40, height: 28 }, "aerisire", `Priza ${i + 1}: robinetul de aerisire`));
+  zonaClic(g, "rect", { x: F.pm[0] - 18, y: F.pm[1] - 80, width: 36, height: 160 }, "pompaAer", "Pompa de mână a colectorului: ridică nivelurile cu ≈ 50 mm");
+  zonaClic(g, "circle", { cx: F.sup[0], cy: F.sup[1], r: 12 }, "aer", "Supapa de aer a colectorului: coboară nivelurile cu ≈ 50 mm");
+  zonaClic(g, "rect", { x: F.db[0] - 40, y: F.db[1] - 20, width: 80, height: 40 }, "debitmetru", "Debitmetrul cu turbină");
+  zonaClic(g, "rect", { x: F.tm[0] - 28, y: F.tm[1] - 14, width: 56, height: 28 }, "termometru", "Termometrul digital");
+  zonaClic(g, "rect", { x: F.sr[0] - 40, y: F.sr[1] - 14, width: 80, height: 22 }, "sursa", "Sursa de laborator 12 V: pornește / oprește");
+  // etichetele
+  SV.et = mk("g", { "pointer-events": "none" }, g);
+  etichetaFoto(SV.et, 300, 650, 150, 560, "Rezervor", "end");
+  etichetaFoto(SV.et, 284, 527, 210, 470, "Termometru", "end");
+  etichetaFoto(SV.et, 532, 660, 470, 740, "Pompă centrifugă", "end");
+  etichetaFoto(SV.et, 610, 560, 640, 500, "Cutia de comandă");
+  etichetaFoto(SV.et, 465, 565, 380, 440, "Robinet de reglare", "end");
+  etichetaFoto(SV.et, 800, 431, 780, 480, "Conductă d = 17 mm, L₁₋₂ = 1,5 m");
+  etichetaFoto(SV.et, 1120, 423, 1080, 370, "Lărgire 17/26 · îngustare");
+  etichetaFoto(SV.et, 1268, 432, 1330, 400, "Cot 90°");
+  etichetaFoto(SV.et, 1300, 508, 1360, 470, "Robinet cu bilă");
+  etichetaFoto(SV.et, 1268, 596, 1360, 550, "Rotametru");
+  etichetaFoto(SV.et, 960, 200, 1010, 200, "Panou cu 7 piezometre");
+  etichetaFoto(SV.et, 673, 150, 610, 240, "Pompă de mână", "end");
+  etichetaFoto(SV.et, 992, 27, 1040, 40, "Supapă de aer");
+  etichetaFoto(SV.et, 549, 410, 480, 360, "Prize de presiune 1…7 (aerisire)", "end");
+  etichetaFoto(SV.et, 870, 690, 900, 740, "Retur transparent");
+  SV.et.style.display = sim.etichete ? "" : "none";
+  prefixeazaId(svg, "v6-");
+}
+function actualizeazaSVG() {
+  if (!SV.g) return;
+  const F = FOTO, L = citire();
+  SV.img.setAttribute("href", sim.p12 ? "img/sim_stand_p12.jpg" : "img/sim_stand.jpg");
+  sim.niv.forEach((_, i) => {
+    const mm = Math.max(-30, Math.min(1030, L[i])), [xb, yb] = pzXY(i, -30), [xt, yt] = pzXY(i, mm), w = 3.4;
+    SV.col[i].setAttribute("points", `${xb - w},${yb} ${xb + w},${yb} ${xt + w},${yt} ${xt - w},${yt}`);
+    SV.men[i].setAttribute("x1", xt - w - 0.5); SV.men[i].setAttribute("x2", xt + w + 0.5); SV.men[i].setAttribute("y1", yt); SV.men[i].setAttribute("y2", yt); SV.men[i].setAttribute("opacity", mm > 0 && mm < 1030 ? 1 : 0);
+    SV.bule[i].forEach((b, j) => { const mb = mm * (0.25 + 0.35 * j) + Math.sin(sim.t * 2 + i + j) * 6, [x, y] = pzXY(i, mb); b.setAttribute("cx", x); b.setAttribute("cy", y); b.setAttribute("opacity", !sim.aer[i] && mm > 40 ? 0.9 : 0); });
+    SV.citiri[i].textContent = L[i] < 0 ? "<0" : L[i] > 1000 ? ">1000" : L[i];
+  });
+  const q = curge() ? Qaf() : 0;
+  SV.dbTxt.textContent = q.toFixed(3); SV.dbMare.textContent = q.toFixed(3);
+  SV.tmTxt.textContent = `${fx(P().T, 1)}°`;
+  SV.led.setAttribute("fill", sim.pompa ? "#3cff4a" : "#223322");
+  SV.aTxt.textContent = `a = ${sim.a} %`;
+  SV.maner.setAttribute("transform", `translate(${F.bv[0]},${F.bv[1]}) rotate(${sim.bila ? 0 : -51})`);
+  const fr = Math.min(1, sim.q / 0.5), yp = F.rot0[1] - 4 - fr * (F.rot0[1] - F.rot1[1] - 8) + (sim.q > 0 ? Math.sin(sim.t * 9) * 0.8 : 0), xp = F.rot0[0] + (F.rot1[0] - F.rot0[0]) * fr;
+  SV.plut.setAttribute("d", `M${xp - 5} ${yp - 4} L${xp + 5} ${yp - 4} L${xp + 2} ${yp + 4} L${xp - 2} ${yp + 4} Z`);
+  SV.p12.style.display = sim.p12 ? "" : "none";
+  if (sim.p12) { SV.mdTxt.textContent = fx(sim.kPa, 1); SV.mdMare.textContent = fx(sim.kPa, 1); SV.srTxt.textContent = sim.sursa ? "12.0V " + (1.2 + 4.1 * sim.q).toFixed(2) + "A" : "OFF"; }
+}
+function miscaParticule(dt) {
+  if (!SV.part) return;
+  const [xl0, xl1, yls, ylj] = FOTO.lar, yc = (yls + ylj) / 2, R = (ylj - yls) / 2 - 1;
+  const vel = (curge() ? sim.q : 0) / 1000 / (Math.PI * 0.017 * 0.017 / 4), v2 = vel * Math.pow(17 / 26, 2);
+  SV.part.forEach(p => { p.s = (p.s + v2 * (1.15 - p.r * p.r * 0.4) * dt / 0.27) % 1; p.el.setAttribute("cx", xl0 + 6 + p.s * (xl1 - xl0 - 12)); p.el.setAttribute("cy", yc + p.r * R); p.el.setAttribute("opacity", vel > 0.02 ? 0.85 : 0); });
+}
+
+/* ------------------------------------------------------------------ comenzi, afișaje, grafic */
+function actualizeazaButoane() {
+  const s = (sel, f) => { const b = $(sel); if (b) f(b); };
+  s("#b-start", b => b.classList.toggle("activ", sim.pompa));
+  s("#b-bila", b => { b.textContent = sim.bila ? "Robinetul cu bilă: deschis (clic = parțial închis)" : "Robinetul cu bilă: parțial închis (clic = deschis)"; b.classList.toggle("activ", !sim.bila); });
+  s("#b-p12", b => { b.textContent = sim.p12 ? "Remontează pompa standului" : "Montează pompa de 12 V"; b.classList.toggle("activ", sim.p12); });
+  s("#b-sursa", b => { b.textContent = sim.sursa ? "Sursa 12 V: oprește ieșirea" : "Sursa 12 V: pornește ieșirea"; b.classList.toggle("activ", sim.sursa); });
   $$(".af-a").forEach(el => el.textContent = `deschidere ${sim.a} %`);
-  $$(".b-start").forEach(b => b.classList.toggle("activ", sim.pompa));
-  $$(".b-bila").forEach(b => { b.textContent = sim.bila ? "Robinetul cu bilă: deschis (clic = parțial închis)" : "Robinetul cu bilă: parțial închis (clic = deschis)"; b.classList.toggle("activ", !sim.bila); });
-  $$(".b-p12").forEach(b => { b.textContent = sim.p12 ? "Remontează pompa standului" : "Montează pompa de 12 V"; b.classList.toggle("activ", sim.p12); });
-  $$(".b-sursa").forEach(b => { b.textContent = sim.sursa ? "Sursa 12 V: oprește" : "Sursa 12 V: pornește"; b.classList.toggle("activ", sim.sursa); });
+  const ns = $("#nota-stand");
+  if (ns) ns.textContent = `${sim.p12 ? "Pompa de 12 V montată" : sim.pompa ? "Pompa standului pornită" : "Pompa standului oprită"} · prize aerisite: ${sim.aer.filter(Boolean).length}/7${curge() ? (stabil() ? " · debit stabilizat" : " · se stabilizează…") : ""}.`;
 }
 function afisaje() {
-  const e = $("#afis"); if (!e) return; const L = citire();
-  e.innerHTML = `<div><span>Debitmetrul</span><b>${curge() ? fx(Qaf(), 3) : "0,000"} L/s</b></div><div><span>Termometrul</span><b>${fx(P().T, 1)} °C</b></div>
-    <div><span>Robinetul de reglare</span><b>${sim.a} %</b></div><div><span>Robinetul cu bilă</span><b>${sim.bila ? "deschis" : "parțial închis"}</b></div>
-    ${sim.p12 ? `<div><span>Sursa / manometrul</span><b>${sim.sursa ? "12,0 V" : "0,0 V"} · ${fx(sim.kPa, 1)} kPa</b></div>` : ""}`;
-  const pz = $("#piez"); if (pz) pz.innerHTML = L.map((v, i) => `<div class="${v < 5 || v > 995 ? "afara" : ""}"><span>${i + 1}</span><b>${v < 0 ? "< 0" : v > 1000 ? "> 1000" : v}</b></div>`).join("");
+  const s = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+  s("#af-Q", curge() ? fx(Qaf(), 3) : "0,000"); s("#af-T", fx(P().T, 1)); s("#af-a", sim.a);
+  s("#af-4n", sim.p12 ? "Manometru refulare" : "Robinet cu bilă"); s("#af-4", sim.p12 ? fx(sim.kPa, 1) : sim.bila ? "deschis" : "parțial"); s("#af-4u", sim.p12 ? "kPa" : sim.bila ? "complet deschis" : "închis ≈ 35°");
+  const L = citire(), pz = $("#piez");
+  if (pz) pz.innerHTML = L.map((v, i) => `<div class="${v < 5 || v > 995 ? "afara" : ""}"><span>${i + 1}</span><b>${v < 0 ? "< 0" : v > 1000 ? "> 1000" : v}</b></div>`).join("");
+}
+function deseneazaLive() {
+  const cv = $("#cv-live"); if (!cv || !cv.getClientRects().length) return;
+  const L = citire(), pts = L.map((v, i) => [i + 1, v]);
+  deseneazaGrafic(cv, { xmin: 0.5, xmax: 7.5, ymin: 0, ymax: 1000, xticks: [1, 2, 3, 4, 5, 6, 7], yticks: [0, 200, 400, 600, 800, 1000], fmtX: v => String(v), xlab: "priza piezometrică", ylab: "nivelul [mm]",
+    serii: [{ tip: "linie", pts, culoare: 0 }, { tip: "pct", pts, culoare: 0, r: 4.5 }] });
 }
 function sincron3d() {
+  if (!SV3 && Cadru.anim && Cadru.anim.seteaza) SV3 = Cadru.anim;
   if (!SV3) return;
   SV3.seteaza({ pompa: sim.pompa, Q: sim.q, Qaf: curge() ? Qaf() : 0, h: citire(), a: sim.a, bila: sim.bila, T: Math.round(P().T * 10) / 10, aerisit: aerisit(), p12: sim.p12, sursa: sim.sursa,
     U12: sim.p12 && sim.sursa ? 12.0 : 0, I12: sim.p12 && sim.sursa ? 1.2 + 4.1 * sim.q : 0, kPa: sim.p12 && sim.sursa ? sim.kPa : 0 });
 }
-function actualizeaza() { afisaje(); sincron3d(); actualizeazaPasi(); }
+const VEDERI = { tot: [[0.2, 1.55, 4.7], [0.2, 1.0, -0.2]], pompa: [[-0.45, 0.75, 1.35], [-0.75, 0.35, 0]], piezo: [[0.45, 1.6, 1.55], [0.39, 1.55, -0.62]],
+  largire: [[1.15, 1.2, 0.85], [1.2, 0.9, 0]], vertical: [[2.1, 0.75, 1.0], [1.65, 0.6, 0]], p12: [[0.0, 0.75, 1.6], [-0.25, 0.25, 0.3]] };
+function vedere3d(v) { sincron3d(); if (SV3 && VEDERI[v]) SV3.vedere(...VEDERI[v]); }
+function actualizeaza() { afisaje(); actualizeazaSVG(); sincron3d(); actualizeazaButoane(); }
 let aerPas = 0;
 function laClic3d(k, e) {
   if (k === "start" || k === "pompa") return sim.pompa ? null : pornestePompa();
@@ -322,22 +421,11 @@ const TEST = [
   { q: "Dacă M se dublează, debitul pompei cu H = 4 − 10⁷Q² (M inițial 10⁷):", o: ["scade la jumătate", "scade cu ≈ 18 %", "crește", "rămâne același"], c: 1, e: "√(4/2·10⁷) → √(4/3·10⁷): 0,447 → 0,365 L/s." }
 ];
 const CSS = `<style>
-.mf6-3d .m3d { height:clamp(400px, 60vh, 660px); }
-.mf6-scena { position:relative; }
-.a3d-tip { position:absolute; background:rgba(20,24,30,.88); color:#fff; font:12px system-ui,sans-serif; padding:.2rem .45rem; border-radius:4px; pointer-events:none; white-space:nowrap; z-index:3; }
-.mf6-banda { margin:.4rem 0; background:color-mix(in srgb, var(--accent) 12%, var(--suprafata)); border-left:4px solid var(--accent); padding:.35rem .6rem; border-radius:6px; font-size:.86rem; }
-.mf6-afis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.4rem; margin:.5rem 0; } .mf6-afis div { background:var(--suprafata-2); border-radius:8px; padding:.35rem .5rem; } .mf6-afis span { display:block; font-size:.72rem; color:var(--text-sec); } .mf6-afis b { font-size:1.05rem; }
-.mf6-piez { display:grid; grid-template-columns:repeat(7,1fr); gap:.3rem; margin:.3rem 0; } .mf6-piez div { background:var(--suprafata-2); border-radius:6px; padding:.25rem; text-align:center; } .mf6-piez span { display:block; font-size:.7rem; color:var(--text-sec); } .mf6-piez b { font:600 .95rem 'Courier New',monospace; } .mf6-piez .afara b { color:#c62828; }
-.mf6-vederi { display:flex; flex-wrap:wrap; gap:.3rem; margin:.3rem 0; } .mf6-vederi button { font-size:.8rem; padding:.2rem .55rem; }
-.tk-pasi .pasi { list-style:none; margin:.4rem 0; padding:0; display:grid; gap:.45rem; }
-.pas { border:1px solid var(--linie); border-radius:8px; background:var(--suprafata); } .pas.activ { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
-.pas-cap { width:100%; display:flex; gap:.5rem; align-items:center; text-align:left; background:none; border:0; padding:.5rem .6rem; font:600 .9rem system-ui,sans-serif; color:var(--text); cursor:pointer; } .pas-cap small { font-weight:400; color:var(--text-sec); }
-.pas-nr { flex:0 0 1.6rem; height:1.6rem; border-radius:50%; display:grid; place-items:center; background:var(--suprafata-2); font-size:.8rem; } .pas.gata .pas-nr { background:#2e9e44; color:#fff; } .pas.activ .pas-nr { background:var(--accent); color:#fff; }
-.pas-prog { margin-left:auto; font:600 .75rem system-ui; color:var(--text-sec); white-space:nowrap; }
-.pas-corp { padding:0 .6rem .6rem; font-size:.86rem; } .pas:not(.activ) .pas-corp { display:none; } .pas-corp ol { margin:.2rem 0 .4rem; padding-left:1.2rem; } .pas-corp li { margin:.15rem 0; }
-.pas-ver { list-style:none; padding:0 !important; margin:.3rem 0 .5rem !important; font-size:.82rem; } .pas-ver li::before { content:"○ "; color:var(--text-sec); } .pas-ver li.ok::before { content:"✓ "; color:#2e9e44; font-weight:700; } .pas-ver li.ok { color:var(--text-sec); }
-.pas-ctl .rand-butoane { margin:.3rem 0; align-items:center; } .pas-ctl button.activ { background:color-mix(in srgb, var(--accent) 18%, var(--suprafata)); border-color:var(--accent); } .pas-corp > button.lat { margin-top:.3rem; }
-.sim-grila:fullscreen .mf6-3d .m3d, .sim-grila.ecran-plin .mf6-3d .m3d { height:calc(100vh - 18rem); }
+#svg-pierderi { width:100%; height:auto; display:block; border-radius:10px; background:#e9edf0; }
+.mf6-piez { display:grid; grid-template-columns:repeat(7,1fr); gap:.3rem; margin:.3rem 0 .6rem; } .mf6-piez div { background:var(--suprafata-2); border-radius:6px; padding:.25rem; text-align:center; } .mf6-piez span { display:block; font-size:.7rem; color:var(--text-sec); } .mf6-piez b { font:600 .95rem 'Courier New', monospace; } .mf6-piez .afara b { color:#c62828; }
+.mf6-vederi { display:flex; flex-wrap:wrap; gap:.3rem; margin:.5rem 0 0; } .mf6-vederi button { font-size:.8rem; padding:.2rem .55rem; }
+#b-start.activ, #b-bila.activ, #b-p12.activ, #b-sursa.activ { background:color-mix(in srgb, var(--accent) 18%, var(--suprafata)); border-color:var(--accent); }
+.sim-comenzi button.lat { margin-top:.3rem; }
 </style>`;
 const H = ["h12", "h23", "h45", "h56", "h67"], HT = ["Δh₁₋₂ [mm]", "Δh₂₋₃ [mm]", "Δh₄₋₅ [mm]", "Δh₅₋₆ [mm]", "Δh₆₋₇ [mm]"];
 Cadru.porneste({
@@ -392,31 +480,85 @@ Cadru.porneste({
   },
   subsol: "Modelul: λ după Colebrook cu diametrul și rugozitatea reale ale exemplarului, coeficienții ξ individuali, Borda–Carnot la lărgire, debitul în funcție de deschiderea robinetului de reglare, nivelurile piezometrelor cu perna de aer din colector, erori de citire de ± 1…2 mm, bule de aer până la aerisire; pompa de 12 V cu H = H₀ − a·Q².",
   continut: { teorie: HTML_TEORIE, probleme: htmlProbleme, intrebari: INTREBARI, test: TEST },
+  animatie: {
+    titluTab: "Standul (3D)", titlu: "Standul pentru pierderi de sarcină – modelul 3D",
+    intro: `<p>Același stand, în 3D: rotiți cu mouse-ul, rotița = zoom. Starea (pompa, robinetele, aerisirea, nivelurile) este cea din simulator. Clic pe butoanele cutiei de comandă, pe roata roșie (−5 %, Shift+clic +5 %), pe pârghia robinetului cu bilă, pe bilele albastre ale prizelor, pe supapa / pompa de mână a colectorului.</p>`,
+    modul: "aparate3d.js?v=10", functie: "creeazaPierderi", optiuni: { laClic: (k, e) => laClic3d(k, e) },
+    dupa: `<div class="mf6-vederi"><span class="nota">Vedere:</span>${[["tot", "Ansamblu"], ["pompa", "Pompa și robinetul de reglare"], ["piezo", "Panoul de piezometre"], ["largire", "Lărgirea și îngustarea"], ["vertical", "Cot, robinet cu bilă, debitmetru"], ["p12", "Pompa de 12 V"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>`
+  },
   sim: {
     html: `${CSS}<div class="sim-grila">
-    <div class="card sim-scena scena mf6-scena">
+    <div class="card sim-scena scena scena-foto">
       <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
-      <div id="st3d" class="mf6-3d"><p class="nota">Se încarcă standul 3D…</p></div>
-      <div class="mf6-vederi"><span class="nota">Vedere:</span>${[["tot", "Ansamblu"], ["pompa", "Pompa și robinetul de reglare"], ["piezo", "Panoul de piezometre"], ["largire", "Lărgirea și îngustarea"], ["vertical", "Cot, robinet cu bilă, debitmetru"], ["p12", "Pompa de 12 V"]].map(([k, t]) => `<button type="button" data-v3="${k}">${t}</button>`).join("")}</div>
-      <p class="mf6-banda" id="banda"></p>
-      <div class="mf6-afis" id="afis"></div>
+      <svg id="svg-pierderi" viewBox="0 0 1536 790" role="img" aria-label="Standul pentru pierderi de sarcină: rezervor, pompă centrifugă cu cutie de comandă, robinet de reglare, conducta de 17 mm cu prizele 1–7, lărgirea și îngustarea, cotul, robinetul cu bilă, rotametrul, debitmetrul cu turbină, returul și panoul cu 7 piezometre"></svg>
+      <div class="afisaje">
+        <div class="afisaj"><span>Debitmetru</span><b id="af-Q">0,000</b><small>L/s</small></div>
+        <div class="afisaj"><span>Temperatura apei</span><b id="af-T">—</b><small>°C</small></div>
+        <div class="afisaj"><span>Robinet de reglare</span><b id="af-a">40</b><small>% deschidere</small></div>
+        <div class="afisaj"><span id="af-4n">Robinet cu bilă</span><b id="af-4">deschis</b><small id="af-4u"></small></div>
+      </div>
       <p class="nota">Citirea piezometrelor [mm]:</p><div class="mf6-piez" id="piez"></div>
-      <p class="nota">Trageți = rotire · rotița = zoom · clic pe butoanele cutiei de comandă (pompa), pe roata roșie (−5 %, Shift+clic +5 %), pe pârghia robinetului cu bilă, pe bilele albastre ale prizelor (aerisire), pe supapa roșie / pompa de mână a colectorului, pe afișajul sursei de 12 V.</p>
+      <div class="grafic-mic"><canvas id="cv-live" height="220" aria-label="Nivelurile piezometrelor 1…7, în timp real"></canvas></div>
     </div>
-    <aside class="card sim-comenzi tk-pasi">
-      <h2>Desfășurarea lucrării</h2>
-      <ol class="pasi" id="pasi"></ol>
+    <aside class="card sim-comenzi">
+      <h2>Pregătire (NSSM)</h2>
+      <label class="bifa"><input type="checkbox" id="ck-nssm1"> Priză cu protecție diferențială, mâini uscate, podea uscată</label>
+      <label class="bifa"><input type="checkbox" id="ck-nssm2"> Furtunurile fixate; nu se desfac sub presiune</label>
+      <h2>Standul vostru</h2>
+      <p class="nota" id="nota-stand"></p>
+      <div class="rand-butoane"><button type="button" id="b-start">I Pornire pompă</button><button type="button" id="b-stop">0 Oprire pompă</button></div>
+      <button type="button" class="lat" id="b-aer">Aerisește toate prizele (robinetele de aerisire)</button>
+      <label class="bifa"><input type="checkbox" id="ck-rapid"> Timp accelerat ×5 (stabilizarea)</label>
+      <button type="button" class="lat" id="b-T">● Temperatura apei → Tabelul 6.0</button>
+      <h2>Robinetele</h2>
+      <p class="nota">Robinetul de reglare (roata roșie; clic pe roată = −5 %, Shift+clic = +5 %; tastele ↑ ↓):</p>
+      <div class="roata-butoane">
+        <button type="button" data-da="-10">−10</button><button type="button" data-da="-5">−5</button><button type="button" data-da="-1">−1</button>
+        <button type="button" data-da="1">+1</button><button type="button" data-da="5">+5</button><button type="button" data-da="10">+10</button>
+      </div>
+      <p class="nota"><b class="af-a"></b></p>
+      <button type="button" class="lat" id="b-bila">Robinetul cu bilă: deschis</button>
+      <h2>Colectorul piezometrelor</h2>
+      <p class="nota">Dacă un nivel iese din scală, mutați toate nivelurile împreună (diferențele nu se schimbă).</p>
+      <div class="rand-butoane"><button type="button" data-off="50">Pompa de mână (+50 mm)</button><button type="button" data-off="-50">Supapa de aer (−50 mm)</button></div>
+      <h2>Înregistrare</h2>
+      <button type="button" class="primar lat" id="b-rand">● Q și nivelurile → Tabelul 6.2</button>
+      <button type="button" class="lat" id="b-part">● Robinet cu bilă parțial închis: Q, Δh₁₋₂, Δh₆₋₇ → Tab. 6.4</button>
+      <h2>Pompa electrică de 12 V</h2>
+      <div class="rand-butoane"><button type="button" id="b-p12">Montează pompa de 12 V</button><button type="button" id="b-sursa">Sursa 12 V: pornește ieșirea</button></div>
+      <button type="button" class="lat" id="b-pfd">● Q și p – robinet cu bilă deschis → Tab. 6.5</button>
+      <button type="button" class="lat" id="b-pfp">● Q și p – parțial închis → Tab. 6.5</button>
       <p class="nota" id="msg-inreg" aria-live="polite"></p>
+      <details class="setari"><summary>Afișare</summary>
+        <label class="bifa"><input type="checkbox" id="ck-et" checked> Etichete pe fotografie</label>
+      </details>
     </aside>
   </div>`,
     init(C) {
-      construiestePasi(); ecranComplet($(".sim-grila"), $("#btn-ecran")); afisaje();
-      $$("[data-v3]").forEach(b => b.addEventListener("click", () => vedere3d(b.dataset.v3)));
-      import(BAZA_COMUN + "aparate3d.js?v=9").then(m => { SV3 = m.creeazaPierderi($("#st3d"), { laClic: laClic3d }); sincron3d(); })
-        .catch(e => { console.warn(e); $("#st3d").innerHTML = `<p class="nota">Standul 3D nu poate fi afișat (WebGL). Folosiți afișajele și citirile de mai jos.</p>`; });
-      C.mesaj("Pasul 1: porniți pompa cu robinetul parțial deschis, aerisiți prizele, citiți temperatura.", "");
+      ecranComplet($(".sim-grila"), $("#btn-ecran"));
+      construiesteSVG();
+      $("#ck-nssm1").addEventListener("change", e => { sim.nssm1 = e.target.checked; });
+      $("#ck-nssm2").addEventListener("change", e => { sim.nssm2 = e.target.checked; });
+      $("#ck-rapid").addEventListener("change", e => { sim.viteza = e.target.checked ? 5 : 1; });
+      $("#b-start").addEventListener("click", pornestePompa); $("#b-stop").addEventListener("click", oprestePompa);
+      $("#b-aer").addEventListener("click", () => aeriseste(null));
+      $("#b-T").addEventListener("click", inregT);
+      $$("[data-da]").forEach(b => b.addEventListener("click", () => seteazaA(sim.a + +b.dataset.da)));
+      $$("[data-off]").forEach(b => b.addEventListener("click", () => aerColector(+b.dataset.off)));
+      $("#b-bila").addEventListener("click", comutaBila);
+      $("#b-rand").addEventListener("click", inregRand); $("#b-part").addEventListener("click", inregPartial);
+      $("#b-p12").addEventListener("click", comutaP12); $("#b-sursa").addEventListener("click", comutaSursa);
+      $("#b-pfd").addEventListener("click", e => inregPF(e, "d")); $("#b-pfp").addEventListener("click", e => inregPF(e, "p"));
+      $("#ck-et").addEventListener("change", e => { sim.etichete = e.target.checked; SV.et.style.display = sim.etichete ? "" : "none"; });
+      document.addEventListener("click", e => { const b = e.target.closest("[data-v3]"); if (b) vedere3d(b.dataset.v3); });
+      document.addEventListener("keydown", e => {
+        if (!$("#tab-sim").classList.contains("activ") || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); seteazaA(sim.a + (e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 5 : 1)); }
+      });
+      actualizeaza();
+      C.mesaj("Bifați NSSM, porniți pompa cu robinetul de reglare parțial deschis, aerisiți prizele și citiți temperatura apei.", "");
     },
-    reset() { Object.assign(sim, { pompa: false, a: 40, bila: true, aer: [false, false, false, false, false, false, false], off: 500, p12: false, sursa: false, q: 0, tStab: 0 }); },
+    reset() { Object.assign(sim, { pompa: false, a: 40, bila: true, aer: [false, false, false, false, false, false, false], off: 500, p12: false, sursa: false, q: 0, tStab: 0 }); if (SV.g) actualizeaza(); },
     cadru(dt0, C, vizibil) {
       const h = Math.min(0.05, dt0 || 0.016), dt = h * sim.viteza;
       sim.t += dt; sim.tStab += dt;
@@ -426,11 +568,14 @@ Cadru.porneste({
         sim.zg = sim.zg.map((_, i) => (Math.random() - 0.5) * (curge() ? 2.2 * fq : 0) + (sim.aer[i] || !curge() ? 0 : Math.sin(sim.t * 3 + i) * 8));
         sim.zgQ = curge() ? (Math.random() - 0.5) * 0.002 : 0; }
       if (sim.p12) sim.kPa = sim.sursa ? Hpompa12() * 9.81 + (Math.random() - 0.5) * 0.08 : 0;
-      if (!vizibil) return; const t = now();
-      if (t - (this._td || 0) > 150) { this._td = t; afisaje(); sincron3d(); }
-      if (t - (this._ts || 0) > 400) { this._ts = t; actualizeazaPasi(); C.stare(1, curge() ? `Q = ${fx(Qaf(), 3)} L/s` : "pompa oprită", curge() ? "inc" : ""); C.stare(2, `pasul ${pasActiv + 1}: ${PASI[pasActiv].t}`); }
+      const t = now();
+      if (C.tabActiv === "anim" && t - (this._t3 || 0) > 150) { this._t3 = t; sincron3d(); }
+      if (!vizibil) return;
+      miscaParticule(h);
+      if (t - (this._td || 0) > 100) { this._td = t; afisaje(); actualizeazaSVG(); }
+      if (t - (this._ts || 0) > 400) { this._ts = t; actualizeazaButoane(); deseneazaLive(); C.stare(1, curge() ? `Q = ${fx(Qaf(), 3)} L/s` : "pompa oprită", curge() ? "inc" : ""); C.stare(2, sim.p12 ? "pompa de 12 V" : `prize aerisite ${sim.aer.filter(Boolean).length}/7`); }
     },
-    redeseneaza() {},
+    redeseneaza() { deseneazaLive(); },
     formule() { return []; }
   }
 });

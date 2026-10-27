@@ -406,7 +406,8 @@ Cadru.porneste({
   continut: { teorie: HTML_TEORIE, probleme: htmlProbleme, intrebari: INTREBARI, test: TEST },
   sim: {
     html: `<div class="sim-grila">
-    <div class="card sim-scena scena">
+    <div class="card sim-scena scena scena-foto">
+      <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <svg id="svg-pascal" viewBox="0 0 1536 760" role="img" aria-label="Fotografia standului de frânare, animată: pedală cu dinamometru, servofrână cu vacuum, pompă centrală tandem cu fereastră de secțiune, manometre și etrier cu celulă de forță"></svg>
       <svg id="svg-lupa" viewBox="0 0 960 270" role="img" aria-label="Cadranele mărite ale vacuummetrului și ale manometrelor de pe cele două circuite" style="margin-top:.4rem"></svg>
       <div class="afisaje">
@@ -456,6 +457,7 @@ Cadru.porneste({
     </aside>
   </div>`,
     init(C) {
+      ecranComplet($(".sim-grila"), $("#btn-ecran"));
       construiesteSVG();
       const tine = (btn, dir) => {
         const on = e => { e.preventDefault(); sim.tinta = null; sim.tine = dir; btn.classList.add("apasat"); };

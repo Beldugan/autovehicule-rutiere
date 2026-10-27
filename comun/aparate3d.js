@@ -28,7 +28,7 @@ function scena(gazda, cam0, tinta) {
   tema(); window.addEventListener("schimbare-tema", tema);
   const viz = ataseazaViz({ renderer, scene, camera, cont, decor: [perete], profil: { titlu: "Temperatura suprafețelor", T0: 20, Tmin: 15, Tmax: 100 } });
   return { cont, canvas, renderer, scene, camera, ctl, viz,
-    porneste(fn) { let tP = performance.now(); const bucla = t => { requestAnimationFrame(bucla); const dt = Math.min(0.1, (t - tP) / 1000); tP = t; if (!cont.getClientRects().length) return; fn(dt);
+    porneste(fn) { let tP = performance.now(); const bucla = t => { requestAnimationFrame(bucla); const dt = Math.max(0, Math.min(0.1, (t - tP) / 1000)); tP = t; if (!cont.getClientRects().length) return; fn(dt);
       ctl.update(); const w = cont.clientWidth, h = cont.clientHeight; if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } renderer.render(scene, camera); }; requestAnimationFrame(bucla); } };
 }
 const add = (p, o) => { o.castShadow = o.receiveShadow = true; p.add(o); return o; };
@@ -655,7 +655,7 @@ export function creeazaReynolds(gazda, opt = {}) {
   const rr = add(roata, new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.004, 10, 40), mat({ color: 0xc62828, roughness: 0.4 }))); rr.rotation.x = Math.PI / 2; k_(rr, "robinet", "Robinetul de reglare (roata de manevră)");
   [0, 1, 2].forEach(k => { const s = add(roata, new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.004, 0.005), mat({ color: 0xc62828, roughness: 0.4 }))); s.rotation.y = k * Math.PI / 3; k_(s, "robinet", "Robinetul de reglare (roata de manevră)"); });
   let furt = null; const pFurt = (inVas) => { if (furt) { sc.remove(furt); furt.geometry.dispose(); } const a = [VX + 0.03, YT, 0], end = inVas ? [0.62, 0.17, 0.2] : [0.72, 0.03, -0.05];
-    furt = tubM([a, [VX + 0.08, YT - 0.02, 0.02], [VX + 0.12, 0.2, 0.1], end], 0.006, mat({ color: 0xd9eef8, roughness: 0.3, transparent: true, opacity: 0.75 }), 40); sc.add(furt); return new THREE.Vector3(...end); };
+    furt = tubM([a, [VX + 0.08, YT - 0.02, 0.02], [VX + 0.12, 0.2, 0.1], end], 0.006, mat({ color: 0xd9eef8, roughness: 0.3, transparent: true, opacity: 0.75 }), 40); furt.userData.foto = 1; sc.add(furt); return new THREE.Vector3(...end); };
   /* ---- scurgerea (pâlnie), vasul gradat de 1 L, cronometrul */
   cyl(sc, 0.05, 0.015, 0.06, M.inox, 0.72, 0.03, -0.05, 24);
   const VG = new THREE.Group(); VG.position.set(0.62, 0, 0.2); sc.add(VG);
@@ -716,7 +716,8 @@ export function creeazaReynolds(gazda, opt = {}) {
     const tc = V.T.toFixed(1); if (tc !== ultT) { ultT = tc; const { x, c } = eTM; x.clearRect(0, 0, c.width, c.height); x.fillStyle = "rgba(255,255,255,.85)"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#c62828"; x.font = "bold 40px system-ui"; x.textAlign = "center"; x.fillText(tc + " °C", 128, 46); eTM.t.needsUpdate = true; }
     const ct = V.crono.toFixed(2); if (ct !== ultC) { ultC = ct; const { x, c } = eCR; x.fillStyle = "#aab79c"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1b2416"; x.font = "bold 54px 'Courier New',monospace"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(ct, c.width / 2, 54); eCR.t.needsUpdate = true; }
   });
-  return { seteaza(o) { Object.assign(V, o); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
+  [jetA, jetV, apV, part, col, colLiq, fCR, rAlim, rcM, ...nori].forEach(o => { o.userData.foto = 1; });
+  return { seteaza(o) { Object.assign(V, o); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); }, _S: S };
 }
 /* ===================================================================== MF L6: standul pentru pierderi de sarcină
    Standul de podea (ca în Fig. 6.1 a îndrumarului, la scara reală): cadrul din țeavă rectangulară vopsită, rezervorul din acril cu
@@ -920,14 +921,15 @@ export function creeazaPierderi(gazda, opt = {}) {
     [P12, furtP12, aspP12, SRS, MDg].forEach(o => o.visible = V.p12);
     if (V.p12) { const ks = `${V.sursa}|${V.U12.toFixed(1)}|${V.I12.toFixed(2)}`; if (ks !== ultSR) { ultSR = ks; const { x, c } = eSR; x.fillStyle = "#0d0f12"; x.fillRect(0, 0, c.width, c.height); x.font = "bold 56px 'Courier New',monospace"; x.textAlign = "right"; x.fillStyle = "#ff5252"; x.fillText(V.U12.toFixed(1), 140, 75); x.fillStyle = "#69f0ae"; x.fillText(V.I12.toFixed(2), 300, 75); x.font = "18px system-ui"; x.fillStyle = "#bbb"; x.fillText("V", 158, 100); x.fillText("A", 316, 100); eSR.t.needsUpdate = true; }
       const km = V.kPa.toFixed(1); if (km !== ultMD) { ultMD = km; const { x, c } = eMD; x.fillStyle = "#b9c7b0"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#1d2414"; x.font = "bold 50px 'Courier New',monospace"; x.textAlign = "center"; x.fillText(km, 96, 58); x.font = "16px system-ui"; x.fillText("kPa", 96, 84); eMD.t.needsUpdate = true; } }
-    const vel = (V.Qaf / 1000) / (Math.PI * 0.017 * 0.017 / 4);
+    const vel = Math.max(0, (V.Qaf / 1000) / (Math.PI * 0.017 * 0.017 / 4) || 0);
     PB.forEach((b, i) => { let p;
       if (b.z) { const v2 = vel * Math.pow(17 / 26, 2) * (1.15 - b.r * b.r * 0.4); b.s = (b.s + v2 * dt / (XL1 - XL0)) % 1; p = v3.set(XL0 + b.s * (XL1 - XL0), YT + Math.sin(b.a) * b.r * 0.012, Math.cos(b.a) * b.r * 0.012); }
       else { b.s = (b.s + vel * dt / curbaRet.getLength()) % 1; const c = curbaRet.getPointAt(b.s); p = v3.set(c.x, c.y + Math.sin(b.a) * b.r * 0.007, c.z + Math.cos(b.a) * b.r * 0.007); }
       m4.compose(p, q0, s1); partic.setMatrixAt(i, m4); });
     partic.instanceMatrix.needsUpdate = true; partic.visible = vel > 0.02;
   });
-  return { seteaza(o) { Object.assign(V, o); if (o.h) V.h = o.h.slice(); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); } };
+  [partic, plut, maner, ledP, fDB, fT, ...coloane.flatMap(c => [c.w, c.men]), ...bulePriza.flat()].forEach(o => { o.userData.foto = 1; });
+  return { seteaza(o) { Object.assign(V, o); if (o.h) V.h = o.h.slice(); }, vedere(p, t) { S.camera.position.set(...p); S.ctl.target.set(...t); }, _S: S };
 }
 
 /* ===================================================================== DA L6: standul didactic ABS/ESC și ADAS

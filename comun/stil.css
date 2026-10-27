@@ -416,6 +416,11 @@ html.fara-derulare, html.fara-derulare body { overflow: hidden; }
 .sim-grila:fullscreen .sim-scena, .sim-grila.ecran-plin .sim-scena { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-template-rows: auto 1fr; gap: .6rem; align-content: start; }
 .sim-grila:fullscreen #motor3d, .sim-grila.ecran-plin #motor3d, .sim-grila:fullscreen #svg-motor, .sim-grila.ecran-plin #svg-motor { grid-row: 1 / span 2; }
 .sim-grila:fullscreen .m3d, .sim-grila.ecran-plin .m3d { height: calc(100vh - 3.6rem); }
+.sim-grila:fullscreen .sim-scena.scena-foto, .sim-grila.ecran-plin .sim-scena.scena-foto { display: flex; flex-direction: column; gap: .5rem; }
+.sim-grila:fullscreen .scena-foto > svg:first-of-type, .sim-grila.ecran-plin .scena-foto > svg:first-of-type { width: 100%; height: auto; max-height: calc(100vh - 12.5rem); flex: 0 0 auto; }
+.sim-grila:fullscreen .scena-foto > svg ~ svg, .sim-grila.ecran-plin .scena-foto > svg ~ svg { max-height: 24vh; flex: 0 0 auto; }
+.sim-grila:fullscreen .scena-foto .afisaje, .sim-grila.ecran-plin .scena-foto .afisaje { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.sim-grila:fullscreen .scena-foto > *, .sim-grila.ecran-plin .scena-foto > * { flex-shrink: 0; }
 .sim-grila:fullscreen .afisaje, .sim-grila.ecran-plin .afisaje { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 .sim-grila:fullscreen .osc-cutie, .sim-grila.ecran-plin .osc-cutie { margin: 0; }
 @media (max-width: 980px) {

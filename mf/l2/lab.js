@@ -1398,7 +1398,8 @@ Cadru.porneste({
   },
   sim: {
     html: `<div class="sim-grila">
-    <div class="card sim-scena scena">
+    <div class="card sim-scena scena scena-foto">
+      <button type="button" class="btn-ecran" id="btn-ecran">⛶ Ecran complet</button>
       <svg id="svg-piezo" viewBox="0 0 900 400" role="img" aria-label="Piezometru cu piston filetat, manometru și roată de manevră"></svg>
       <div class="afisaje">
         <div class="afisaj"><span>Presiune</span><b id="af-p">0,0</b><small>bar</small></div>
@@ -1487,6 +1488,7 @@ Cadru.porneste({
 
   `,
     init(C) {
+      ecranComplet($(".sim-grila"), $("#btn-ecran"));
       const sf = $("#in-fluid");
       sf.innerHTML = Object.entries(FLUIDE).map(([k, f]) => `<option value="${k}">${f.nume}</option>`).join(""); sf.value = "DOT4";
       $("#sel-tinta").innerHTML = [0, 1, 2, 5, 20, 40, 60, 80, 100].map(p => `<option value="${p}">${p === 0 ? "0 bar (descarcă)" : p + " bar"}</option>`).join(""); $("#sel-tinta").value = "20";
