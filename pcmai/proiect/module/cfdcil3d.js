@@ -145,12 +145,19 @@ export function creeazaSolver3D(geo, o = {}) {
       else if (solid(X, Y, Z)) P[q * 3 + 1] = Y + dt * Math.abs(vp) + 0.2 * h;
       Pv[q] = Math.hypot(a2, b2, c2); }
   }
+  /** după închiderea supapei, coloana de aer din canal se oprește (unda de presiune reflectată și frecarea la perete, care lipsesc
+      dintr-un model incompresibil fără vâscozitate): amortizare exponențială cu constanta de timp a 8 °RAC, numai în canal (y > 0) */
+  function franeazaCanal(dt, om) { const f = Math.exp(-dt / ((8 * RAD) / om));
+    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) { if (yc(j) <= 0) continue; for (let i = 0; i <= nx; i++) u[iu(i, j, k)] *= f; for (let i = 0; i < nx; i++) w[iw(i, j, k)] *= f; }
+    for (let k = 0; k < nz; k++) for (let j = 1; j <= ny; j++) { if (y0 + j * h <= 0) continue; for (let i = 0; i < nx; i++) v[iv(i, j, k)] *= f; }
+    for (let j = 0; j < ny; j++) if (yc(j) > 0) for (let i = 0; i < nx; i++) w[iw(i, j, nz)] *= f; }
   /** rulează 0…a1 °RAC cu pasul dA; laPas(a, r, cadru?) – cadrele la fiecare pasCadru grade */
   function ruleaza(n_rpm, a0, a1, dA, itP, pasCadru, laPas) {
     const om = (n_rpm * Math.PI) / 30, dt = (dA * RAD) / om, ser = [];
     for (let a = a0; a <= a1 + 1e-9; a += dA) {
       const yp0 = geo.yPiston(a), yp1 = geo.yPiston(a + dA); vp = (yp1 - yp0) / dt; vval = -(geo.Lv(a + dA) - geo.Lv(a)) / dt;
       masca(a); conditii(); advectie(dt); conditii(); proiectie(dt, itP); conditii();
+      if (Lcur < 1e-5) franeazaCanal(dt, om);
       particule(dt, geo.Lv(a) > 0.02 * geo.g.Lmax && a < 180 + geo.g.isa);
       const r = integrale(om), Qd = Math.abs(vp) * Math.PI * D * D / 4, A = Math.PI * geo.dv * Math.max(geo.Lv(a), 1e-9);
       r.Cd = geo.Lv(a) > 0.1 * geo.g.Lmax && r.pCil < -1 && vp < 0 ? Math.min(1.2, Qd / (A * Math.sqrt(2 * Math.abs(r.pCil)))) : null;

@@ -132,7 +132,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const dare = new THREE.LineSegments(gT, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })); dare.frustumCulled = false; dare.renderOrder = 4; fara(dare); G.add(dare);
   const gP = new THREE.BufferGeometry(); gP.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3)); gP.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3));
   const part = new THREE.Points(gP, new THREE.PointsMaterial({ size: 0.028 * D, vertexColors: true, sizeAttenuation: true })); part.frustumCulled = false; fara(part); G.add(part);
-  const st = { vmax: 50, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
+  const st = { vmax: 50, prag: 0.04, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
   // câmpul termic al chiulasei: T(x, z) pe placa de foc, scăzând exponențial spre fața superioară (grosimea de pătrundere ≈ 0,25·D)
   function coloreazaChiulasa() { const cc = gCh.attributes.color.array, pp = gCh.attributes.position.array, th = ext.termic;
     for (let j = 0; j < cc.length / 3; j++) { if (!st.termic || !th) { cc[3 * j] = cc[3 * j + 1] = cc[3 * j + 2] = 1; continue; }
@@ -144,7 +144,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const leg2 = document.createElement("div"); leg2.className = "po-leg2"; gazda.appendChild(leg2);
   function legenda2(titlu, sub, vmin, vmax, u) { if (titlu == null) { leg2.hidden = true; return; } leg2.hidden = false;
     leg2.innerHTML = `<b>${titlu}</b><br><span>${sub}</span><br><span>Unitate: ${u}</span><div class="po-leg2-b">${Array.from({ length: 10 }, (_, k) => { const t = 1 - k / 9, c = culoareJet(t); return `<div><i style="background:rgb(${c.join(",")})"></i>${(vmin + (vmax - vmin) * t).toPrecision(4)}${k === 0 ? " Max" : k === 9 ? " Min" : ""}</div>`; }).join("")}</div>`; }
-  function umple(t, M, T, a, b) { const d = t.image.data; for (let s = 0; s < a * b; s++) { const q = s * 4; if (T[s]) { d[q + 3] = 0; continue; } const c = culoareJet(M[s] / st.vmax); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 240; } t.needsUpdate = true; }
+  function umple(t, M, T, a, b) { const d = t.image.data; for (let s = 0; s < a * b; s++) { const q = s * 4; if (T[s]) { d[q + 3] = 0; continue; } const v = M[s] / st.vmax; if (v < st.prag) { d[q + 3] = 0; continue; } const c = culoareJet(v); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = Math.round(120 + 120 * Math.min(1, (v - st.prag) / 0.15)); } /* aerul practic în repaus (sub prag) nu se colorează */ t.needsUpdate = true; }
   let ultimCadru = -1;
   function pozeaza(a) {
     // mișcarea continuă a pieselor (cinematica exactă), câmpul din cadrul cel mai apropiat, particulele interpolate între cadre
@@ -168,7 +168,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
       const A = gP.attributes.position.array, Cc = gP.attributes.color.array, TA = gT.attributes.position.array, TC = gT.attributes.color.array, P0 = C[k0].P, P1 = C[k1].P, V0 = C[k0].Pv;
       const lim = 0.25 * D; // salt mai mare decât atât între cadre = particulă reinjectată (fără dâră)
       for (let k = 0; k < NP; k++) { const i3 = k * 3; let X = P0[i3];
-        if (X !== X) { A[i3] = 0; A[i3 + 1] = 1e3; A[i3 + 2] = 0; TA.fill(0, k * NT * 6, (k + 1) * NT * 6); continue; }
+        if (X !== X || V0[k] < st.prag * st.vmax) { A[i3] = 0; A[i3 + 1] = 1e3; A[i3 + 2] = 0; TA.fill(0, k * NT * 6, (k + 1) * NT * 6); continue; }
         let x = X, y = P0[i3 + 1], z = P0[i3 + 2]; const X1 = P1[i3];
         if (X1 === X1 && Math.abs(X1 - X) + Math.abs(P1[i3 + 1] - y) + Math.abs(P1[i3 + 2] - z) < lim) { x += (X1 - X) * f; y += (P1[i3 + 1] - y) * f; z += (P1[i3 + 2] - z) * f; }
         A[i3] = x; A[i3 + 1] = y; A[i3 + 2] = z;

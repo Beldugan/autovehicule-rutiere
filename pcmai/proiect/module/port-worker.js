@@ -1,6 +1,6 @@
 /* Web Worker: simulările CFD 3D ale canalului de admisie și ale cilindrului (planul experimentelor numerice și detaliul unui design). */
 import * as F from "./cfd2d.js?v=2";
-import { creeazaSolver3D } from "./cfdcil3d.js?v=1";
+import { creeazaSolver3D } from "./cfdcil3d.js?v=2";
 const rar = (a, k) => a.filter((_, j) => j % k === 0);
 // convenția de semn: tumble pozitiv = tumble „direct” (jetul trece peste supapă spre partea evacuării și coboară pe cămașa de acolo)
 const semn = (ser) => ser.forEach((r) => { r.tumble = -r.tumble; });

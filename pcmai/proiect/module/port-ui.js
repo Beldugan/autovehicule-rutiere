@@ -4,7 +4,7 @@
    unghiuri, norul de puncte masă reținută – tumble, datele paralele, evoluțiile masei, tumble/swirl și energiei cinetice turbulente. */
 import { fx, concluzie } from "./scena.js";
 import { creeazaGeometrie } from "./cfd2d.js?v=2";
-import { scenaPort3D, culoareJet } from "./port3d.js?v=4";
+import { scenaPort3D, culoareJet } from "./port3d.js?v=6";
 import { bielaMEF, chiulasaTermic } from "./fem2d.js?v=2";
 
 const nr = (v, d = 2) => fx(v, d);
@@ -132,7 +132,7 @@ export function studiuPort(corp, ctx, U) {
     <div class="po-anim"><button type="button" data-a="play">⏸ Pauză</button><label>viteza <select data-a="vit"><option value="10">×0,25</option><option value="20">×0,5</option><option value="40" selected>×1</option><option value="80">×2</option></select></label>
       <label>α <input type="range" data-a="alfa" min="0" max="360" step="2" value="0"></label><output data-a="av">0</output>°RAC
       <label><input type="checkbox" data-v="contur" checked> secțiunea mediană</label><label><input type="checkbox" data-v="orizontal" checked> planul orizontal</label><label><input type="checkbox" data-v="vectori" checked> vectori</label><label><input type="checkbox" data-v="particule" checked> particule</label><label><input type="checkbox" data-v="mef" checked> biela – tensiuni (MEF)</label><label><input type="checkbox" data-v="termic"> chiulasa – temperatură</label>
-      <label>scala vitezei <input type="number" data-a="vmax" min="5" step="5" style="width:5rem"> m/s</label></div>
+      <label>scala vitezei <input type="number" data-a="vmax" min="5" step="5" style="width:5rem"> m/s</label><label title="aerul cu viteza sub acest procent din scală nu se colorează (zonele în repaus, de exemplu canalul cu supapa închisă)">pragul de afișare <input type="number" data-a="prag" value="4" min="0" max="50" step="1" style="width:4rem"> %</label></div>
     <h3 class="po-h">Tabloul de post-procesare</h3>
     <div class="po-tablou">
       <div class="po-col"><div class="po-pan"><div class="po-t" data-t="c0"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="c1"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="c2"></div><canvas class="po-c"></canvas></div></div>
@@ -146,7 +146,7 @@ export function studiuPort(corp, ctx, U) {
   const axe = [{ nume: "Canal_θ", f: (d) => d.par.theta, fmt: (v) => v.toFixed(1) }, { nume: "Cot_b/D", f: (d) => d.par.b, fmt: (v) => v.toFixed(3) }, { nume: "PreScaun_h/D", f: (d) => d.par.hps, fmt: (v) => v.toFixed(3) },
     { nume: "Masa_cilindru", f: (d) => d.rez.mIVC * 1e6, fmt: (v) => v.toFixed(1) }, { nume: "TKE_cilindru", f: (d) => d.rez.tke, fmt: (v) => v.toFixed(2) }, { nume: "Tumble", f: (d) => d.rez.tumble, fmt: (v) => v.toFixed(3) }];
   const titlu = (k, s) => { const e = corp.querySelector(`[data-t="${k}"]`); if (e) e.textContent = s; };
-  const lucrator = () => new Worker(new URL("./port-worker.js?v=3", import.meta.url), { type: "module" });
+  const lucrator = () => new Worker(new URL("./port-worker.js?v=4", import.meta.url), { type: "module" });
   const stare = (s) => { $q(".po-stare").textContent = s; };
   function ruleaza() {
     st.W.forEach((w) => w.terminate()); st.W = [];
@@ -178,7 +178,7 @@ export function studiuPort(corp, ctx, U) {
       m.cadre.forEach((c) => { if (c.a < 30 || c.a > 200) return; for (let j = 0; j < c.M.length; j += 2) if (!c.T[j]) v.push(c.M[j]); }); v.sort((a, b) => a - b);
       st.vmax = Math.max(5, Math.ceil((v.length ? v[Math.floor(v.length * 0.99)] : 50) / 5) * 5); $q('[data-a="vmax"]').value = st.vmax;
       if (st.v3) st.v3.distruge(); const gz = $q(".po-3d-sc"); gz.innerHTML = "";
-      st.v3 = scenaPort3D(gz, creeazaGeometrie(g, m.par), m, { fe: S3.fe, forta: S3.forta, sMax: S3.sMax, termic: S3.termic }); st.v3.st.vmax = st.vmax; corp.querySelectorAll("[data-v]").forEach((x) => (st.v3.st[x.dataset.v] = x.checked));
+      st.v3 = scenaPort3D(gz, creeazaGeometrie(g, m.par), m, { fe: S3.fe, forta: S3.forta, sMax: S3.sMax, termic: S3.termic }); st.v3.st.vmax = st.vmax; st.v3.st.prag = Math.max(0, +$q('[data-a="prag"]').value || 0) / 100; corp.querySelectorAll("[data-v]").forEach((x) => (st.v3.st[x.dataset.v] = x.checked));
       st.v3.legenda(st.vmax, (x) => nr(x, 0)); st.v3.coloreazaChiulasa(); leg2();
       stare(`designul ${st.sel} (rețea ${m.nx} × ${m.ny} × ${m.nz} = ${m.celule.toLocaleString("ro-RO")} celule, ${nr(m.ms / 1000, 1)} s): m = ${nr(m.mIVC * 1e6, 1)} mg, η_v = ${nr(m.etaV, 3)}, C_d = ${nr(m.CdM, 3)}`);
       redesen(); rezultate(); }
@@ -237,6 +237,7 @@ export function studiuPort(corp, ctx, U) {
   $q('[data-a="vit"]').addEventListener("change", (e) => { st.vit = +e.target.value; });
   sl.addEventListener("input", () => { st.k = +sl.value; st.ruleaza = false; bp.textContent = "▶ Pornește"; redesen(); });
   $q('[data-a="vmax"]').addEventListener("change", (e) => { st.vmax = Math.max(1, +e.target.value || st.vmax); if (st.v3) { st.v3.st.vmax = st.vmax; st.v3.legenda(st.vmax, (x) => nr(x, 0)); } redesen(); });
+  $q('[data-a="prag"]').addEventListener("change", (e) => { if (st.v3) { st.v3.st.prag = Math.max(0, +e.target.value || 0) / 100; st.v3.st.reface = true; } });
   corp.querySelectorAll("[data-v]").forEach((x) => x.addEventListener("change", () => { if (st.v3) { st.v3.st[x.dataset.v] = x.checked; st.v3.st.reface = true; if (x.dataset.v === "termic") st.v3.coloreazaChiulasa(); leg2(); } }));
   window.addEventListener("resize", () => redesen());
   ruleaza();
