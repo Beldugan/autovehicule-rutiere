@@ -45,7 +45,8 @@
   if (!TIPURI[tip]) tip = null;
   const T = tip ? TIPURI[tip] : null;
   const CH_TEMA = "pcmai-tema", CH_PR = "pcmai-proiect-" + (tip || ""), CH_MOD = "pcmai-mod-" + (tip || "");
-  let tema = Object.assign({ nume: "", grupa: "", an: PORTAL.an, varianta: "", titlu: "", indrumator: "Ș.l. univ. dr. ing. Camil Tudor", gabarit: { cL: 1.1, cH: 2.2, cE: 0.95, cB: 2 } }, Stocare.citeste(CH_TEMA, {}));
+  let tema = Object.assign({ nume: "", grupa: "", an: PORTAL.an, varianta: "", titlu: "", indrumator: PORTAL.cadru, gabarit: { cL: 1.1, cH: 2.2, cE: 0.95, cB: 2 } }, Stocare.citeste(CH_TEMA, {}));
+  if (/Tudor/.test(tema.indrumator || "")) tema.indrumator = PORTAL.cadru;
   const salvatPr = tip ? Stocare.citeste(CH_PR, null) : null;
 
   /* ------------------------------------------------------------------ antet */
@@ -82,7 +83,7 @@
   Stocare.scrie("pcmai-tip", tip);
   document.title = `Proiect PCMAI – ${T.nume}`;
   const ex = T.exemple.map(([a, k, t]) => `<button type="button" data-${a}="${k}">${t}</button>`).join("");
-  document.body.innerHTML = antet(`Proiect PCMAI · ${T.nume}`, `${esc(T.indrumar)} · C. Tudor, A.-M. Beldugan, 2026`) + `
+  document.body.innerHTML = antet(`Proiect PCMAI · ${T.nume}`, `${esc(T.indrumar)} · A.-M. Beldugan, 2026`) + `
   <div class="pc-bara-tip nu-tipari"><div class="pc-tipuri">${carduriTip(tip)}</div></div>
   <main class="pagina pc-grila" data-mod="tema">
     <nav class="pc-nav nu-tipari" aria-label="Capitolele proiectului">
@@ -124,7 +125,7 @@
     </section>
   </main>
   <footer class="subsol"><p>Calculele capitolelor sunt cele ale îndrumarelor de proiect (aceleași relații și aceleași rezultate ca exemplele rezolvate). Modulele M, S și F sunt simulatoare interne, fiecare verificat cu teste de referință analitice.</p>
-  <p>Ș.l. univ. dr. ing. Camil Tudor · ${esc(PORTAL.cadru)} · ${esc(PORTAL.univ)}, ${PORTAL.an}</p></footer>`;
+  <p>${esc(PORTAL.cadru)} · ${esc(PORTAL.univ)}, ${PORTAL.an}</p></footer>`;
   Tema.leaga();
 
   // tema studentului
@@ -236,7 +237,7 @@
       <table class="tabel"><tbody><tr><td>Tipul autovehiculului</td><td>${T.nume}</td></tr><tr><td>Varianta temei</td><td>${esc(tema.varianta || "–")}</td></tr>
       <tr><td>Student</td><td>${esc(tema.nume || "–")}, grupa ${esc(tema.grupa || "–")}</td></tr><tr><td>Îndrumător</td><td>${esc(tema.indrumator || "–")}</td></tr>
       <tr><td>Anul universitar</td><td>${esc(tema.an || PORTAL.an)}</td></tr><tr><td>Data</td><td>${new Date().toLocaleDateString("ro-RO")}</td></tr></tbody></table>
-      <p class="nota">Îndrumarul de proiect: ${esc(T.indrumar)} (C. Tudor, A.-M. Beldugan, 2026). Calculele capitolelor sunt reproductibile cu datele din capitolul 1; modulele M, S, F sunt simulatoare interne cu teste de referință.</p></div>`;
+      <p class="nota">Îndrumarul de proiect: ${esc(T.indrumar)} (A.-M. Beldugan, 2026). Calculele capitolelor sunt reproductibile cu datele din capitolul 1; modulele M, S, F sunt simulatoare interne cu teste de referință.</p></div>`;
     const d = PCMAI_SHELL.date();
     const parti = [];
     for (const m of MODULE) {

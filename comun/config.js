@@ -13,7 +13,7 @@ const PORTAL = {
   discipline: {
     MF: {
       nume: "Mecanica fluidelor", an: "anul II", sem: 1, cod: "MR2104", tip: "Laborator", dosar: "mf",
-      indrumar: "Îndrumar de laborator – Mecanica fluidelor (I. Omer, A.-M. Beldugan, 2026)",
+      indrumar: "Îndrumar de laborator – Mecanica fluidelor (A.-M. Beldugan, 2026)",
       pdf: "mf/indrumar-mecanica-fluidelor.pdf",
       endpoint: "https://script.google.com/macros/s/AKfycbwOr2gf7rGCzz3zEO1B-CgpRfqALPQptHUGhMu1Tsf86cdCo7prsaIFFJx5NfeLduQoDA/exec",
       lucrari: [
@@ -34,7 +34,7 @@ const PORTAL = {
     },
     DA: {
       nume: "Diagnosticarea autovehiculelor", an: "anul IV", sem: 1, cod: "MR4103", tip: "Laborator", dosar: "da",
-      indrumar: "Îndrumar de laborator – Diagnosticarea autovehiculelor (T. Dordea; revizuire A.-M. Beldugan, 2026)",
+      indrumar: "Îndrumar de laborator – Diagnosticarea autovehiculelor (A.-M. Beldugan, 2026)",
       pdf: "da/indrumar-diagnosticarea-autovehiculelor.pdf",
       endpoint: "https://script.google.com/macros/s/AKfycbz801hXDRXLdwi1OTapwGxsVn06JXIGCrxcCLV73199XyTrdIiHjAgG-tj6forWJPJmQA/exec",
       lucrari: [
@@ -82,7 +82,7 @@ const PORTAL = {
     },
     PCMAI: {
       nume: "Procese și caracteristici ale motoarelor cu ardere internă", scurt: "PCMAI", an: "anul III", sem: 1, cod: "MM3104", tip: "Proiect", dosar: "pcmai",
-      indrumar: "Îndrumare de proiect PCMAI (C. Tudor, A.-M. Beldugan, 2026)",
+      indrumar: "Îndrumare de proiect PCMAI (A.-M. Beldugan, 2026)",
       endpoint: "",
       lucrari: ["Proiectul PCMAI pe capitole: tipul autovehiculului, datele de intrare, calculul și modulele de simulare M, S, F"]
     }
