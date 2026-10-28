@@ -1,6 +1,6 @@
 /* Web Worker: simulările CFD 3D ale canalului de admisie și ale cilindrului (planul experimentelor numerice și detaliul unui design). */
 import * as F from "./cfd2d.js?v=2";
-import { creeazaSolver3D } from "./cfdcil3d.js?v=4";
+import { creeazaSolver3D } from "./cfdcil3d.js?v=5";
 const rar = (a, k) => a.filter((_, j) => j % k === 0);
 // convenția de semn: tumble pozitiv = tumble „direct” (jetul trece peste supapă spre partea evacuării și coboară pe cămașa de acolo)
 const semn = (ser) => ser.forEach((r) => { r.tumble = -r.tumble; });
@@ -9,7 +9,7 @@ function ciclu(t) { const n = t.Tm.length - 1;
   return { T0: t.T0, Tr: t.Tr, la(a) { const x = Math.max(0, Math.min(n, a)), i = Math.min(n - 1, Math.floor(x)), f = x - i, L = (k) => t[k][i] + f * (t[k][i + 1] - t[k][i]);
     return { inchis: t.inchis[Math.round(x)] === 1, evac: t.evac[Math.round(x)] === 1, xb: L("xb"), yb: L("yb"), Tu: L("Tu"), Tb: L("Tb"), Tm: L("Tm"), div: t.evac[Math.round(x)] === 1 ? L("div") : null }; } }; }
 function calcul(d, par, N, pasCadru, laCadru) {
-  const geo = F.creeazaGeometrie(d.g, par), s = creeazaSolver3D(geo, { N, particule: d.particule || 2500, ciclu: d.ciclu ? ciclu(d.ciclu) : null });
+  const geo = F.creeazaGeometrie(d.g, par), s = creeazaSolver3D(geo, { N, particule: d.particule || 2500, ciclu: d.ciclu ? ciclu(d.ciclu) : null, bujie: d.bujie });
   const ser = s.ruleaza(d.n, 0, d.a1 || 360, 1, d.itP || 30, pasCadru, laCadru ? (a, r, c) => { if (c) laCadru(c, s); } : null);
   semn(ser);
   const f = F.umplere0D(geo, ser, { n: d.n, p0: d.p0, T0: d.T0 });

@@ -6,7 +6,7 @@ import { creeazaCompresie, izentrop, placaRacire } from "./cfd.js";
 import { placaCFD } from "./cfd3d.js";
 import { cilindruReal } from "./cilindru-real.js?v=8";
 import { ardereMAS, testFlacaraLibera, sprayMAC, cicluMotor } from "./ardere.js?v=3";
-import { studiuPort } from "./port-ui.js?v=11";
+import { studiuPort } from "./port-ui.js?v=14";
 import { creeazaUI } from "./ui.js";
 
 const U = creeazaUI("post-procesare a câmpurilor calculate");

@@ -4,8 +4,9 @@
    unghiuri, norul de puncte masă reținută – tumble, datele paralele, evoluțiile masei, tumble/swirl și energiei cinetice turbulente. */
 import { fx, concluzie } from "./scena.js";
 import { creeazaGeometrie } from "./cfd2d.js?v=2";
-import { scenaPort3D, culoareJet } from "./port3d.js?v=10";
+import { scenaPort3D, culoareJet } from "./port3d.js?v=12";
 import { bielaMEF, chiulasaTermic } from "./fem2d.js?v=2";
+import { sprayMAC, cicluMotor } from "./ardere.js?v=3";
 
 const nr = (v, d = 2) => fx(v, d);
 /* ------------------------------------------------------------------ scala de culori „albastru–roșu” a post-procesoarelor */
@@ -145,7 +146,16 @@ export function studiuPort(corp, ctx, U) {
         T.Tm.push(Tm); T.Tu.push(Tu); T.Tb.push(Tb); T.xb.push(xb); T.yb.push(yb); T.div.push(evc ? ev[a].div : 0); T.inchis.push(inch ? 1 : 0); T.evac.push(evc ? 1 : 0); }
       const p_ = (a) => (a >= aEVO && ev[Math.round(a)] ? ev[Math.round(a)].p : pP(a));
       return Object.assign(T, { T0, Tr: T.Tm[720], aIVC, aEVO, aS, p: p_, TbMax: Math.max(...T.Tb.filter((x, k) => T.xb[k] > 0.05)), Le, a90: (() => { for (let a = aS; a < aEVO; a++) if (T.xb[a] >= 0.9) return a; return aS + 40; })() }); })();
-    return { forta, fe, sMax, aMax, Smax: Math.max(...forta), Smin: Math.min(...forta), termic, qM, qEstimat: Qw == null, vC, vT, ciclu }; })();
+    /* injecția și arderea pentru scena 3D: combustibilul (injectat / vaporizat / ars) din modelul ciclului complet, jeturile MAC (Hiroyasu–Arai, injector 1600 bar, 7 × 0,13 mm, SOI = începutul arderii − 6°) */
+    const ardere = (() => { if (t === "MOTO") return null; const X_ = window.PCMAI_EXTRA, Z = X_.model0D(R), dd = R.date, mac = dd.tip === "MAC", A_ = Z.arr, iz = (f, k) => { const j = Math.max(0, Math.min(A_.length - 1, Math.round((f - A_[0].phi) / (A_[1].phi - A_[0].phi)))); return A_[j][k]; };
+      let soi = 0, eoi = 0, spr = null;
+      if (mac) { soi = Z.vp[0][1] - 6; spr = sprayMAC({ pInj: 1600, d0: 0.13e-3, gauri: 7, Cd: 0.7, rhoL: 830, mf: Z.m_f, soi, n, pf: (f) => iz(f, "p") * 1e6, Tf: (f) => iz(f, "T"), Rbol: 0.33 * g.D }); eoi = soi + spr.durInj; }
+      const cy = cicluMotor({ D: g.D, S: g.S, L: g.L, eps: g.eps, n, dist: { dsa: g.dsa, isa: g.isa, dse: g.dse, ise: g.ise }, Lmax: g.Lmax, dv: 0.42 * g.D, pa: R.p_a * 1e6, Ta: R.T_a, pe: 1.05e5, arr: A_, mf: Z.m_f, Hu: dd.Q_i * 1e3, tip: dd.tip, soi, eoi });
+      return { mac, soi, eoi, spr, cy, la(a) { const i = Math.max(0, Math.min(720, Math.round(a))), q = cy.out[i], f = a - 360;
+        let S = 0, teta = 20, inj = false; if (mac && spr && f >= soi) { const o_ = spr.out.find((x) => x.phi >= f) || spr.out[spr.out.length - 1]; S = o_.S; teta = o_.teta; inj = f <= eoi + 3; }
+        const Tb = ciclu.Tb[i], tFl = Math.max(0, Math.min(1, (Tb - ciclu.T0) / Math.max(1, ciclu.TbMax - ciclu.T0)));
+        return { fInj: q.mfInj / Z.m_f, fVap: q.mfVap / Z.m_f, xb: ciclu.inchis[i] ? ciclu.xb[i] : 0, yb: ciclu.inchis[i] ? ciclu.yb[i] : 0, S, teta, injecteaza: inj, injPort: !mac && i < ciclu.aIVC && q.La > 0.05 * g.Lmax, tFl }; } }; })();
+    return { forta, fe, sMax, aMax, Smax: Math.max(...forta), Smin: Math.min(...forta), termic, qM, qEstimat: Qw == null, vC, vT, ciclu, ardere }; })();
   corp.innerHTML = `<div class="po-bara"><label>designuri <select data-p="N"><option>12</option><option selected>24</option><option>36</option></select></label>
       <label>rețeaua planului <select data-p="nx"><option value="14">14 celule pe alezaj</option><option value="16" selected>16 celule pe alezaj</option><option value="20">20 celule pe alezaj</option></select></label>
       <label>rețeaua designului afișat <select data-p="nd"><option value="24">24 celule pe alezaj</option><option value="28" selected>28 celule pe alezaj</option><option value="36">36 celule pe alezaj</option></select></label>
@@ -154,11 +164,11 @@ export function studiuPort(corp, ctx, U) {
     <h3 class="po-h">Simularea 3D a ciclului complet – admisia, comprimarea, arderea, destinderea, evacuarea (designul afișat)</h3>
     <div class="po-3d"><div class="po-3d-sc mod-scena"><p class="nota" style="padding:1rem">Se calculează designul de bază…</p></div></div>
     <div class="po-faze" role="group" aria-label="Faza"><span>Faza:</span><button type="button" data-f="tot" aria-pressed="true">Ciclul complet</button><button type="button" data-f="adm">Admisia</button><button type="button" data-f="comp">Comprimarea</button><button type="button" data-f="ard">Arderea</button><button type="button" data-f="dest">Destinderea</button><button type="button" data-f="evac">Evacuarea</button>
-      <span class="po-sep"></span><button type="button" data-a="pas-">◀ 1°</button><button type="button" data-a="ingheata">❄ Îngheață</button><button type="button" data-a="pas+">1° ▶</button>
+      <span class="po-sep"></span><button type="button" data-a="pas-">◀ 1°</button><button type="button" data-a="ingheata">❄ Îngheață</button><button type="button" data-a="pas+">1° ▶</button><button type="button" data-a="zoom">🔍 Camera de ardere</button>
       <label>mărimea afișată <select data-a="camp"><option value="v">viteza</option><option value="T">temperatura</option><option value="p">presiunea</option></select></label></div>
     <div class="po-anim"><button type="button" data-a="play">⏸ Pauză</button><label>viteza <select data-a="vit"><option value="10">×0,25</option><option value="20">×0,5</option><option value="40" selected>×1</option><option value="80">×2</option></select></label>
       <label>α <input type="range" data-a="alfa" min="0" max="720" step="1" value="0" style="width:280px"></label><output data-a="av">0</output>°RAC
-      <label><input type="checkbox" data-v="contur" checked> secțiunea mediană</label><label><input type="checkbox" data-v="orizontal" checked> planul orizontal</label><label><input type="checkbox" data-v="vectori" checked> vectori</label><label><input type="checkbox" data-v="particule" checked> particule</label><label><input type="checkbox" data-v="mef" checked> biela – tensiuni (MEF)</label><label><input type="checkbox" data-v="termic"> chiulasa – temperatură</label>
+      <label><input type="checkbox" data-v="contur" checked> secțiunea mediană</label><label><input type="checkbox" data-v="orizontal" checked> planul orizontal</label><label><input type="checkbox" data-v="vectori" checked> vectori</label><label><input type="checkbox" data-v="particule" checked> particule</label><label><input type="checkbox" data-v="ardere" checked> injecția și arderea</label><label><input type="checkbox" data-v="mef" checked> biela – tensiuni (MEF)</label><label><input type="checkbox" data-v="termic"> chiulasa – temperatură</label>
       <label>scala vitezei <input type="number" data-a="vmax" min="5" step="5" style="width:5rem"> m/s</label><label title="aerul cu viteza sub acest procent din scală nu se colorează (zonele în repaus, de exemplu canalul cu supapa închisă)">pragul de afișare <input type="number" data-a="prag" value="4" min="0" max="50" step="1" style="width:4rem"> %</label></div>
     <h3 class="po-h">Tabloul de post-procesare</h3>
     <div class="po-tablou">
@@ -173,7 +183,7 @@ export function studiuPort(corp, ctx, U) {
   const axe = [{ nume: "Canal_θ", f: (d) => d.par.theta, fmt: (v) => v.toFixed(1) }, { nume: "Cot_b/D", f: (d) => d.par.b, fmt: (v) => v.toFixed(3) }, { nume: "PreScaun_h/D", f: (d) => d.par.hps, fmt: (v) => v.toFixed(3) },
     { nume: "Masa_cilindru", f: (d) => d.rez.mIVC * 1e6, fmt: (v) => v.toFixed(1) }, { nume: "TKE_cilindru", f: (d) => d.rez.tke, fmt: (v) => v.toFixed(2) }, { nume: "Tumble", f: (d) => d.rez.tumble, fmt: (v) => v.toFixed(3) }];
   const titlu = (k, s) => { const e = corp.querySelector(`[data-t="${k}"]`); if (e) e.textContent = s; };
-  const lucrator = () => new Worker(new URL("./port-worker.js?v=6", import.meta.url), { type: "module" });
+  const lucrator = () => new Worker(new URL("./port-worker.js?v=7", import.meta.url), { type: "module" });
   const stare = (s) => { $q(".po-stare").textContent = s; };
   function ruleaza() {
     st.W.forEach((w) => w.terminate()); st.W = [];
@@ -189,7 +199,7 @@ export function studiuPort(corp, ctx, U) {
     stare(`se calculează în 3D designul ${k} pe rețeaua fină (${N} celule pe alezaj)…`);
     if (st.wd) st.wd.terminate(); st.wd = lucrator(); st.wd.onmessage = mesaj; st.wd.onerror = (e) => stare("eroare în simulare: " + e.message);
     const cc = S3.ciclu; st.wd.postMessage({ tip: "detaliu", par: d.par, g, n, N, pasCadru: 2, p0, T0, itP: 30, particule: 3000, a1: 720,
-      ciclu: { T0: cc.T0, Tr: cc.Tr, Tm: cc.Tm, Tu: cc.Tu, Tb: cc.Tb, xb: cc.xb, yb: cc.yb, div: cc.div, inchis: cc.inchis, evac: cc.evac } });
+      bujie: g.tipMotor === "MAC" ? [0, -0.006 * g.D, 0] : [0, -0.012 * g.D, -0.3 * g.D], ciclu: { T0: cc.T0, Tr: cc.Tr, Tm: cc.Tm, Tu: cc.Tu, Tb: cc.Tb, xb: cc.xb, yb: cc.yb, div: cc.div, inchis: cc.inchis, evac: cc.evac } });
     redesen();
   }
   function mesaj(e) {
@@ -206,7 +216,7 @@ export function studiuPort(corp, ctx, U) {
       m.cadre.forEach((c) => { if (c.a < 30 || c.a > 200) return; for (let j = 0; j < c.M.length; j += 2) if (!c.T[j]) v.push(c.M[j]); }); v.sort((a, b) => a - b);
       st.vmax = Math.max(5, Math.ceil((v.length ? v[Math.floor(v.length * 0.99)] : 50) / 5) * 5); $q('[data-a="vmax"]').value = st.vmax;
       if (st.v3) st.v3.distruge(); const gz = $q(".po-3d-sc"); gz.innerHTML = "";
-      st.v3 = scenaPort3D(gz, creeazaGeometrie(g, m.par), m, { fe: S3.fe, forta: S3.forta, sMax: S3.sMax, termic: S3.termic }); st.v3.st.vmax = st.vmax; st.v3.st.prag = Math.max(0, +$q('[data-a="prag"]').value || 0) / 100; corp.querySelectorAll("[data-v]").forEach((x) => (st.v3.st[x.dataset.v] = x.checked));
+      cam0 = null; aproape = false; st.v3 = scenaPort3D(gz, creeazaGeometrie(g, m.par), m, { fe: S3.fe, forta: S3.forta, sMax: S3.sMax, termic: S3.termic, ardere: S3.ardere }); st.v3.st.vmax = st.vmax; st.v3.st.prag = Math.max(0, +$q('[data-a="prag"]').value || 0) / 100; corp.querySelectorAll("[data-v]").forEach((x) => (st.v3.st[x.dataset.v] = x.checked));
       st.v3.st.camp = $q('[data-a="camp"]').value; legendaCamp(); st.v3.coloreazaChiulasa(); leg2();
       stare(`designul ${st.sel} (rețea ${m.nx} × ${m.ny} × ${m.nz} = ${m.celule.toLocaleString("ro-RO")} celule, ${nr(m.ms / 1000, 1)} s): m = ${nr(m.mIVC * 1e6, 1)} mg, η_v = ${nr(m.etaV, 3)}, C_d = ${nr(m.CdM, 3)}`);
       redesen(); rezultate(); }
@@ -266,6 +276,14 @@ export function studiuPort(corp, ctx, U) {
   const opreste = (b) => { st.ruleaza = !b; bp.textContent = st.ruleaza ? "⏸ Pauză" : "▶ Pornește"; const g_ = $q('[data-a="ingheata"]'); g_.setAttribute("aria-pressed", b); g_.textContent = b ? "❄ Înghețat – reia" : "❄ Îngheață"; };
   corp.querySelectorAll(".po-faze [data-f]").forEach((b) => b.addEventListener("click", () => { corp.querySelectorAll(".po-faze [data-f]").forEach((x) => x.setAttribute("aria-pressed", x === b)); st.faza = FAZE[b.dataset.f]; st.k = st.faza[0]; opreste(false); redesen(); }));
   $q('[data-a="ingheata"]').addEventListener("click", () => opreste(st.ruleaza));
+  // vederea de aproape a camerei de ardere (injecția, aprinderea, arderea) sau a motorului întreg
+  let aproape = false, cam0 = null;
+  const vedere = (b) => { if (!st.v3) return; const sc_ = st.v3.sc, D_ = g.D; if (!cam0) cam0 = { p: sc_.camera.position.clone(), t: sc_.ctl.target.clone() }; aproape = b;
+    const zb = $q('[data-a="zoom"]'); zb.setAttribute("aria-pressed", b); zb.textContent = b ? "🔍 Motorul întreg" : "🔍 Camera de ardere";
+    if (b) { const t_ = new sc_.THREE.Vector3(0, -0.06 * D_, 0), dir = new sc_.THREE.Vector3(1, 0.4, 0.55).normalize(); sc_.ctl.target.copy(t_); sc_.camera.position.copy(t_).addScaledVector(dir, 1.9 * D_); }
+    else { sc_.ctl.target.copy(cam0.t); sc_.camera.position.copy(cam0.p); } sc_.camera.near = D_ * 0.01; sc_.camera.updateProjectionMatrix(); sc_.ctl.update(); };
+  $q('[data-a="zoom"]').addEventListener("click", () => vedere(!aproape));
+  corp.querySelectorAll(".po-faze [data-f]").forEach((b) => b.addEventListener("click", () => vedere(b.dataset.f === "ard")));
   [["pas-", -1], ["pas+", 1]].forEach(([a, d]) => $q(`[data-a="${a}"]`).addEventListener("click", () => { opreste(true); st.k = Math.max(0, Math.min(720, Math.round(st.k) + d)); redesen(); }));
   $q('[data-a="camp"]').addEventListener("change", (e) => { if (!st.v3) return; st.v3.st.camp = e.target.value; st.v3.st.reface = true; legendaCamp(); });
   function legendaCamp() { if (!st.v3) return; const v_ = st.v3.st; v_.pf = (a) => cc.p(Math.max(0, Math.min(720, Math.round(a)))); v_.pGal = p0;

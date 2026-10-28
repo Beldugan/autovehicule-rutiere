@@ -165,7 +165,7 @@ export function creeazaSolver3D(geo, o = {}) {
     for (let k = 0; k < nz; k++) for (let j = 1; j <= ny; j++) { if (y0 + j * h <= 0) continue; for (let i = 0; i < nx; i++) if (sel(xc(i))) v[iv(i, j, k)] *= f; }
     for (let j = 0; j < ny; j++) if (yc(j) > 0) for (let i = 0; i < nx; i++) if (sel(xc(i))) w[iw(i, j, nz)] *= f; }
   /** temperatura: transportul (semi-lagrangian) și sursele ciclului în cilindrul închis */
-  const dist = new Float32Array(n), ordine = []; const bj = [0, -0.01 * D, 0];
+  const dist = new Float32Array(n), ordine = []; const bj = o.bujie || [0, -0.01 * D, 0];   // centrul arderii: bujia (MAS) sau injectorul (MAC)
   function temperatura(a, dt) {
     // celulele descoperite de piston (sau de supape) în acest pas preiau temperatura vecinilor fluizi; altfel ar păstra valori vechi
     for (let c = 0; c < n; c++) if (!tip[c] && tipV[c]) { let sT_ = 0, m = 0; for (const d of [-1, 1, -nx, nx, -sxy, sxy]) { const e = c + d; if (e >= 0 && e < n && !tip[e] && !tipV[e]) { sT_ += Tq[e]; m++; } }

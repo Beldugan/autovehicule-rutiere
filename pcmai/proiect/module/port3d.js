@@ -141,7 +141,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const dare = new THREE.LineSegments(gT, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })); dare.frustumCulled = false; dare.renderOrder = 4; fara(dare); G.add(dare);
   const gP = new THREE.BufferGeometry(); gP.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3)); gP.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3));
   const part = new THREE.Points(gP, new THREE.PointsMaterial({ size: 0.028 * D, vertexColors: true, sizeAttenuation: true })); part.frustumCulled = false; fara(part); G.add(part);
-  const st = { vmax: 50, prag: 0.04, camp: "v", Tmin: 300, Tmax: 2600, pMin: 0, pMax: 6e6, pGal: 1e5, pf: null, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
+  const st = { ardere: true, vmax: 50, prag: 0.04, camp: "v", Tmin: 300, Tmax: 2600, pMin: 0, pMax: 6e6, pGal: 1e5, pf: null, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
   // câmpul termic al chiulasei: T(x, z) pe placa de foc, scăzând exponențial spre fața superioară (grosimea de pătrundere ≈ 0,25·D)
   function coloreazaChiulasa() { const cc = gCh.attributes.color.array, pp = gCh.attributes.position.array, th = ext.termic;
     for (let j = 0; j < cc.length / 3; j++) { if (!st.termic || !th) { cc[3 * j] = cc[3 * j + 1] = cc[3 * j + 2] = 1; continue; }
@@ -159,11 +159,60 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   function umpleT(t, V, T, a, b) { const d = t.image.data; for (let s_ = 0; s_ < a * b; s_++) { const q = s_ * 4; if (T[s_]) { d[q + 3] = 0; continue; } const c = culoareJet((V[s_] - st.Tmin) / (st.Tmax - st.Tmin)); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 235; } t.needsUpdate = true; }
   function umple(t, M, T, a, b) { const d = t.image.data; for (let s = 0; s < a * b; s++) { const q = s * 4; if (T[s]) { d[q + 3] = 0; continue; } const v = M[s] / st.vmax; if (v < st.prag) { d[q + 3] = 0; continue; } const c = culoareJet(v); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = Math.round(120 + 120 * Math.min(1, (v - st.prag) / 0.15)); } /* aerul practic în repaus (sub prag) nu se colorează */ t.needsUpdate = true; }
   let ultimCadru = -1;
+  /* injecția și arderea (ext.ardere.la(a) → { fInj, fVap, xb, yb, S, teta, injecteaza, injPort, tFl }):
+     MAC – injectorul central cu 7 jeturi (lichid / vapori), aprinse după autoaprindere; MAS – injectorul din canalul de admisie
+     și amestecul omogen din cilindru; flacăra (front încrețit) cu volumul ars al ciclului, între piston și chiulasă */
+  const Ap = (Math.PI * D * D) / 4, AR = ext.ardere, macA = g.tipMotor === "MAC", cArd = macA ? V3(0, -0.006 * D, 0) : V3(0, -0.012 * D, -0.3 * D);
+  const plCr = new THREE.Plane(V3(0, 1, 0), 0), plCh = new THREE.Plane(V3(0, -1, 0), -0.001 * D);
+  const gFl = new THREE.SphereGeometry(1, 64, 40), bFl = Float32Array.from(gFl.attributes.position.array), zg = new Float32Array(gFl.attributes.position.count);
+  for (let k = 0; k < zg.length; k++) { const x = bFl[3 * k], y = bFl[3 * k + 1], z = bFl[3 * k + 2]; zg[k] = 0.5 * Math.sin(7 * x + 3 * y) * Math.cos(6 * z - 2 * y) + 0.3 * Math.sin(13 * y + 11 * z) * Math.cos(9 * x) + 0.2 * Math.sin(23 * x - 17 * z + 5 * y); }
+  const flM = new THREE.MeshStandardMaterial({ color: 0xffb04a, emissive: 0xff6a00, emissiveIntensity: 1.6, transparent: true, opacity: 0.55, depthWrite: false, clippingPlanes: [plCr, plCh] });
+  const flac = new THREE.Mesh(gFl, flM); flac.position.copy(cArd); flac.visible = false; fara(flac); G.add(flac);
+  const jet = new THREE.Group(); G.add(jet);
+  for (let k = 0; k < 7; k++) { const j = new THREE.Mesh(new THREE.ConeGeometry(0.05 * D, 1, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0xe0a100, emissive: 0xc77800, emissiveIntensity: 0.6, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide, clippingPlanes: [plCr] })); j.userData.k = k; fara(j); jet.add(j); }
+  jet.visible = false;
+  if (AR && macA) { const inj = new THREE.Group(); inj.add(contur(new THREE.Mesh(new THREE.CylinderGeometry(0.035 * D, 0.03 * D, yH + 0.4 * D, 20), metal(0x8a9199)), 30, 0.3)); inj.children[0].position.y = (yH + 0.4 * D) / 2;
+    const cap = contur(new THREE.Mesh(new THREE.BoxGeometry(0.14 * D, 0.12 * D, 0.18 * D), matCAE(0x1d2024)), 30, 0.3); cap.position.y = yH + 0.42 * D; inj.add(cap); fara(inj); G.add(inj); }
+  const NFC = 1400, gC = new THREE.BufferGeometry(), PC = new Float32Array(NFC * 3), CC = new Float32Array(NFC * 3), sF = new Float32Array(NFC), lF = [], vF = new Float32Array(NFC);
+  for (let k = 0; k < NFC; k++) { sF[k] = Math.pow(Math.random(), 0.7); const r = Math.sqrt(Math.random()), f = Math.random() * Math.PI * 2; lF.push([r * Math.cos(f), r * Math.sin(f)]); vF[k] = Math.random(); }
+  gC.setAttribute("position", new THREE.BufferAttribute(PC, 3)); gC.setAttribute("color", new THREE.BufferAttribute(CC, 3));
+  const comb = new THREE.Points(gC, new THREE.PointsMaterial({ size: 0.026 * D, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false })); comb.frustumCulled = false; comb.visible = false; fara(comb); G.add(comb);
+  let conP = null; if (AR && !macA) { const i0 = Math.min(lmA.length - 1, 14), pa = V3(lmA[i0][0], lmA[i0][1] + rP * 0.9, 0), pb = V3(xv, 0.04 * D, 0), dir = pb.clone().sub(pa).normalize();
+    const corp = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.045 * D, 0.045 * D, 0.5 * D, 16), matCAE(0x26292d)), 30, 0.3); corp.quaternion.setFromUnitVectors(V3(0, 1, 0), dir.clone().negate()); corp.position.copy(pa).addScaledVector(dir, -0.25 * D); fara(corp); G.add(corp);
+    conP = new THREE.Mesh(new THREE.ConeGeometry(0.15 * D, 1, 20, 1, true), new THREE.MeshStandardMaterial({ color: 0xe0a100, emissive: 0xb06a00, emissiveIntensity: 0.5, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }));
+    conP.userData = { pa, dir, L: pa.distanceTo(pb) }; conP.visible = false; fara(conP); G.add(conP); }
+  const dirs = Array.from({ length: 7 }, (_, j) => { const u = (j / 7) * Math.PI * 2; return V3(Math.cos(u), -0.1, Math.sin(u)).normalize(); });   // pistonul plat al domeniului CFD: jeturi aproape orizontale
+  const c3 = (k, r, g_, b) => { CC[3 * k] = r; CC[3 * k + 1] = g_; CC[3 * k + 2] = b; };
+  let ampV = -1;
+  function ardere(a, yp) {
+    if (!AR || !st.ardere) { flac.visible = jet.visible = comb.visible = false; if (conP) conP.visible = false; return; }
+    const q = AR.la(a); plCr.constant = -yp;
+    // flacăra: volumul ars al ciclului, emisferă din centrul arderii, încrețită de turbulență
+    const V = Ap * Math.max(0, -yp), rf = Math.cbrt((Math.max(0, q.yb) * V * 3) / (2 * Math.PI));
+    flac.visible = q.xb > 0.003 && q.xb < 0.995; if (flac.visible) { const amp = 0.12 * (1 - q.xb); if (Math.abs(amp - ampV) > 0.004) { ampV = amp; const P_ = gFl.attributes.position.array; for (let k = 0; k < zg.length; k++) { const f = 1 + amp * zg[k]; P_[3 * k] = bFl[3 * k] * f; P_[3 * k + 1] = bFl[3 * k + 1] * f; P_[3 * k + 2] = bFl[3 * k + 2] * f; } gFl.attributes.position.needsUpdate = true; gFl.computeVertexNormals(); }
+      const r_ = Math.min(rf, 1.2 * D); flac.scale.set(r_, macA ? Math.min(r_, -yp + 0.05 * D) : r_, r_); const c = culoareJet(q.tFl); flM.color.setRGB(lin(c[0]), lin(c[1]), lin(c[2])); flM.emissive.copy(flM.color); flM.emissiveIntensity = 0.8 + 3 * (1 - q.xb); }
+    // jeturile (MAC): lungimea = penetrația, deschiderea = unghiul conului; portocalii după autoaprindere
+    jet.visible = macA && q.injecteaza && q.S > 0;
+    if (jet.visible) jet.children.forEach((j) => { const d = dirs[j.userData.k], ln = q.S, lat = Math.max(0.2, (ln * Math.tan((q.teta * RAD) / 2)) / (0.05 * D)); j.scale.set(lat, Math.max(1e-3, ln), lat); j.quaternion.setFromUnitVectors(V3(0, 1, 0), d.clone().negate()); j.position.copy(cArd).addScaledVector(d, ln / 2);
+      const ard = q.xb > 0.002; j.material.color.setHex(ard ? 0xff7a1a : 0xe0a100); j.material.emissive.setHex(ard ? 0xff4400 : 0xc77800); });
+    // injectorul din canal (MAS), în timpul admisiei
+    if (conP) { conP.visible = !!q.injPort; if (conP.visible) { const L_ = conP.userData.L; conP.scale.set(1, L_, 1); conP.quaternion.setFromUnitVectors(V3(0, 1, 0), conP.userData.dir.clone().negate()); conP.position.copy(conP.userData.pa).addScaledVector(conP.userData.dir, L_ / 2); } }
+    // combustibilul: picături și vapori, consumate pe măsură ce arde
+    const nInj = Math.round(q.fInj * NFC), nArs = Math.round(Math.min(q.xb, q.fInj) * NFC); comb.visible = nInj > 0 && q.xb < 0.995 && yp < -0.002 * D;
+    if (comb.visible) { const S = Math.max(0.02 * D, q.S || 0), tg = Math.tan(((q.teta || 20) * RAD) / 2);
+      for (let k = 0; k < NFC; k++) { let x, y, z;
+        if (k >= nInj || k < nArs) { PC[3 * k + 1] = 1e3; continue; }
+        if (macA) { const d = dirs[k % 7], e1 = V3(-d.z, 0, d.x).normalize(), e2 = d.clone().cross(e1), s_ = sF[k] * S, lat = s_ * tg; const p_ = cArd.clone().addScaledVector(d, s_).addScaledVector(e1, lF[k][0] * lat).addScaledVector(e2, lF[k][1] * lat); x = p_.x; y = Math.max(p_.y, yp + 0.004 * D); z = p_.z;
+          const lich = sF[k] < 0.35 && k > q.fVap * NFC * 0.9, arde = q.xb > 0.002 && k < nArs + NFC * 0.08; arde ? c3(k, 1, 0.42, 0.08) : lich ? c3(k, 0.55, 0.32, 0.02) : c3(k, 1, 0.86, 0.35); }
+        else { x = lF[k][0] * 0.47 * D; z = lF[k][1] * 0.47 * D; y = yp + 0.004 * D + vF[k] * Math.max(0, -yp - 0.01 * D); if (flac.visible && Math.hypot(x - cArd.x, y - cArd.y, z - cArd.z) < rf) { PC[3 * k + 1] = 1e3; continue; } c3(k, 1, 0.82, 0.3); }
+        PC[3 * k] = x; PC[3 * k + 1] = y; PC[3 * k + 2] = z; }
+      gC.attributes.position.needsUpdate = true; gC.attributes.color.needsUpdate = true; }
+  }
   function pozeaza(a) {
     // mișcarea continuă a pieselor (cinematica exactă), câmpul din cadrul cel mai apropiat, particulele interpolate între cadre
     supA(a); supE(a);
     if (bielaCul && st.mef && ext.forta) bielaCul(ext.forta[Math.max(0, Math.min(ext.forta.length - 1, Math.round(a)))], st.sMax);
-    const yp = geo.yPiston(a); piston.position.y = yp;
+    const yp = geo.yPiston(a); piston.position.y = yp; ardere(a, yp);
     const ar = a * RAD, pin = V3(0, yp + yBolt, 0), cp = V3(Rm * Math.sin(ar), yC + Rm * Math.cos(ar), 0);
     biela.position.copy(pin); biela.rotation.z = Math.atan2(cp.x - pin.x, -(cp.y - pin.y)); cot.rotation.z = -ar;
     const dA = C.length > 1 ? C[1].a - C[0].a : 2, kf = Math.max(0, Math.min(C.length - 1, (a - C[0].a) / dA)), k0 = Math.floor(kf), k1 = Math.min(C.length - 1, k0 + 1), f = kf - k0, c = C[Math.round(kf)];
