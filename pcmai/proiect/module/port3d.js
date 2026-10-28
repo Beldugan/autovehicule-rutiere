@@ -113,8 +113,9 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const cot = new THREE.Group(); cot.position.y = yC;
   { const brat = new THREE.Shape(); brat.absarc(0, Rm, 0.3 * D, 0, Math.PI, false); brat.absarc(0, -0.15 * D, 0.62 * D, Math.PI * 1.15, Math.PI * 1.85, false); brat.closePath();
     [-0.2, 0.2].forEach((z) => { const gw = new THREE.ExtrudeGeometry(brat, { depth: 0.12 * D, bevelEnabled: false, curveSegments: 24 }); gw.translate(0, 0, z * D - (z < 0 ? 0.12 * D : 0)); cot.add(contur(new THREE.Mesh(gw, metal(0x8f969d, { metalness: 0.6 })), 30, 0.35)); });
-    const man = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * D, 0.2 * D, 0.3 * D, 32), metal(0x8f969d)); man.rotation.x = Math.PI / 2; man.position.y = Rm; cot.add(man);
-    const pal = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * D, 0.24 * D, 1.4 * D, 32), metal(0x8f969d)); pal.rotation.x = Math.PI / 2; cot.add(pal); }
+    // manetonul (fusul bielei) numai între brațe, în lagărul bielei; fusurile paliere numai în exteriorul brațelor (biela se rotește liber între ele)
+    const man = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.255 * D, 0.255 * D, 0.42 * D, 40), metal(0xb0b6bd)), 30, 0.3); man.rotation.x = Math.PI / 2; man.position.y = Rm; cot.add(man);
+    [-1, 1].forEach((sg) => { const pal = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.27 * D, 0.27 * D, 0.38 * D, 40), metal(0xb0b6bd)), 30, 0.3); pal.rotation.x = Math.PI / 2; pal.position.z = sg * 0.51 * D; cot.add(pal); }); }
   fara(cot); G.add(cot);
 
   /* ---------------- câmpul calculat: planurile colorate, vectorii, particulele cu dâre */
@@ -132,7 +133,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const dare = new THREE.LineSegments(gT, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })); dare.frustumCulled = false; dare.renderOrder = 4; fara(dare); G.add(dare);
   const gP = new THREE.BufferGeometry(); gP.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3)); gP.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3));
   const part = new THREE.Points(gP, new THREE.PointsMaterial({ size: 0.028 * D, vertexColors: true, sizeAttenuation: true })); part.frustumCulled = false; fara(part); G.add(part);
-  const st = { vmax: 50, prag: 0.04, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
+  const st = { vmax: 50, prag: 0.04, camp: "v", Tmin: 300, Tmax: 2600, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
   // câmpul termic al chiulasei: T(x, z) pe placa de foc, scăzând exponențial spre fața superioară (grosimea de pătrundere ≈ 0,25·D)
   function coloreazaChiulasa() { const cc = gCh.attributes.color.array, pp = gCh.attributes.position.array, th = ext.termic;
     for (let j = 0; j < cc.length / 3; j++) { if (!st.termic || !th) { cc[3 * j] = cc[3 * j + 1] = cc[3 * j + 2] = 1; continue; }
@@ -144,6 +145,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const leg2 = document.createElement("div"); leg2.className = "po-leg2"; gazda.appendChild(leg2);
   function legenda2(titlu, sub, vmin, vmax, u) { if (titlu == null) { leg2.hidden = true; return; } leg2.hidden = false;
     leg2.innerHTML = `<b>${titlu}</b><br><span>${sub}</span><br><span>Unitate: ${u}</span><div class="po-leg2-b">${Array.from({ length: 10 }, (_, k) => { const t = 1 - k / 9, c = culoareJet(t); return `<div><i style="background:rgb(${c.join(",")})"></i>${(vmin + (vmax - vmin) * t).toPrecision(4)}${k === 0 ? " Max" : k === 9 ? " Min" : ""}</div>`; }).join("")}</div>`; }
+  function umpleT(t, V, T, a, b) { const d = t.image.data; for (let s_ = 0; s_ < a * b; s_++) { const q = s_ * 4; if (T[s_]) { d[q + 3] = 0; continue; } const c = culoareJet((V[s_] - st.Tmin) / (st.Tmax - st.Tmin)); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 235; } t.needsUpdate = true; }
   function umple(t, M, T, a, b) { const d = t.image.data; for (let s = 0; s < a * b; s++) { const q = s * 4; if (T[s]) { d[q + 3] = 0; continue; } const v = M[s] / st.vmax; if (v < st.prag) { d[q + 3] = 0; continue; } const c = culoareJet(v); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = Math.round(120 + 120 * Math.min(1, (v - st.prag) / 0.15)); } /* aerul practic în repaus (sub prag) nu se colorează */ t.needsUpdate = true; }
   let ultimCadru = -1;
   function pozeaza(a) {
@@ -156,8 +158,9 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
     const dA = C.length > 1 ? C[1].a - C[0].a : 2, kf = Math.max(0, Math.min(C.length - 1, (a - C[0].a) / dA)), k0 = Math.floor(kf), k1 = Math.min(C.length - 1, k0 + 1), f = kf - k0, c = C[Math.round(kf)];
     pZ.visible = st.contur; pY.visible = st.orizontal; vec.visible = st.vectori; part.visible = dare.visible = st.particule;
     if (Math.round(kf) !== ultimCadru || st.reface) { ultimCadru = Math.round(kf); st.reface = false;
-      if (st.contur) umple(tZ, c.M, c.T, nx, ny);
-      if (st.orizontal) { umple(tY, c.Mh, c.Th, nx, nz); pY.position.y = c.yh; }
+      const tC = st.camp === "T" && c.Tz;
+      if (st.contur) (tC ? umpleT(tZ, c.Tz, c.T, nx, ny) : umple(tZ, c.M, c.T, nx, ny));
+      if (st.orizontal) { (tC ? umpleT(tY, c.Thz, c.Th, nx, nz) : umple(tY, c.Mh, c.Th, nx, nz)); pY.position.y = c.yh; }
       if (st.vectori) { const A = gV.attributes.position.array; let q = 0; const L = pas * h * 1.1;
         for (let j = 0; j < ny; j += pas) for (let i = 0; i < nx; i += pas) { const s = i + nx * j, U = c.U[s], V = c.V[s], m = Math.hypot(U, V), x = x0 + (i + 0.5) * h, y = y0 + (j + 0.5) * h;
           if (c.T[s] || m < 0.03 * st.vmax) { A.fill(0, q, q + 18); q += 18; continue; }
@@ -168,11 +171,12 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
       const A = gP.attributes.position.array, Cc = gP.attributes.color.array, TA = gT.attributes.position.array, TC = gT.attributes.color.array, P0 = C[k0].P, P1 = C[k1].P, V0 = C[k0].Pv;
       const lim = 0.25 * D; // salt mai mare decât atât între cadre = particulă reinjectată (fără dâră)
       for (let k = 0; k < NP; k++) { const i3 = k * 3; let X = P0[i3];
-        if (X !== X || V0[k] < st.prag * st.vmax) { A[i3] = 0; A[i3 + 1] = 1e3; A[i3 + 2] = 0; TA.fill(0, k * NT * 6, (k + 1) * NT * 6); continue; }
+        const modT = st.camp === "T" && C[k0].Pt;
+        if (X !== X || (!modT && V0[k] < st.prag * st.vmax)) { A[i3] = 0; A[i3 + 1] = 1e3; A[i3 + 2] = 0; TA.fill(0, k * NT * 6, (k + 1) * NT * 6); continue; }
         let x = X, y = P0[i3 + 1], z = P0[i3 + 2]; const X1 = P1[i3];
         if (X1 === X1 && Math.abs(X1 - X) + Math.abs(P1[i3 + 1] - y) + Math.abs(P1[i3 + 2] - z) < lim) { x += (X1 - X) * f; y += (P1[i3 + 1] - y) * f; z += (P1[i3 + 2] - z) * f; }
         A[i3] = x; A[i3 + 1] = y; A[i3 + 2] = z;
-        const col = culoareJet(V0[k] / st.vmax), r = lin(col[0]), gg = lin(col[1]), b = lin(col[2]); Cc[i3] = r; Cc[i3 + 1] = gg; Cc[i3 + 2] = b;
+        const col = culoareJet(modT ? (C[k0].Pt[k] - st.Tmin) / (st.Tmax - st.Tmin) : V0[k] / st.vmax), r = lin(col[0]), gg = lin(col[1]), b = lin(col[2]); Cc[i3] = r; Cc[i3 + 1] = gg; Cc[i3 + 2] = b;
         // dâra: segmentele dintre pozițiile din cadrele anterioare
         let ax = x, ay = y, az = z;
         for (let s = 0; s < NT; s++) { const kk = k0 - s, q = (k * NT + s) * 6; if (kk < 0) { TA.fill(0, q, q + 6); continue; } const Pp = C[kk].P, bx = Pp[i3], by = Pp[i3 + 1], bz = Pp[i3 + 2];
@@ -186,6 +190,6 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   pozeaza(0); coloreazaChiulasa();
   sc.vedere("sect", [0, 0, -1]); sc.incadreaza([0.5, 0.25, 1.0], [0, 0, 0]);
   { const t = sc.ctl.target; t.y += 0.15 * D; sc.camera.position.sub(t).multiplyScalar(1.4).add(t); sc.ctl.update(); }
-  function legenda(vmax, f) { sc.legenda("Viteza: modul", 0, vmax, "m/s", f); const b = gazda.querySelector(".bara-c"); if (b) b.style.background = `linear-gradient(90deg, ${[0, 0.25, 0.5, 0.75, 1].map((t) => `rgb(${culoareJet(t).join(",")})`).join(",")})`; }
+  function legenda(vmax, f, titlu = "Viteza: modul", u = "m/s", vmin = 0) { sc.legenda(titlu, vmin, vmax, u, f); const b = gazda.querySelector(".bara-c"); if (b) b.style.background = `linear-gradient(90deg, ${[0, 0.25, 0.5, 0.75, 1].map((t) => `rgb(${culoareJet(t).join(",")})`).join(",")})`; }
   return { sc, st, pozeaza, legenda, legenda2, coloreazaChiulasa, distruge() { sc.distruge(); } };
 }

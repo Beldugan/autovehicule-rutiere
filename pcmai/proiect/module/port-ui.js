@@ -4,7 +4,7 @@
    unghiuri, norul de puncte masă reținută – tumble, datele paralele, evoluțiile masei, tumble/swirl și energiei cinetice turbulente. */
 import { fx, concluzie } from "./scena.js";
 import { creeazaGeometrie } from "./cfd2d.js?v=2";
-import { scenaPort3D, culoareJet } from "./port3d.js?v=6";
+import { scenaPort3D, culoareJet } from "./port3d.js?v=8";
 import { bielaMEF, chiulasaTermic } from "./fem2d.js?v=2";
 
 const nr = (v, d = 2) => fx(v, d);
@@ -121,16 +121,43 @@ export function studiuPort(corp, ctx, U) {
     let sMax = 0, aMax = 0; forta.forEach((S, a) => { const v = (S >= 0 ? vC : vT) * Math.abs(S) / 1e6; if (v > sMax) { sMax = v; aMax = a; } });
     const qM = Qw != null ? 0.35 * Qw * 1000 * (n / 120) / Ap : 1.0e6;
     const termic = chiulasaTermic({ D: g.D, xv: -0.25 * g.D, dv: 0.42 * g.D, q: qM });
-    return { forta, fe, sMax, aMax, Smax: Math.max(...forta), Smin: Math.min(...forta), termic, qM, qEstimat: Qw == null, vC, vT }; })();
+    /* tabelul ciclului pentru simularea 3D completă: temperaturile din cilindrul închis (modelul 0D), cele două zone la ardere,
+       evacuarea liberă (orificiu compresibil, destinderea izentropă a gazelor rămase) */
+    const ciclu = (() => { const Rg = 287, ga = 1.33, Vc = Ap * g.S / (g.eps - 1), xP = (a) => { const r = a * Math.PI / 180; return Rm * (1 - Math.cos(r)) + g.L - Math.sqrt(g.L * g.L - (Rm * Math.sin(r)) ** 2); }, Vf = (a) => Vc + Ap * xP(a);
+      const aIVC = 180 + g.isa, aEVO = 540 - g.dse, Z = t === "MOTO" ? null : window.PCMAI_EXTRA.model0D(R), pP = (a) => pI(a) * 1e6;
+      const TIVC = Z ? Z.arr[0].T : 330, Tz = (a) => { if (!Z) return TIVC * pP(a) * Vf(a) / (pP(aIVC) * Vf(aIVC)); const f = a - 360, A = Z.arr, j = Math.max(0, Math.min(A.length - 1, Math.round((f - A[0].phi) / (A[1].phi - A[0].phi)))); return A[j].T; };
+      const xbZ = (a) => { if (!Z) return 0; const A = Z.arr, f = a - 360, j = Math.max(0, Math.min(A.length - 1, Math.round((f - A[0].phi) / (A[1].phi - A[0].phi)))); return A[j].x; };
+      const aS = Z ? 360 + Z.vp[0][1] : 345, pS = pP(aS), TS = Tz(aS);
+      const T = { Tm: [], Tu: [], Tb: [], xb: [], yb: [], div: [], inchis: [], evac: [] };
+      // evacuarea liberă
+      const durE = 180 + g.dse + g.ise, Le = (a) => { const f = ((a - aEVO) % 720 + 720) % 720; return f <= durE ? g.Lmax * Math.sin(Math.PI * f / durE) ** 2 : 0; }, Ae = (a) => Math.PI * 0.42 * g.D * Le(a);
+      const pE = 1.05e5, TE0 = Tz(aEVO), pE0 = pP(aEVO), VE0 = Vf(aEVO), mE0 = pE0 * VE0 / (Rg * TE0), ev = {}; let m = mE0;
+      for (let a = aEVO; a <= 720 + 1e-9; a += 0.25) { const V = Vf(a), p = pE0 * Math.pow(m / mE0, ga) * Math.pow(VE0 / V, ga), Tg = p * V / (m * Rg), r = pE / p, rc = Math.pow(2 / (ga + 1), ga / (ga - 1));
+        const psi = p <= pE ? 0 : r <= rc ? Math.sqrt(ga) * Math.pow(2 / (ga + 1), (ga + 1) / (2 * (ga - 1))) : Math.sqrt(2 * ga / (ga - 1) * (Math.pow(r, 2 / ga) - Math.pow(r, (ga + 1) / ga)));
+        const mdot = 0.7 * Ae(a) * p / Math.sqrt(Rg * Tg) * psi, dVdt = (Vf(a + 0.25) - V) / (0.25 * Math.PI / 180 / om);
+        if (Math.abs(a - Math.round(a)) < 1e-9) ev[Math.round(a)] = { Tm: Tg, div: dVdt / V + mdot / m, p };
+        m = Math.max(1e-9, m - mdot * 0.25 * Math.PI / 180 / om); }
+      for (let a = 0; a <= 720; a++) {
+        const inch = a >= aIVC && a < aEVO, evc = a >= aEVO, xb = inch ? xbZ(a) : 0, Tm = evc ? ev[a].Tm : inch ? Tz(a) : TIVC;
+        const Tu = inch && a >= aS ? TS * Math.pow(pP(a) / pS, 0.35 / 1.35) : Tm;
+        let Tb = xb > 0.05 ? Math.min(3200, Math.max(Tu, (Tm - (1 - xb) * Tu) / xb)) : Tu + 2000;
+        const yb = xb * Tb / (xb * Tb + (1 - xb) * Tu || 1);
+        T.Tm.push(Tm); T.Tu.push(Tu); T.Tb.push(Tb); T.xb.push(xb); T.yb.push(yb); T.div.push(evc ? ev[a].div : 0); T.inchis.push(inch ? 1 : 0); T.evac.push(evc ? 1 : 0); }
+      const p_ = (a) => (a >= aEVO && ev[Math.round(a)] ? ev[Math.round(a)].p : pP(a));
+      return Object.assign(T, { T0, Tr: T.Tm[720], aIVC, aEVO, aS, p: p_, TbMax: Math.max(...T.Tb.filter((x, k) => T.xb[k] > 0.05)), Le, a90: (() => { for (let a = aS; a < aEVO; a++) if (T.xb[a] >= 0.9) return a; return aS + 40; })() }); })();
+    return { forta, fe, sMax, aMax, Smax: Math.max(...forta), Smin: Math.min(...forta), termic, qM, qEstimat: Qw == null, vC, vT, ciclu }; })();
   corp.innerHTML = `<div class="po-bara"><label>designuri <select data-p="N"><option>12</option><option selected>24</option><option>36</option></select></label>
       <label>rețeaua planului <select data-p="nx"><option value="14">14 celule pe alezaj</option><option value="16" selected>16 celule pe alezaj</option><option value="20">20 celule pe alezaj</option></select></label>
       <label>rețeaua designului afișat <select data-p="nd"><option value="24">24 celule pe alezaj</option><option value="28" selected>28 celule pe alezaj</option><option value="36">36 celule pe alezaj</option></select></label>
       <button type="button" class="primar" data-a="run">Rulează planul de experimente 3D</button><div class="mod-progres"><i></i></div><span class="po-stare nota"></span></div>
     <p class="nota">Calcul CFD 3D al canalului de admisie și al cilindrului motorului proiectat (${eti}, ${n} rot/min, faze dsa ${g.dsa}° / îsa ${g.isa}°, ridicarea maximă ${nr(g.Lmax * 1e3, 1)} mm), de la deschiderea admisiei până la PMS-comprimare. Parametrii canalului: unghiul θ, deplasarea cotului b și înălțimea înainte de scaun h<sub>ps</sub>. Unghiurile sunt în °RAC cu 0 = PMS la începutul admisiei; tumble pozitiv = tumble direct (jetul trece peste supapă spre evacuare și coboară pe cămașa de acolo).</p>
-    <h3 class="po-h">Simularea 3D animată – designul afișat</h3>
+    <h3 class="po-h">Simularea 3D a ciclului complet – admisia, comprimarea, arderea, destinderea, evacuarea (designul afișat)</h3>
     <div class="po-3d"><div class="po-3d-sc mod-scena"><p class="nota" style="padding:1rem">Se calculează designul de bază…</p></div></div>
+    <div class="po-faze" role="group" aria-label="Faza"><span>Faza:</span><button type="button" data-f="tot" aria-pressed="true">Ciclul complet</button><button type="button" data-f="adm">Admisia</button><button type="button" data-f="comp">Comprimarea</button><button type="button" data-f="ard">Arderea</button><button type="button" data-f="dest">Destinderea</button><button type="button" data-f="evac">Evacuarea</button>
+      <span class="po-sep"></span><button type="button" data-a="pas-">◀ 1°</button><button type="button" data-a="ingheata">❄ Îngheață</button><button type="button" data-a="pas+">1° ▶</button>
+      <label>mărimea afișată <select data-a="camp"><option value="v">viteza</option><option value="T">temperatura</option></select></label></div>
     <div class="po-anim"><button type="button" data-a="play">⏸ Pauză</button><label>viteza <select data-a="vit"><option value="10">×0,25</option><option value="20">×0,5</option><option value="40" selected>×1</option><option value="80">×2</option></select></label>
-      <label>α <input type="range" data-a="alfa" min="0" max="360" step="2" value="0"></label><output data-a="av">0</output>°RAC
+      <label>α <input type="range" data-a="alfa" min="0" max="720" step="1" value="0" style="width:280px"></label><output data-a="av">0</output>°RAC
       <label><input type="checkbox" data-v="contur" checked> secțiunea mediană</label><label><input type="checkbox" data-v="orizontal" checked> planul orizontal</label><label><input type="checkbox" data-v="vectori" checked> vectori</label><label><input type="checkbox" data-v="particule" checked> particule</label><label><input type="checkbox" data-v="mef" checked> biela – tensiuni (MEF)</label><label><input type="checkbox" data-v="termic"> chiulasa – temperatură</label>
       <label>scala vitezei <input type="number" data-a="vmax" min="5" step="5" style="width:5rem"> m/s</label><label title="aerul cu viteza sub acest procent din scală nu se colorează (zonele în repaus, de exemplu canalul cu supapa închisă)">pragul de afișare <input type="number" data-a="prag" value="4" min="0" max="50" step="1" style="width:4rem"> %</label></div>
     <h3 class="po-h">Tabloul de post-procesare</h3>
@@ -146,7 +173,7 @@ export function studiuPort(corp, ctx, U) {
   const axe = [{ nume: "Canal_θ", f: (d) => d.par.theta, fmt: (v) => v.toFixed(1) }, { nume: "Cot_b/D", f: (d) => d.par.b, fmt: (v) => v.toFixed(3) }, { nume: "PreScaun_h/D", f: (d) => d.par.hps, fmt: (v) => v.toFixed(3) },
     { nume: "Masa_cilindru", f: (d) => d.rez.mIVC * 1e6, fmt: (v) => v.toFixed(1) }, { nume: "TKE_cilindru", f: (d) => d.rez.tke, fmt: (v) => v.toFixed(2) }, { nume: "Tumble", f: (d) => d.rez.tumble, fmt: (v) => v.toFixed(3) }];
   const titlu = (k, s) => { const e = corp.querySelector(`[data-t="${k}"]`); if (e) e.textContent = s; };
-  const lucrator = () => new Worker(new URL("./port-worker.js?v=4", import.meta.url), { type: "module" });
+  const lucrator = () => new Worker(new URL("./port-worker.js?v=5", import.meta.url), { type: "module" });
   const stare = (s) => { $q(".po-stare").textContent = s; };
   function ruleaza() {
     st.W.forEach((w) => w.terminate()); st.W = [];
@@ -161,7 +188,8 @@ export function studiuPort(corp, ctx, U) {
     st.sel = k; const d = st.D[k] || { par: { theta: 30, b: 0, hps: 0.25 } }, N = +$q('[data-p="nd"]').value;
     stare(`se calculează în 3D designul ${k} pe rețeaua fină (${N} celule pe alezaj)…`);
     if (st.wd) st.wd.terminate(); st.wd = lucrator(); st.wd.onmessage = mesaj; st.wd.onerror = (e) => stare("eroare în simulare: " + e.message);
-    st.wd.postMessage({ tip: "detaliu", par: d.par, g, n, N, pasCadru: 2, p0, T0, itP: 30, particule: 3000 });
+    const cc = S3.ciclu; st.wd.postMessage({ tip: "detaliu", par: d.par, g, n, N, pasCadru: 2, p0, T0, itP: 30, particule: 3000, a1: 720,
+      ciclu: { T0: cc.T0, Tr: cc.Tr, Tm: cc.Tm, Tu: cc.Tu, Tb: cc.Tb, xb: cc.xb, yb: cc.yb, div: cc.div, inchis: cc.inchis, evac: cc.evac } });
     redesen();
   }
   function mesaj(e) {
@@ -179,7 +207,7 @@ export function studiuPort(corp, ctx, U) {
       st.vmax = Math.max(5, Math.ceil((v.length ? v[Math.floor(v.length * 0.99)] : 50) / 5) * 5); $q('[data-a="vmax"]').value = st.vmax;
       if (st.v3) st.v3.distruge(); const gz = $q(".po-3d-sc"); gz.innerHTML = "";
       st.v3 = scenaPort3D(gz, creeazaGeometrie(g, m.par), m, { fe: S3.fe, forta: S3.forta, sMax: S3.sMax, termic: S3.termic }); st.v3.st.vmax = st.vmax; st.v3.st.prag = Math.max(0, +$q('[data-a="prag"]').value || 0) / 100; corp.querySelectorAll("[data-v]").forEach((x) => (st.v3.st[x.dataset.v] = x.checked));
-      st.v3.legenda(st.vmax, (x) => nr(x, 0)); st.v3.coloreazaChiulasa(); leg2();
+      st.v3.st.camp = $q('[data-a="camp"]').value; legendaCamp(); st.v3.coloreazaChiulasa(); leg2();
       stare(`designul ${st.sel} (rețea ${m.nx} × ${m.ny} × ${m.nz} = ${m.celule.toLocaleString("ro-RO")} celule, ${nr(m.ms / 1000, 1)} s): m = ${nr(m.mIVC * 1e6, 1)} mg, η_v = ${nr(m.etaV, 3)}, C_d = ${nr(m.CdM, 3)}`);
       redesen(); rezultate(); }
   }
@@ -233,7 +261,15 @@ export function studiuPort(corp, ctx, U) {
   $q('[data-a="run"]').addEventListener("click", ruleaza);
   $q(".po-nor").addEventListener("click", (e) => { if (!st.pos) return; const r = e.target.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let b = -1, dm = 1e9; st.pos.forEach(([px, py], k) => { const d = Math.hypot(px - x, py - y); if (d < dm) { dm = d; b = k; } }); if (b >= 0 && dm < 20) detaliu(b); });
   const bp = $q('[data-a="play"]'), sl = $q('[data-a="alfa"]');
-  bp.addEventListener("click", () => { st.ruleaza = !st.ruleaza; bp.textContent = st.ruleaza ? "⏸ Pauză" : "▶ Pornește"; });
+  const cc = S3.ciclu, FAZE = { tot: [0, 720], adm: [0, cc.aIVC], comp: [cc.aIVC, cc.aS], ard: [cc.aS - 5, cc.a90 + 10], dest: [cc.aS, cc.aEVO], evac: [cc.aEVO, 720] };
+  st.faza = FAZE.tot;
+  const opreste = (b) => { st.ruleaza = !b; bp.textContent = st.ruleaza ? "⏸ Pauză" : "▶ Pornește"; const g_ = $q('[data-a="ingheata"]'); g_.setAttribute("aria-pressed", b); g_.textContent = b ? "❄ Înghețat – reia" : "❄ Îngheață"; };
+  corp.querySelectorAll(".po-faze [data-f]").forEach((b) => b.addEventListener("click", () => { corp.querySelectorAll(".po-faze [data-f]").forEach((x) => x.setAttribute("aria-pressed", x === b)); st.faza = FAZE[b.dataset.f]; st.k = st.faza[0]; opreste(false); redesen(); }));
+  $q('[data-a="ingheata"]').addEventListener("click", () => opreste(st.ruleaza));
+  [["pas-", -1], ["pas+", 1]].forEach(([a, d]) => $q(`[data-a="${a}"]`).addEventListener("click", () => { opreste(true); st.k = Math.max(0, Math.min(720, Math.round(st.k) + d)); redesen(); }));
+  $q('[data-a="camp"]').addEventListener("change", (e) => { if (!st.v3) return; st.v3.st.camp = e.target.value; st.v3.st.reface = true; legendaCamp(); });
+  function legendaCamp() { if (!st.v3) return; if (st.v3.st.camp === "T") { st.v3.st.Tmin = Math.round(cc.T0 / 50) * 50; st.v3.st.Tmax = Math.ceil(cc.TbMax / 100) * 100; st.v3.legenda(st.v3.st.Tmax, (x) => nr(x, 0), "Temperatura", "K", st.v3.st.Tmin); } else st.v3.legenda(st.vmax, (x) => nr(x, 0)); }
+  bp.addEventListener("click", () => opreste(st.ruleaza));
   $q('[data-a="vit"]').addEventListener("change", (e) => { st.vit = +e.target.value; });
   sl.addEventListener("input", () => { st.k = +sl.value; st.ruleaza = false; bp.textContent = "▶ Pornește"; redesen(); });
   $q('[data-a="vmax"]').addEventListener("change", (e) => { st.vmax = Math.max(1, +e.target.value || st.vmax); if (st.v3) { st.v3.st.vmax = st.vmax; st.v3.legenda(st.vmax, (x) => nr(x, 0)); } redesen(); });
@@ -243,8 +279,9 @@ export function studiuPort(corp, ctx, U) {
   ruleaza();
   let tg = 0;
   return {
-    pas(dt) { if (!st.det) return; if (st.ruleaza) st.k = (st.k + dt * st.vit) % 360; const c = cadru(st.k);
-      if (st.v3) { st.v3.pozeaza(st.k); st.v3.sc.hud(`α = <b>${Math.round(c.a)}°</b> RAC · ${c.a < aIVC && c.L > 0 ? "admisia" : "comprimarea"} · ridicarea supapei ${nr(c.L * 1e3, 2)} mm<br>Tumble = <b>${nr((st.det.T.find((q) => q[0] >= c.a) || [0, 0])[1], 2)}</b> · TKE = <b>${nr((st.det.K.find((q) => q[0] >= c.a) || [0, 0])[1], 1)} m²/s²</b>`); }
+    pas(dt) { if (!st.det) return; const [fa, fb] = st.faza; if (st.ruleaza) { st.k += dt * st.vit; if (st.k > fb || st.k < fa) st.k = fa; } const c = cadru(st.k);
+      if (st.v3) { st.v3.pozeaza(st.k); const a = Math.round(st.k), fz = a < cc.aIVC ? "admisia" : a < cc.aS ? "comprimarea" : a < cc.a90 ? "arderea" : a < cc.aEVO ? "destinderea" : "evacuarea", la = (k) => ((st.det[k] || []).find((q) => q[0] >= c.a) || [0, 0])[1];
+        st.v3.sc.hud(`α = <b>${a}°</b> RAC · <b>${fz}</b> · supapa de admisie ${nr((c.L || 0) * 1e3, 1)} mm · de evacuare ${nr((c.LE || 0) * 1e3, 1)} mm<br>p = <b>${nr(cc.p(a) / 1e6, 2)} MPa</b> · T medie = <b>${nr(cc.Tm[a], 0)} K</b>${cc.xb[a] > 0.001 ? ` · x<sub>b</sub> = <b>${nr(cc.xb[a] * 100, 0)} %</b>` : ""} · tumble ${nr(la("T"), 2)} · TKE ${nr(la("K"), 1)} m²/s²`); }
       tg += dt; if (tg > 0.12) { tg = 0; desenMEF(st.k); const geo = { nx: st.det.nx, ny: st.det.ny }; titlu("c0", `Optimizare canal admisie: ${Math.round(st.k)} °RAC – Design ${st.sel} · secțiunea z = 0`); desenCamp(cvs[0], c, geo, st.vmax, `Unghiul de RAC: ${c.a.toFixed(1)} (°)`); if (document.activeElement !== sl) sl.value = Math.round(st.k); $q('[data-a="av"]').textContent = Math.round(st.k); } },
     raport() { return $q(".mod-rez").innerHTML + $q(".mod-ver").innerHTML; },
     distruge() { st.W.forEach((w) => w.terminate()); if (st.wd) st.wd.terminate(); if (st.v3) st.v3.distruge(); }

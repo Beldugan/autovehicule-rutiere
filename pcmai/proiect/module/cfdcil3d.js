@@ -1,4 +1,4 @@
-/* Solverul CFD 3D al curgerii în canalul de admisie și în cilindru (admisia și comprimarea, 0…360 °RAC):
+/* Solverul CFD 3D al curgerii prin canalele de admisie și de evacuare și în cilindru, pe întregul ciclu (0…720 °RAC):
    • ecuațiile Euler incompresibile cu condiția de compresibilitate uniformă în cilindrul închis (Mach mic), pe o rețea
      carteziană 3D decalată (MAC): advecție semi-lagrangiană cu interpolare triliniară, proiecție cu ecuația Poisson
      pentru presiune (SOR roșu-negru, pornire din presiunea pasului anterior);
@@ -7,6 +7,10 @@
      frontiere imersate (celule mascate, viteza peretelui pe fețe);
    • mărimi integrale: tumble (în jurul axei z, normală pe planul supapă – axa cilindrului), tumble transversal (axa x),
      swirl (axa cilindrului), energia cinetică a fluctuațiilor rezolvate, coeficientul de debit al supapei;
+   • ciclul complet (opțiunea o.ciclu): supapa de evacuare cu legea ei, ieșirea canalului de evacuare la presiune impusă,
+     destinderea gazelor la evacuarea liberă (divergența uniformă −d ln ρ/dt din modelul 0D al evacuării), temperatura ca
+     scalar transportat de curgere, cu zona arsă (volumul cel mai apropiat de bujie egal cu fracția volumică arsă) și
+     comprimarea / destinderea gazelor din cilindrul închis după modelul 0D;
    • post-procesare: secțiunea mediană z = 0 și secțiunea orizontală prin cilindru (câmpul vitezei), particule-trasor
      lansate din intrarea canalului și transportate cu viteza calculată (Runge–Kutta 2).
    Fișierul nu folosește DOM (rulează în Web Worker). */
@@ -15,27 +19,30 @@ const RAD = Math.PI / 180;
 
 export function creeazaSolver3D(geo, o = {}) {
   const D = geo.D, N = o.N || 24, h = D / N;
-  const x0 = geo.x0, y0 = geo.yBot, z0 = -0.56 * D;
-  const nx = Math.ceil(geo.W / h), ny = Math.ceil((geo.yTop - geo.yBot) / h), nz = Math.ceil(1.12 * D / h);
+  const x0 = geo.x0, y0 = geo.yBot, z0 = -0.56 * D, Wx = -2 * geo.x0;   // domeniul simetric: canalul de admisie (x < 0) și cel de evacuare (x > 0)
+  const nx = Math.ceil(Wx / h), ny = Math.ceil((geo.yTop - geo.yBot) / h), nz = Math.ceil(1.12 * D / h);
   const n = nx * ny * nz, sxy = nx * ny;
   const id = (i, j, k) => i + nx * (j + ny * k);
   const xc = (i) => x0 + (i + 0.5) * h, yc = (j) => y0 + (j + 0.5) * h, zc = (k) => z0 + (k + 0.5) * h;
   const nu_ = (nx + 1) * ny * nz, nv_ = nx * (ny + 1) * nz, nw_ = nx * ny * (nz + 1);
   const iu = (i, j, k) => i + (nx + 1) * (j + ny * k), iv = (i, j, k) => i + nx * (j + (ny + 1) * k), iw = (i, j, k) => i + nx * (j + ny * k);
   const u = new Float32Array(nu_), v = new Float32Array(nv_), w = new Float32Array(nw_), uN = new Float32Array(nu_), vN = new Float32Array(nv_), wN = new Float32Array(nw_);
-  const p = new Float32Array(n), dv = new Float32Array(n), tip = new Uint8Array(n), stat = new Uint8Array(n), inlet = new Uint8Array(n), cil = new Uint8Array(n);
+  const p = new Float32Array(n), dv = new Float32Array(n), tip = new Uint8Array(n), stat = new Uint8Array(n), inlet = new Uint8Array(n), outlet = new Uint8Array(n), cil = new Uint8Array(n), canalE = new Uint8Array(n);
+  const Tq = new Float32Array(n), TqN = new Float32Array(n), cic = o.ciclu || null;
   const rP = geo.wP / 2, R2 = (D / 2) ** 2;
   // distanța 3D la linia mediană (aflată în planul z = 0)
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const c = id(i, j, k), x = xc(i), y = yc(j), z = zc(k);
     if (y < 0) { stat[c] = x * x + z * z < R2 ? 0 : 1; cil[c] = 1; }
-    else { const d2 = geo.dSeg(x, y); stat[c] = d2 * d2 + z * z < rP * rP ? 0 : 1; }
+    else { const dA = geo.dSeg(x, y), dE = geo.dSeg(-x, y), ok = (d) => d * d + z * z < rP * rP; stat[c] = ok(dA) || ok(dE) ? 0 : 1; if (ok(dE) && !ok(dA)) canalE[c] = 1; }
     if (i === 0 && !stat[c] && y > 0) inlet[c] = 1;
+    if (i === nx - 1 && !stat[c] && y > 0) outlet[c] = 1;
   }
-  let vp = 0, vval = 0, Lcur = 0;
-  const hd = geo.dv * 0.53, ts = 0.035 * D, tv = geo.tv;
+  let vp = 0, vval = 0, vvalE = 0, Lcur = 0, LEcur = 0, divCil = null;
+  const hd = geo.dv * 0.53, ts = 0.035 * D, tv = geo.tv, xE = -geo.xv, gg = geo.g;
+  const durE = 180 + (gg.dse ?? 45) + (gg.ise ?? 10), Le = (a) => { const f = ((((a - (540 - (gg.dse ?? 45))) % 720) + 720) % 720); return f <= durE ? gg.Lmax * Math.sin((Math.PI * f) / durE) ** 2 : 0; };
   function masca(aG) {
-    const yp = geo.yPiston(aG), L = geo.Lv(aG); Lcur = L;
+    const yp = geo.yPiston(aG), L = geo.Lv(aG), LE = Le(aG); Lcur = L; LEcur = LE;
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
       const c = id(i, j, k); let t = stat[c];
       if (t === 0) { const y = yc(j);
@@ -43,14 +50,16 @@ export function creeazaSolver3D(geo, o = {}) {
         else { const rx = xc(i) - geo.xv, rz = zc(k), r2 = rx * rx + rz * rz;
           if (r2 < hd * hd && y < -L && y > -L - tv) t = 3;
           else if (r2 < ts * ts && y > -L - tv) t = 3;
-          else if (L < 1e-5 && y >= -tv && y < 0.01 * D && r2 < hd * hd) t = 3; } }
+          else if (L < 1e-5 && y >= -tv && y < 0.01 * D && r2 < hd * hd) t = 3;
+          else { const ex = xc(i) - xE, e2 = ex * ex + rz * rz;                       // supapa de evacuare
+            if (e2 < hd * hd && y < -LE && y > -LE - tv) t = 4; else if (e2 < ts * ts && y > -LE - tv) t = 4; else if (LE < 1e-5 && y >= -tv && y < 0.01 * D && e2 < hd * hd) t = 4; } } }
       tip[c] = t; }
   }
-  const Vs = (t) => (t === 2 ? vp : t === 3 ? vval : 0);
+  const Vs = (t) => (t === 2 ? vp : t === 3 ? vval : t === 4 ? vvalE : 0);
   function conditii() {
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i <= nx; i++) { const q = iu(i, j, k);
       if (i === 0) { const c = id(0, j, k); if (!(inlet[c] && !tip[c])) u[q] = 0; continue; }
-      if (i === nx) { u[q] = 0; continue; }
+      if (i === nx) { const c = id(nx - 1, j, k); if (!(outlet[c] && !tip[c])) u[q] = 0; continue; }
       if (tip[id(i - 1, j, k)] || tip[id(i, j, k)]) u[q] = 0; }
     for (let k = 0; k < nz; k++) for (let j = 0; j <= ny; j++) for (let i = 0; i < nx; i++) { const q = iv(i, j, k);
       if (j === 0 || j === ny) { v[q] = 0; continue; }
@@ -72,7 +81,7 @@ export function creeazaSolver3D(geo, o = {}) {
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 1; i < nx; i++) { const q = iu(i, j, k);
       if (tip[id(i - 1, j, k)] || tip[id(i, j, k)]) { uN[q] = u[q]; continue; }
       const X = x0 + i * h, Y = yc(j), Z = zc(k); uN[q] = sU(X - dt * u[q], Y - dt * sV(X, Y, Z), Z - dt * sW(X, Y, Z)); }
-    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) { uN[iu(0, j, k)] = u[iu(0, j, k)]; uN[iu(nx, j, k)] = 0; }
+    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) { uN[iu(0, j, k)] = u[iu(0, j, k)]; uN[iu(nx, j, k)] = outlet[id(nx - 1, j, k)] ? u[iu(nx, j, k)] : 0; }
     for (let k = 0; k < nz; k++) for (let j = 1; j < ny; j++) for (let i = 0; i < nx; i++) { const q = iv(i, j, k);
       if (tip[id(i, j - 1, k)] || tip[id(i, j, k)]) { vN[q] = v[q]; continue; }
       const X = xc(i), Y = y0 + j * h, Z = zc(k); vN[q] = sV(X - dt * sU(X, Y, Z), Y - dt * v[q], Z - dt * sW(X, Y, Z)); }
@@ -83,16 +92,17 @@ export function creeazaSolver3D(geo, o = {}) {
     u.set(uN); v.set(vN); w.set(wN);
   }
   function proiectie(dt, it) {
-    let sum = 0, nc = 0; const inchis = Lcur < 1e-5;
+    let sum = 0, nc = 0; const inchis = Lcur < 1e-5 && LEcur < 1e-5;
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const c = id(i, j, k); if (tip[c]) { dv[c] = 0; continue; }
       dv[c] = (u[iu(i + 1, j, k)] - u[iu(i, j, k)] + v[iv(i, j + 1, k)] - v[iv(i, j, k)] + w[iw(i, j, k + 1)] - w[iw(i, j, k)]) / h;
       if (inchis && cil[c]) { sum += dv[c]; nc++; } }
     if (nc) { const m = sum / nc; for (let c = 0; c < n; c++) if (!tip[c] && cil[c]) dv[c] -= m; }
+    else if (divCil != null && Lcur < 1e-5) { for (let c = 0; c < n; c++) if (!tip[c] && cil[c]) dv[c] -= divCil; }   // evacuarea liberă: destinderea gazelor din cilindru
     const om = 1.8, k2 = (h * h) / dt;
     for (let s = 0; s < it; s++) for (let par = 0; par < 2; par++) for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = (j + k + par) & 1; i < nx; i += 2) {
       const c = id(i, j, k); if (tip[c]) continue; let nb = 0, sp = 0;
       if (i > 0) { if (!tip[c - 1]) { nb++; sp += p[c - 1]; } } else if (inlet[c]) nb++;
-      if (i < nx - 1 && !tip[c + 1]) { nb++; sp += p[c + 1]; }
+      if (i < nx - 1) { if (!tip[c + 1]) { nb++; sp += p[c + 1]; } } else if (outlet[c]) nb++;
       if (j > 0 && !tip[c - nx]) { nb++; sp += p[c - nx]; }
       if (j < ny - 1 && !tip[c + nx]) { nb++; sp += p[c + nx]; }
       if (k > 0 && !tip[c - sxy]) { nb++; sp += p[c - sxy]; }
@@ -101,7 +111,7 @@ export function creeazaSolver3D(geo, o = {}) {
     const f = dt / h;
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i <= nx; i++) { const q = iu(i, j, k);
       if (i === 0) { const c = id(0, j, k); if (inlet[c] && !tip[c]) u[q] -= f * p[c]; continue; }
-      if (i === nx) continue; const a = id(i - 1, j, k), b = a + 1; if (!tip[a] && !tip[b]) u[q] -= f * (p[b] - p[a]); }
+      if (i === nx) { const c = id(nx - 1, j, k); if (outlet[c] && !tip[c]) u[q] -= f * (0 - p[c]); continue; } const a = id(i - 1, j, k), b = a + 1; if (!tip[a] && !tip[b]) u[q] -= f * (p[b] - p[a]); }
     for (let k = 0; k < nz; k++) for (let j = 1; j < ny; j++) for (let i = 0; i < nx; i++) { const b = id(i, j, k), a = b - nx; if (!tip[a] && !tip[b]) v[iv(i, j, k)] -= f * (p[b] - p[a]); }
     for (let k = 1; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const b = id(i, j, k), a = b - sxy; if (!tip[a] && !tip[b]) w[iw(i, j, k)] -= f * (p[b] - p[a]); }
   }
@@ -123,51 +133,73 @@ export function creeazaSolver3D(geo, o = {}) {
   /** secțiunea z = 0 (câmpul la centrele celulelor) și secțiunea orizontală y = yh */
   const kM = Math.round((0 - z0) / h - 0.5);
   function sectiuni(yh) {
-    const M = new Float32Array(sxy), U = new Float32Array(sxy), V = new Float32Array(sxy), T = new Uint8Array(sxy);
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const c = id(i, j, kM), s = i + nx * j; T[s] = tip[c]; if (tip[c]) continue; const a = Uc(i, j, kM), b = Vc(i, j, kM); U[s] = a; V[s] = b; M[s] = Math.hypot(a, b, Wc(i, j, kM)); }
+    const M = new Float32Array(sxy), U = new Float32Array(sxy), V = new Float32Array(sxy), T = new Uint8Array(sxy), Tz = new Float32Array(sxy);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const c = id(i, j, kM), s = i + nx * j; T[s] = tip[c]; Tz[s] = Tq[c]; if (tip[c]) continue; const a = Uc(i, j, kM), b = Vc(i, j, kM); U[s] = a; V[s] = b; M[s] = Math.hypot(a, b, Wc(i, j, kM)); }
     const jh = Math.max(0, Math.min(ny - 1, Math.round((yh - y0) / h - 0.5))), sxz = nx * nz;
-    const Mh = new Float32Array(sxz), Uh = new Float32Array(sxz), Wh = new Float32Array(sxz), Th = new Uint8Array(sxz);
-    for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) { const c = id(i, jh, k), s = i + nx * k; Th[s] = tip[c]; if (tip[c]) continue; const a = Uc(i, jh, k), b = Wc(i, jh, k); Uh[s] = a; Wh[s] = b; Mh[s] = Math.hypot(a, b, Vc(i, jh, k)); }
-    return { M, U, V, T, Mh, Uh, Wh, Th, yh: y0 + (jh + 0.5) * h };
+    const Mh = new Float32Array(sxz), Uh = new Float32Array(sxz), Wh = new Float32Array(sxz), Th = new Uint8Array(sxz), Thz = new Float32Array(sxz);
+    for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) { const c = id(i, jh, k), s = i + nx * k; Th[s] = tip[c]; Thz[s] = Tq[c]; if (tip[c]) continue; const a = Uc(i, jh, k), b = Wc(i, jh, k); Uh[s] = a; Wh[s] = b; Mh[s] = Math.hypot(a, b, Vc(i, jh, k)); }
+    return { M, U, V, T, Tz, Mh, Uh, Wh, Th, Thz, yh: y0 + (jh + 0.5) * h };
   }
   // particulele-trasor
-  const NP = o.particule || 2500, P = new Float32Array(NP * 3).fill(NaN), Pv = new Float32Array(NP); let pNext = 0, rnd = 12345;
+  const NP = o.particule || 2500, P = new Float32Array(NP * 3).fill(NaN), Pv = new Float32Array(NP), Pt = new Float32Array(NP); let pNext = 0, rnd = 12345;
   const rand = () => { rnd = (rnd * 16807) % 2147483647; return (rnd - 1) / 2147483646; };
   const intrari = []; for (let c = 0; c < n; c++) if (inlet[c]) intrari.push(c);
   const solid = (X, Y, Z) => { const i = Math.floor((X - x0) / h), j = Math.floor((Y - y0) / h), k = Math.floor((Z - z0) / h); if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz) return true; return tip[id(i, j, k)] !== 0; };
-  function particule(dt, injecteaza) {
+  const xMax = x0 + nx * h, sT = (X, Y, Z) => tri(Tq, X, Y, Z, nx, ny, nz, 0.5, 0.5, 0.5);
+  function particule(dt, injecteaza, seamanaCil) {
+    if (seamanaCil) for (let s = 0; s < 20; s++) { const c = (rand() * n) | 0; if (tip[c] || !cil[c]) continue; const i = c % nx, j = ((c / nx) | 0) % ny, k = (c / sxy) | 0, q = pNext % NP; P[q * 3] = xc(i); P[q * 3 + 1] = yc(j); P[q * 3 + 2] = zc(k); pNext++; }
     if (injecteaza && intrari.length) for (let s = 0; s < (o.injectie || 30); s++) { const c = intrari[(rand() * intrari.length) | 0], j = ((c / nx) | 0) % ny, k = (c / sxy) | 0, q = pNext % NP;
       P[q * 3] = x0 + 0.3 * h; P[q * 3 + 1] = yc(j) + (rand() - 0.5) * h; P[q * 3 + 2] = zc(k) + (rand() - 0.5) * h; pNext++; }
     for (let q = 0; q < NP; q++) { const X = P[q * 3]; if (X !== X) continue; const Y = P[q * 3 + 1], Z = P[q * 3 + 2];
       const a = sU(X, Y, Z), b = sV(X, Y, Z), c = sW(X, Y, Z), Xm = X + 0.5 * dt * a, Ym = Y + 0.5 * dt * b, Zm = Z + 0.5 * dt * c;
       const a2 = sU(Xm, Ym, Zm), b2 = sV(Xm, Ym, Zm), c2 = sW(Xm, Ym, Zm), Xn = X + dt * a2, Yn = Y + dt * b2, Zn = Z + dt * c2;
+      if (Xn >= xMax - 0.5 * h) { P[q * 3] = NaN; continue; }                       // particula a ieșit prin canalul de evacuare
       if (!solid(Xn, Yn, Zn)) { P[q * 3] = Xn; P[q * 3 + 1] = Yn; P[q * 3 + 2] = Zn; }
       else if (solid(X, Y, Z)) P[q * 3 + 1] = Y + dt * Math.abs(vp) + 0.2 * h;
-      Pv[q] = Math.hypot(a2, b2, c2); }
+      Pv[q] = Math.hypot(a2, b2, c2); if (cic) Pt[q] = sT(P[q * 3], P[q * 3 + 1], P[q * 3 + 2]); }
   }
   /** după închiderea supapei, coloana de aer din canal se oprește (unda de presiune reflectată și frecarea la perete, care lipsesc
       dintr-un model incompresibil fără vâscozitate): amortizare exponențială cu constanta de timp a 8 °RAC, numai în canal (y > 0) */
-  function franeazaCanal(dt, om) { const f = Math.exp(-dt / ((8 * RAD) / om));
-    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) { if (yc(j) <= 0) continue; for (let i = 0; i <= nx; i++) u[iu(i, j, k)] *= f; for (let i = 0; i < nx; i++) w[iw(i, j, k)] *= f; }
-    for (let k = 0; k < nz; k++) for (let j = 1; j <= ny; j++) { if (y0 + j * h <= 0) continue; for (let i = 0; i < nx; i++) v[iv(i, j, k)] *= f; }
-    for (let j = 0; j < ny; j++) if (yc(j) > 0) for (let i = 0; i < nx; i++) w[iw(i, j, nz)] *= f; }
+  function franeazaCanal(dt, om, partea) { const f = Math.exp(-dt / ((8 * RAD) / om)), sel = (x) => (partea < 0 ? x < 0 : x > 0);   // partea −1: admisia (x < 0), +1: evacuarea (x > 0)
+    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) { if (yc(j) <= 0) continue; for (let i = 0; i <= nx; i++) if (sel(x0 + i * h)) u[iu(i, j, k)] *= f; for (let i = 0; i < nx; i++) if (sel(xc(i))) w[iw(i, j, k)] *= f; }
+    for (let k = 0; k < nz; k++) for (let j = 1; j <= ny; j++) { if (y0 + j * h <= 0) continue; for (let i = 0; i < nx; i++) if (sel(xc(i))) v[iv(i, j, k)] *= f; }
+    for (let j = 0; j < ny; j++) if (yc(j) > 0) for (let i = 0; i < nx; i++) if (sel(xc(i))) w[iw(i, j, nz)] *= f; }
+  /** temperatura: transportul (semi-lagrangian) și sursele ciclului în cilindrul închis */
+  const dist = new Float32Array(n), ordine = []; const bj = [0, -0.01 * D, 0];
+  function temperatura(a, dt) {
+    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const c = id(i, j, k); if (tip[c]) { TqN[c] = Tq[c]; continue; }
+      if (inlet[c]) { TqN[c] = cic.T0; continue; } const X = xc(i), Y = yc(j), Z = zc(k); TqN[c] = sT(X - dt * Uc(i, j, k), Y - dt * Vc(i, j, k), Z - dt * Wc(i, j, k)); }
+    Tq.set(TqN);
+    const q = cic.la(a), q0 = cic.la(a - cic.dA);
+    if (q.inchis) {
+      if (q.xb > 0.002 && q.xb < 0.998) {   // arderea: zona arsă = volumul cel mai apropiat de bujie egal cu fracția volumică arsă
+        ordine.length = 0; for (let c = 0; c < n; c++) if (!tip[c] && cil[c]) { dist[c] = Math.hypot(xc(c % nx) - bj[0], yc(((c / nx) | 0) % ny) - bj[1], zc((c / sxy) | 0) - bj[2]); ordine.push(c); }
+        ordine.sort((a1, b1) => dist[a1] - dist[b1]); const nb = Math.round(q.yb * ordine.length);
+        for (let r = 0; r < ordine.length; r++) Tq[ordine[r]] = r < nb ? q.Tb : q.Tu;
+      } else { const f = q.Tm / Math.max(1, q0.Tm); for (let c = 0; c < n; c++) if (!tip[c] && cil[c]) Tq[c] *= f; }
+    } else if (q.evac) { const f = q.Tm / Math.max(1, q0.Tm); for (let c = 0; c < n; c++) if (!tip[c] && cil[c]) Tq[c] *= f; }
+  }
   /** rulează 0…a1 °RAC cu pasul dA; laPas(a, r, cadru?) – cadrele la fiecare pasCadru grade */
   function ruleaza(n_rpm, a0, a1, dA, itP, pasCadru, laPas) {
     const om = (n_rpm * Math.PI) / 30, dt = (dA * RAD) / om, ser = [];
+    if (cic) { cic.dA = dA; for (let c = 0; c < n; c++) Tq[c] = cil[c] || canalE[c] ? cic.Tr : cic.T0; }
     for (let a = a0; a <= a1 + 1e-9; a += dA) {
       const yp0 = geo.yPiston(a), yp1 = geo.yPiston(a + dA); vp = (yp1 - yp0) / dt; vval = -(geo.Lv(a + dA) - geo.Lv(a)) / dt;
+      vvalE = -(Le(a + dA) - Le(a)) / dt; divCil = cic ? cic.la(a).div : null;
       masca(a); conditii(); advectie(dt); conditii(); proiectie(dt, itP); conditii();
-      if (Lcur < 1e-5) franeazaCanal(dt, om);
-      particule(dt, geo.Lv(a) > 0.02 * geo.g.Lmax && a < 180 + geo.g.isa);
+      if (Lcur < 1e-5) franeazaCanal(dt, om, -1); if (cic && LEcur < 1e-5) franeazaCanal(dt, om, 1);
+      if (cic) temperatura(a, dt);
+      const am = ((a % 720) + 720) % 720;
+      particule(dt, geo.Lv(a) > 0.02 * geo.g.Lmax && am < 180 + geo.g.isa, cic && LEcur > 0.05 * geo.g.Lmax && am > 400);
       const r = integrale(om), Qd = Math.abs(vp) * Math.PI * D * D / 4, A = Math.PI * geo.dv * Math.max(geo.Lv(a), 1e-9);
       r.Cd = geo.Lv(a) > 0.1 * geo.g.Lmax && r.pCil < -1 && vp < 0 ? Math.min(1.2, Qd / (A * Math.sqrt(2 * Math.abs(r.pCil)))) : null;
       r.a = a; r.L = geo.Lv(a); r.vp = vp; ser.push(r);
       let cadru = null;
       if (pasCadru && Math.round(a / dA) % Math.round(pasCadru / dA) === 0) {
-        const yp = geo.yPiston(a); cadru = Object.assign(sectiuni(yp + 0.5 * (-yp)), { a, P: P.slice(), Pv: Pv.slice(), yp, L: geo.Lv(a) }); }
+        const yp = geo.yPiston(a); cadru = Object.assign(sectiuni(yp + 0.5 * (-yp)), { a, P: P.slice(), Pv: Pv.slice(), Pt: Pt.slice(), yp, L: geo.Lv(a), LE: Le(a) }); }
       if (laPas) laPas(a, r, cadru);
     }
     return ser;
   }
-  return { nx, ny, nz, h, x0, y0, z0, n, ruleaza, masca, kM };
+  return { nx, ny, nz, h, x0, y0, z0, n, ruleaza, masca, kM, Le };
 }
