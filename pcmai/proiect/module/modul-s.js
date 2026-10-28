@@ -3,7 +3,8 @@
    serie-paralel / PHEV, motocicleta (transmisia pe treaptă fixă, varianta electrică). Teste de referință cu valorile ghidului. */
 import { grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii, V3, turboColor } from "./scena.js";
 import * as SI from "./sistem.js";
-import { schemaFlux, cilindruArdere } from "./flux3d.js";
+import { schemaFlux } from "./flux3d.js";
+import { cilindruReal } from "./cilindru-real.js?v=4";
 import { creeazaUI } from "./ui.js";
 
 /** regimul pentru autovehiculul 3D: stop / pornire / acc / croaziera / franare / ev */
@@ -35,7 +36,7 @@ function studiuCiclu0D(corp, ctx) {
     Z = X.model0D(r, vp, o); Z2 = X.model0D(r, vp, Object.assign({}, o, { pas: p.pas / 2 })); mot = X.model0D(r, vp, Object.assign({}, o, { eta_c: 1e-9 }));
     pa = X.pAlfa0D(r, Z);
     Tmn = Math.min(...Z.arr.map((q) => q.T)); Tmx = Z.T_max;
-    U.SC.goleste(U.SC.grup); cil = cilindruArdere({ D: r.D_r / 1000, S: r.S_r / 1000, L: r.S_r / 2 / D.lam / 1000, eps: D.eps, tip: D.tip }); U.SC.grup.add(cil.G); sc3.vedere("sect", [0, 0, -1]); sc3.incadreaza([0.3, 0.12, 0.5], [0, 0, 0]);
+    U.SC.goleste(U.SC.grup); cil = cilindruReal({ D: r.D_r / 1000, S: r.S_r / 1000, L: r.S_r / 2 / D.lam / 1000, eps: D.eps, tip: D.tip, dist: { dsa: D.dsa, isa: D.isa, dse: D.dse, ise: D.ise } }); U.SC.grup.add(cil.G); sc3.vedere("sect", [-1, 0, 0]); sc3.incadreaza([1, 0.35, 0.45], [0, 0, 0]); { const t = sc3.ctl.target; sc3.camera.position.sub(t).multiplyScalar(1.1).add(t); sc3.ctl.update(); }
     U.SC.legenda("Temperatura gazelor", Tmn, Tmx, "K", (v) => nr(v, 0));
     const dW = Math.abs(Z.W_hp - Z2.W_hp) / Math.abs(Z2.W_hp) * 100, pcMot = mot.arr.reduce((a, q) => (Math.abs(q.phi) < Math.abs(a.phi) ? q : a)).p;
     z.rez.innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Mărime</th><th class="num">Model 0D</th><th class="num">Ciclul de calcul</th><th>Unitate</th></tr></thead><tbody>

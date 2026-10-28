@@ -167,7 +167,7 @@ export function motorReal(o) {
     [-1, 1].forEach((sg) => { const b = C(new THREE.Mesh(new THREE.CylinderGeometry(0.035 * D, 0.035 * D, 0.06 * D, 6), mOtel)); b.position.set(xj, ycam + 0.19 * D, z + sg * 0.18 * D); G.add(b); }); } });
   const supape = [];
   const lobGeom = (offs, adm) => { const sh = new THREE.Shape(), N = 120;
-    for (let k = 0; k <= N; k++) { const psi = (k / N) * Math.PI * 2, al = 2 * (psi - Math.PI / 2) * 180 / Math.PI - offs;
+    for (let k = 0; k <= N; k++) { const psi = (k / N) * Math.PI * 2, al = 2 * (psi + Math.PI / 2) * 180 / Math.PI - offs;
       const L_ = adm ? lift(mod(al + dist.dsa, 720), durA, Lmax) : lift(mod(al - (540 - dist.dse), 720), durE, Lmax), r = rbc + L_;
       k ? sh.lineTo(r * Math.cos(psi), r * Math.sin(psi)) : sh.moveTo(r * Math.cos(psi), r * Math.sin(psi)); }
     return extrudZY(sh, 0.1 * D, 0.06); };

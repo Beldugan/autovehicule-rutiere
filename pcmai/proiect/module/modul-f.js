@@ -1,10 +1,12 @@
-/* Modulul F – câmpuri: curgerea în canalul de admisie și mișcarea încărcăturii (planul de experimente numerice CFD 2D),
+/* Modulul F – câmpuri: curgerea în canalul de admisie și mișcarea încărcăturii (planul de experimente numerice CFD 3D), arderea,
    comprimarea în cilindru (volume finite 1D pe rețea mobilă, ecuațiile Euler), placa de răcire a bateriei (conducția în placă
    cuplată cu lichidul din canalele în serpentină). Fiecare câmp are testul de referință analitic și studiul de rețea. */
-import { grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii } from "./scena.js";
+import { grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii, turboColor } from "./scena.js";
 import { creeazaCompresie, izentrop, placaRacire } from "./cfd.js";
-import { cilindruCFD, placaCFD } from "./cfd3d.js";
-import { studiuPort } from "./port-ui.js?v=4";
+import { placaCFD } from "./cfd3d.js";
+import { cilindruReal } from "./cilindru-real.js?v=4";
+import { ardereMAS, testFlacaraLibera, sprayMAC } from "./ardere.js?v=2";
+import { studiuPort } from "./port-ui.js?v=5";
 import { creeazaUI } from "./ui.js";
 
 const U = creeazaUI("post-procesare a câmpurilor calculate");
@@ -17,8 +19,8 @@ const asteapta = () => new Promise((r) => setTimeout(r, 0));
 /* ------------------------------------------------------------------ geometria motorului proiectat */
 function geoMotor(ctx) {
   const { tip, R, S } = ctx; if (!R) return null;
-  if (tip === "MAS" || tip === "MAC") { const d = R.date; return { D: R.D_r / 1000, S: R.S_r / 1000, L: R.S_r / 2 / d.lam / 1000, eps: d.eps, n: d.n_P, p0: R.p_a * 1e6, T0: R.T_a, n1: R.n_1, pc: R.p_c * 1e6, Tc: R.T_c, et: `${d.tip}, ${d.P_nom} kW la ${d.n_P} rot/min` }; }
-  if (tip === "MOTO" && R.r) { const r = R.r, d = S.d; return { D: r.D_cil / 1000, S: r.S_cil / 1000, L: r.S_cil / 2 / d.lam / 1000, eps: d.eps || 10, n: d.n_P, p0: 0.9e5, T0: 330, et: `motocicletă ${d.tau}T` }; }
+  if (tip === "MAS" || tip === "MAC") { const d = R.date; return { D: R.D_r / 1000, S: R.S_r / 1000, L: R.S_r / 2 / d.lam / 1000, eps: d.eps, n: d.n_P, tip: d.tip, dist: { dsa: d.dsa, isa: d.isa, dse: d.dse, ise: d.ise }, p0: R.p_a * 1e6, T0: R.T_a, n1: R.n_1, pc: R.p_c * 1e6, Tc: R.T_c, et: `${d.tip}, ${d.P_nom} kW la ${d.n_P} rot/min` }; }
+  if (tip === "MOTO" && R.r) { const r = R.r, d = S.d; return { D: r.D_cil / 1000, S: r.S_cil / 1000, L: r.S_cil / 2 / d.lam / 1000, eps: d.eps || 10, n: d.n_P, tip: "MAS", p0: 0.9e5, T0: 330, et: `motocicletă ${d.tau}T` }; }
   return null;
 }
 
@@ -41,8 +43,8 @@ function studiuCompresie(corp, ctx, referinta) {
     for (const [N, dA] of caz) { await asteapta(); const s = creeazaCompresie(Object.assign({}, o, { N: Math.round(N), dAlfa: dA })); const t0 = performance.now(); s.avanseaza(360); ret.push({ N: Math.round(N), dA, s, ms: performance.now() - t0 }); }
     S0 = ret[1].s; const iz = izentrop(o.p0, o.T0, p.eps), f = S0.iesire[S0.iesire.length - 1];
     lim3 = { T: [o.T0, f.Tmax], p: [o.p0 / 1e5, f.p / 1e5 * 1.02], u: [-Math.max(...S0.iesire.map((q) => Math.max(...q.camp.u.map(Math.abs)))), 0] };
-    U.SC.goleste(U.SC.grup); cil = cilindruCFD({ D: gm.D, S: gm.S, L: gm.L, eps: p.eps, N: N0 }); U.SC.grup.add(cil.G);
-    cil.pozeaza(180, [gm.T0], gm.T0, gm.T0 + 1, [0], 0); sc3.vedere("sect", [0, 0, -1]); sc3.incadreaza([0.3, 0.12, 0.8], [0, 0, 0]); { const t = sc3.ctl.target; sc3.camera.position.sub(t).multiplyScalar(1.3).add(t); sc3.ctl.update(); }
+    U.SC.goleste(U.SC.grup); cil = cilindruReal({ D: gm.D, S: gm.S, L: gm.L, eps: p.eps, tip: gm.tip || "MAS", dist: gm.dist }); U.SC.grup.add(cil.G);
+    cil.pozeaza(180, gm.T0, 0, 0, gm.T0, gm.T0 + 1, 0, turboColor); sc3.vedere("sect", [-1, 0, 0]); sc3.incadreaza([1, 0.35, 0.45], [0, 0, 0]); { const t = sc3.ctl.target; sc3.camera.position.sub(t).multiplyScalar(1.1).add(t); sc3.ctl.update(); }
     const fin = ret.map((r) => r.s.iesire[r.s.iesire.length - 1]);
     z.rez.innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Rețeaua / pasul</th><th class="num">p la PMS [bar]</th><th class="num">T la PMS [K]</th><th class="num">ΔM/M₀ maxim</th><th class="num">pași de timp</th><th class="num">timp de calcul [ms]</th></tr></thead><tbody>
       ${ret.map((r, k) => `<tr><td>${r.N} volume, ${nr(r.dA, 1)}°</td><td class="num">${nr(fin[k].p / 1e5, 3)}</td><td class="num">${nr(fin[k].T, 2)}</td><td class="num">${Math.max(...r.s.iesire.map((q) => Math.abs(q.dM))).toExponential(1)}</td><td class="num">${r.s.pasi}</td><td class="num">${nr(r.ms, 0)}</td></tr>`).join("")}
@@ -76,7 +78,8 @@ function studiuCompresie(corp, ctx, referinta) {
       if (st.ruleaza) st.k = (st.k + dt * 30 * st.viteza / 2) % 181;
       const q = cel(st.k), cmp = U.citeste(z.par).cmp, scU = gm.D * 0.02;
       const v = cmp === "T" ? q.camp.T : cmp === "p" ? q.camp.p.map((x) => x / 1e5) : q.camp.u, l = lim3[cmp];
-      cil.pozeaza(q.a, v, l[0], l[1], q.camp.u, scU);
+      const vm = cmp === "u" ? v.reduce((x, y) => x + Math.abs(y), 0) / v.length : v.reduce((x, y) => x + y, 0) / v.length; void scU;
+      cil.pozeaza(q.a, vm, 0, 0, cmp === "u" ? 0 : l[0], cmp === "u" ? Math.max(1e-9, -l[0]) : l[1], 0, turboColor);
       U.SC.legenda({ T: "Temperatura", p: "Presiunea", u: "Viteza axială" }[cmp], l[0], l[1], { T: "K", p: "bar", u: "m/s" }[cmp]);
       U.SC.hud(`α = <b>${nr(q.a, 0)}°</b> RAC · comprimarea<br>p = <b>${nr(q.p / 1e5, 2)} bar</b> · T = <b>${nr(q.T, 0)} K</b> · izentropa: ${nr(q.pIs / 1e5, 2)} bar`);
       st.afis(); tg += dt; if (tg > 0.2) { tg = 0; grafice(); }
@@ -140,19 +143,112 @@ function studiuPlaca(corp, ctx, referinta) {
 
 /* ================================================================== arderea / injecția */
 function studiuArdere(corp, ctx) {
-  const mac = ctx.tip === "MAC";
-  corp.innerHTML = `<div class="mod-incomplet"><h3>${mac ? "Injecția și arderea" : "Arderea"} în cilindru – câmp 3D</h3>
-    <p>Un calcul de câmp al ${mac ? "jetului de combustibil, al vaporizării și al arderii difuzive" : "propagării frontului de flacără"} nu este inclus: pentru a fi verificabil cere date pe care proiectul nu le definește.</p>
-    <ul>${(mac ? ["geometria injectorului: numărul și diametrul orificiilor, unghiul conului, protruzia", "legea de injecție (debitul instantaneu) și presiunea din rampă", "geometria camerei din piston (bowl) și raportul de swirl măsurat pe stand", "un model de pulverizare și de vaporizare calibrat pe măsurători ale penetrației jetului"]
-      : ["poziția și energia bujiei, geometria electrozilor", "viteza laminară a flăcării pentru combustibilul ales (în funcție de p, T, λ, fracția de gaze reziduale)", "câmpul turbulent 3D la închiderea admisiei (din studiul canalului se obține numai secțiunea mediană 2D)", "un model de ardere turbulentă (de tip G-equation sau ECFM) calibrat pe presiunea măsurată în cilindru"]).map((x) => `<li>${x}</li>`).join("")}</ul>
-    <p class="nota">Degajarea căldurii pe unghi, presiunea și temperatura din cilindru sunt calculate în modulul S (modelul 0D Vibe–Woschni), verificat cu ciclul de calcul din capitolele de calcul termic.</p></div>`;
-  return { raport() { return ""; } };
+  const R = ctx.R, X = window.PCMAI_EXTRA, gm = geoMotor(ctx), mac = ctx.tip === "MAC";
+  if (!gm || !X || !R.date) { corp.innerHTML = `<div class="mod-incomplet">Arderea se calculează pentru MAS și MAC (lipsesc rezultatele calculului termic).</div>`; return null; }
+  const d = R.date, Z = X.model0D(R), A = Z.arr, phiArr = A.map((q) => q.phi), vp0 = Z.vp;
+  const intp = (f, k) => { let j = phiArr.findIndex((x) => x >= f); if (j <= 0) return A[Math.max(0, j)][k]; const a = A[j - 1], b = A[j], t = (f - a.phi) / (b.phi - a.phi); return a[k] + t * (b[k] - a[k]); };
+  const pf = (f) => intp(f, "p") * 1e6, Tf = (f) => intp(f, "T"), cm = (gm.S * gm.n) / 30, phi0 = vp0[0][1];
+  const cfd = window.PCMAI_CFD && window.PCMAI_CFD.uTDC;
+  const par = mac
+    ? `${U.camp("pinj", "presiunea de injecție", 1600, 50, "bar")}${U.camp("d0", "diametrul orificiilor", 0.13, 0.01, "mm")}${U.camp("nh", "numărul de orificii", 7, 1)}${U.camp("cd", "coeficientul de debit", 0.7, 0.01)}${U.camp("soi", "începutul injecției (° față de PMI)", Math.round(phi0 - 6), 0.5)}${U.camp("rb", "raza camerei din piston", nr(0.33 * gm.D * 1000, 1).replace(",", "."), 0.5, "mm")}`
+    : `${U.alege("usrc", "intensitatea turbulenței u'", [["cm", "0,75 · c_m (corelație)"], ...(cfd ? [["cfd", "din CFD 3D al canalului"]] : [])], "cm")}${U.camp("up", "u' la aprindere", nr(0.75 * cm, 2).replace(",", "."), 0.1, "m/s")}${U.camp("phis", "aprinderea – scânteia (° față de PMI)", phi0 - 8, 0.5)}${U.camp("lam", "coeficientul excesului de aer λ", d.alfa ?? 1, 0.01)}${U.camp("xr", "fracția de gaze reziduale", nr(d.g_r ?? 0.06, 3).replace(",", "."), 0.005)}${U.camp("N", "eșantioane de volum", 12000, 1000)}`;
+  const z = U.zonaLucru(corp, mac ? "" : `<button type="button" data-a="calib">Avansul pentru MFB50 al legii Vibe</button>`, par), sc3 = z.sc3;
+  const cil = cilindruReal({ D: gm.D, S: gm.S, L: gm.L, eps: gm.eps, tip: d.tip, dist: gm.dist }); U.SC.grup.add(cil.G);
+  sc3.vedere("sect", [-1, 0, 0]); sc3.incadreaza([1, 0.25, 0.35], [0, 0, 0]); { const t = sc3.ctl.target; t.y += 0.15 * gm.D; sc3.camera.position.sub(t).multiplyScalar(0.8).add(t); sc3.ctl.update(); }
+  const Tmn = Math.min(...A.map((q) => q.T)), Tmx = Math.max(Z.T_max, 2900);
+  U.SC.legenda("Temperatura gazelor", Tmn, Tmx, "K", (v) => nr(v, 0));
+  const G = mac ? { s: grafic(z.graf, "Penetrația jeturilor (Hiroyasu–Arai) și raza camerei din piston"), x: grafic(z.graf, "Fracția arsă: modelul 0D (Vibe) și momentul autoaprinderii"), p: grafic(z.graf, "Presiunea și temperatura în cilindru (modelul 0D)") }
+    : { x: grafic(z.graf, "Fracția de masă arsă: front de flacără (3D cvasidimensional) și legea Vibe (0D)"), r: grafic(z.graf, "Raza și aria frontului de flacără în camera reală"), v: grafic(z.graf, "Viteza laminară S_L, viteza de antrenare u' + S_L"), p: grafic(z.graf, "Presiunea: modelul cu front de flacără (adiabatic) și modelul 0D") };
+  let Q = null, a0 = 0, a1 = 0;
+  function calc() {
+    const p = U.citeste(z.par);
+    if (!mac) {
+      if (p.usrc === "cfd" && cfd) { p.up = cfd; z.par.querySelector('[data-p="up"]').value = nr(cfd, 2).replace(",", "."); }
+      const t0 = performance.now();
+      Q = ardereMAS({ D: gm.D, S: gm.S, L: gm.L, eps: gm.eps, n: gm.n, lambda: p.lam, xr: p.xr, phiS: p.phis, pf, Ts: Tf(p.phis), uP: p.up, N: Math.round(p.N) }); Q.ms = performance.now() - t0;
+      const vib = (f) => vp0.reduce((s_, [fr, f0, df, m]) => s_ + fr * (f <= f0 ? 0 : 1 - Math.exp(-6.908 * Math.pow((f - f0) / df, m + 1))), 0);
+      const ang = (x) => { for (let f = -60; f < 150; f += 0.05) if (vib(f) >= x) return f; return NaN; };
+      Q.vibe = { MFB10: ang(0.1), MFB50: ang(0.5), MFB90: ang(0.9), f: vib };
+      const pmQ = Math.max(...Q.out.map((q) => q.p)), kq = Q.out.findIndex((q) => q.p === pmQ), Tz = testFlacaraLibera();
+      a0 = Math.floor(p.phis - 25); a1 = Math.ceil(Q.out[Q.out.length - 1].phi + 10);
+      z.rez.innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Mărime</th><th class="num">Front de flacără (3D cvasidimensional)</th><th class="num">Legea Vibe (0D, modulul S)</th><th>Unitate</th></tr></thead><tbody>
+        <tr><td>MFB10 / MFB50 / MFB90</td><td class="num">${nr(Q.MFB10, 1)} / ${nr(Q.MFB50, 1)} / ${nr(Q.MFB90, 1)}</td><td class="num">${nr(Q.vibe.MFB10, 1)} / ${nr(Q.vibe.MFB50, 1)} / ${nr(Q.vibe.MFB90, 1)}</td><td>° după PMI</td></tr>
+        <tr><td>Durata arderii 10–90 %</td><td class="num">${nr(Q.MFB90 - Q.MFB10, 1)}</td><td class="num">${nr(Q.vibe.MFB90 - Q.vibe.MFB10, 1)}</td><td>°RAC</td></tr>
+        <tr><td>Presiunea maximă / unghiul ei</td><td class="num">${nr(pmQ / 1e6, 3)} la ${nr(Q.out[kq].phi, 1)}°</td><td class="num">${nr(Z.p_max, 3)} la ${nr(Z.phi_pmax, 1)}°</td><td>MPa</td></tr>
+        <tr><td>Viteza laminară la aprindere; u'; scara Taylor λ<sub>T</sub></td><td class="num" colspan="2">${nr(Q.out[0].SL, 3)} m/s; ${nr(p.up, 2)} m/s (c<sub>m</sub> = ${nr(cm, 2)} m/s); ${nr(Q.lamT * 1e3, 3)} mm</td><td></td></tr>
+        <tr><td>Camera de ardere: înălțimea acoperișului; jocul de strivire; ΔT<sub>ad</sub></td><td class="num" colspan="2">${nr(Q.hr * 1e3, 1)} mm; ${nr(Q.hs * 1e3, 2)} mm; ${nr(Q.dTad, 0)} K</td><td></td></tr>
+        <tr><td>Pași de calcul / timp</td><td class="num" colspan="2">${Q.out.length} pași de 0,5°, ${Math.round(p.N)} eșantioane de volum, ${nr(Q.ms, 0)} ms</td><td></td></tr></tbody></table></div>
+        <p class="nota">Modelul cvasidimensional cu front de flacără (Blizard–Keck): frontul sferic pornește din bujie și înglobează amestecul cu viteza u' + S<sub>L</sub>; amestecul înglobat arde în spatele frontului cu timpul λ<sub>T</sub>/S<sub>L</sub>. Aria frontului este partea sferei aflată în camera reală (cilindrul cu pistonul la unghiul curent și acoperișul în două pante), calculată prin eșantionarea volumului. Viteza laminară Metghalchi–Keck pentru benzină. Presiunea rezultă din bilanțul volumelor celor două zone (gaze nearse comprimate izentrop, gaze arse cu T<sub>u</sub> + ΔT<sub>ad</sub>), fără transfer de căldură.</p>`;
+      const dm = Q.MFB50 - Q.vibe.MFB50;
+      z.ver.innerHTML = `<h3>Verificare</h3>${tabelVerificare([["Raza flăcării sferice libere după 4 ms", "r_f", Tz.r * 1e3, Tz.rAn * 1e3, "mm", 4, 0.5]], "Reperul analitic: flacăra sferică liberă, r = (ρ<sub>u</sub>/ρ<sub>b</sub>)·S<sub>L</sub>·t")}
+        <h3>Concluzii</h3>${concluzie(Math.abs(dm) < 6 ? "ok" : "av", `Frontul de flacără dă MFB50 la ${nr(Q.MFB50, 1)}° după PMI, față de ${nr(Q.vibe.MFB50, 1)}° în legea Vibe adoptată (diferența ${nr(dm, 1)}°). ${Math.abs(dm) < 6 ? "Legea Vibe a proiectului este compatibilă cu viteza de ardere a camerei reale." : dm > 0 ? "Cu turbulența aleasă arderea este mai lentă decât legea Vibe: se mărește avansul la aprindere sau mișcarea încărcăturii (tumble)." : "Cu turbulența aleasă arderea este mai rapidă decât legea Vibe: avansul la aprindere poate fi redus."}`)}
+        ${concluzie("ok", `Arderea începe lent (nucleul laminar, ${nr(Q.MFB10 - p.phis, 1)}° de la scânteie până la 10 % ars), se accelerează când frontul devine turbulent și se încheie când frontul atinge pereții (aria scade) – forma în S a curbei Vibe rezultă din geometria camerei.`)}
+        ${concluzie("nd", "Modelul nu rezolvă turbulența și chimia în fiecare punct: u' este un parametru (din corelație sau din CFD-ul canalului), iar detonația și stingerea flăcării la pereți nu sunt modelate. Presiunea este adiabatică, deci mai mare decât în modelul 0D cu transfer de căldură.")}`;
+    } else {
+      const mf = Z.m_f, rb = p.rb / 1000, t0 = performance.now();
+      Q = sprayMAC({ pInj: p.pinj, d0: p.d0 / 1000, gauri: Math.round(p.nh), Cd: p.cd, rhoL: 830, mf, soi: p.soi, n: gm.n, pf, Tf, Rbol: rb }); Q.ms = performance.now() - t0; Q.soi = p.soi;
+      a0 = Math.floor(p.soi - 15); a1 = Math.ceil(Math.max(p.soi + Q.durInj + 30, vp0[1] ? vp0[1][1] + vp0[1][2] : 60));
+      const dsoc = Q.soc - phi0, eS = Math.abs(Q.s1 - Q.s2) / Q.s2 * 100;
+      z.rez.innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Mărime</th><th class="num">Valoare</th><th>Unitate</th></tr></thead><tbody>
+        <tr><td>Doza pe ciclu (din calculul termic)</td><td class="num">${nr(mf * 1e6, 2)}</td><td>mg</td></tr>
+        <tr><td>Debitul injectorului / durata injecției</td><td class="num">${nr(Q.mdot * 1e3, 2)} g/s / ${nr(Q.tInj * 1e3, 3)} ms = ${nr(Q.durInj, 1)}°RAC</td><td></td></tr>
+        <tr><td>Timpul de rupere a jetului</td><td class="num">${nr(Q.out[0].tb * 1e6, 1)}</td><td>µs</td></tr>
+        <tr><td>Unghiul conului jetului</td><td class="num">${nr(Q.out[Math.min(5, Q.out.length - 1)].teta, 1)}</td><td>°</td></tr>
+        <tr><td>Întârzierea la autoaprindere (Wolfer, integrată)</td><td class="num">${nr(Q.intarziere, 2)}° = ${nr(Q.intarziere / (6 * gm.n) * 1e3, 3)} ms</td><td></td></tr>
+        <tr><td>Începutul arderii: jeturi + întârziere / legea Vibe (0D)</td><td class="num">${nr(Q.soc, 1)}° / ${nr(phi0, 1)}°</td><td>față de PMI</td></tr>
+        <tr><td>Jetul atinge peretele camerei din piston</td><td class="num">${Q.impact != null ? nr(Q.impact, 1) + "°" : "nu"}</td><td></td></tr></tbody></table></div>
+        <p class="nota">Penetrația jetului: corelația Hiroyasu–Arai (înainte de rupere S = 0,39·√(2Δp/ρ<sub>l</sub>)·t, după rupere S = 2,95·(Δp/ρ<sub>a</sub>)<sup>1/4</sup>·√(d<sub>0</sub>·t)), cu densitatea aerului din cilindru la fiecare unghi (modelul 0D). Întârzierea la autoaprindere: Wolfer, τ = 0,44·p<sup>−1,19</sup>·e<sup>4650/T</sup> ms, integrată pe condițiile variabile (∫dt/τ = 1).</p>`;
+      z.ver.innerHTML = `<h3>Verificare</h3>${tabelVerificare([["Penetrația la timpul de rupere: ramura dinainte / de după", "S(t_b)", Q.s1 * 1e3, Q.s2 * 1e3, "mm", 3, 1]], "Continuitatea corelației Hiroyasu–Arai")}
+        <h3>Concluzii</h3>${concluzie(Math.abs(dsoc) < 3 ? "ok" : "av", `Cu injecția începută la ${nr(p.soi, 1)}° și întârzierea calculată, arderea începe la ${nr(Q.soc, 1)}° față de ${nr(phi0, 1)}° în legea Vibe (diferența ${nr(dsoc, 1)}°)${Math.abs(dsoc) < 3 ? "" : ": se ajustează începutul injecției"}.`)}
+        ${concluzie(Q.impact != null ? "av" : "ok", Q.impact != null ? `Jetul atinge peretele camerei din piston la ${nr(Q.impact, 1)}° (combustibil pe perete: fum, HC) – se reduce presiunea de injecție, se mărește numărul de orificii sau raza camerei.` : "Jeturile nu ating peretele camerei din piston în timpul injecției.")}
+        ${concluzie("nd", "Vaporizarea, lungimea lichidă și arderea difuzivă nu sunt rezolvate în câmp; degajarea căldurii rămâne cea din modelul 0D (două legi Vibe).")}`;
+    }
+    const sl = z.comenzi.querySelector('[data-a="t"]'); if (sl) { sl.min = a0; sl.max = a1; sl.step = 0.5; } if (st.k < a0 || st.k > a1) st.k = a0;
+    grafice();
+  }
+  const st = U.redare(z, 1, (k) => `${Math.round(k)}°`, 2); let tg = 0;
+  function grafice() {
+    if (!Q) return; const k = st.k;
+    if (!mac) { const O = Q.out, f = O.map((q) => q.phi), fx_ = Array.from({ length: Math.round(a1 - a0) + 1 }, (_, j) => a0 + j);
+      G.x.deseneaza({ xmin: a0, xmax: a1, xlab: "φ [° față de PMI-ardere]", ylab: "x_b", ymin: 0, ymax: 1.05, serii: [serie(fx_, fx_.map(Q.vibe.f), 1, { punctat: true }), serie(f, O.map((q) => q.xb), 0), serie(f, O.map((q) => q.xe), 2, { gros: 1 }), { tip: "pct", pts: [[k, xbLa(k)]], culoare: 0 }], legenda: [["front de flacără: arsă", 0], ["înglobată de front", 2], ["Vibe (0D)", 1]] });
+      G.r.deseneaza({ xmin: a0, xmax: a1, xlab: "φ [°]", ylab: "r_f [mm] · A_f [cm²]", ...yl([O.map((q) => (q.xe < 0.999 ? q.rf * 1e3 : 0)), O.map((q) => q.Af * 1e4)]), serii: [serie(f, O.map((q) => (q.xe < 0.999 ? q.rf * 1e3 : NaN)), 0), serie(f, O.map((q) => q.Af * 1e4), 3)], legenda: [["raza frontului [mm]", 0], ["aria frontului [cm²]", 3]] });
+      G.v.deseneaza({ xmin: a0, xmax: a1, xlab: "φ [°]", ylab: "viteza [m/s]", ...yl([O.map((q) => q.ST), O.map((q) => q.SL)]), serii: [serie(f, O.map((q) => q.SL), 1), serie(f, O.map((q) => q.ST), 0)], legenda: [["S_L (laminară)", 1], ["u' + S_L (antrenare)", 0]] });
+      G.p.deseneaza({ xmin: a0, xmax: a1, xlab: "φ [°]", ylab: "p [MPa]", ...yl([O.map((q) => q.p / 1e6), fx_.map((x) => pf(x) / 1e6)]), serii: [serie(fx_, fx_.map((x) => pf(x) / 1e6), 1, { punctat: true }), serie(f, O.map((q) => q.p / 1e6), 0)], legenda: [["front de flacără (adiabatic)", 0], ["modelul 0D (Woschni)", 1]] }); }
+    else { const O = Q.out, f = O.map((q) => q.phi), fx_ = Array.from({ length: Math.round(a1 - a0) + 1 }, (_, j) => a0 + j), rb = U.citeste(z.par).rb;
+      G.s.deseneaza({ xmin: a0, xmax: a1, xlab: "φ [° față de PMI-ardere]", ylab: "S [mm]", ...yl([O.map((q) => q.Sliber * 1e3), [rb * 1.1]]), serii: [serie(f, O.map((q) => q.Sliber * 1e3), 0), serie([a0, a1], [rb, rb], 3, { punctat: true })], legenda: [["penetrația jetului", 0], ["raza camerei din piston", 3]] });
+      const vib = (x) => vp0.reduce((s_, [fr, f0, df, m]) => s_ + fr * (x <= f0 ? 0 : 1 - Math.exp(-6.908 * Math.pow((x - f0) / df, m + 1))), 0);
+      G.x.deseneaza({ xmin: a0, xmax: a1, xlab: "φ [°]", ylab: "x_b", ymin: 0, ymax: 1.05, serii: [serie(fx_, fx_.map(vib), 0), serie([Q.soc, Q.soc], [0, 1], 3, { punctat: true }), serie([Q.soi, Q.soi], [0, 1], 2, { punctat: true })], legenda: [["Vibe (0D)", 0], ["autoaprinderea calculată", 3], ["începutul injecției", 2]] });
+      G.p.deseneaza({ xmin: a0, xmax: a1, xlab: "φ [°]", ylab: "p [MPa] · T/1000 [K]", ...yl([fx_.map((x) => pf(x) / 1e6), fx_.map((x) => Tf(x) / 1000)]), serii: [serie(fx_, fx_.map((x) => pf(x) / 1e6), 0), serie(fx_, fx_.map((x) => Tf(x) / 1000), 1)], legenda: [["p", 0], ["T/1000", 1]] }); }
+  }
+  const xbLa = (f) => { const O = Q.out; if (f <= O[0].phi) return 0; const q = O.find((x) => x.phi >= f); return q ? q.xb : 1; };
+  z.par.addEventListener("change", () => calc());
+  const bc = z.comenzi.querySelector('[data-a="calib"]');
+  if (bc) bc.addEventListener("click", () => { bc.disabled = true; bc.textContent = "se caută avansul…"; setTimeout(() => {
+    const p = U.citeste(z.par), tinta = Q.vibe.MFB50, mfb = (fs) => ardereMAS({ D: gm.D, S: gm.S, L: gm.L, eps: gm.eps, n: gm.n, lambda: p.lam, xr: p.xr, phiS: fs, pf, Ts: Tf(fs), uP: p.up, N: 5000 }).MFB50;
+    let a = -70, b = 0; if (!(mfb(a) < tinta)) { bc.textContent = "MFB50 nu poate fi atins cu u' ales"; bc.disabled = false; return; }
+    for (let it = 0; it < 12; it++) { const c = (a + b) / 2, v = mfb(c); if (!Number.isFinite(v) || v > tinta) b = c; else a = c; }
+    z.par.querySelector('[data-p="phis"]').value = ((a + b) / 2).toFixed(1); bc.disabled = false; bc.textContent = "Avansul pentru MFB50 al legii Vibe"; calc(); }, 30); });
+  calc();
+  return {
+    pas(dt) {
+      if (!Q) return; const N = a1 - a0; if (st.ruleaza) st.k = a0 + ((st.k - a0 + dt * 12 * st.viteza) % N + N) % N; if (st.k < a0 || st.k > a1) st.k = a0;
+      const f = st.k, alfa = 360 + f, T = Tf(f);
+      if (!mac) { const O = Q.out, q = f < O[0].phi ? null : O.find((x) => x.phi >= f) || O[O.length - 1], up = U.citeste(z.par).up;
+        cil.pozeaza(alfa, q ? q.Tu : T, q ? q.xb : 0, 0, Tmn, Tmx, 0, turboColor, { rf: q ? q.rf : 0, zbarcire: q ? Math.min(0.18, 0.04 * up / q.SL * (1 - Math.exp(-q.rf / (0.03 * gm.D)))) : 0, tFl: q ? (q.Tb - Tmn) / (Tmx - Tmn) : 1 });
+        U.SC.hud(`φ = <b>${nr(f, 1)}°</b> față de PMI · ${f < U.citeste(z.par).phis ? "comprimarea" : "arderea"}<br>${q ? `x<sub>b</sub> = <b>${nr(q.xb * 100, 1)} %</b> · r<sub>f</sub> = <b>${nr(q.rf * 1e3, 1)} mm</b> · T<sub>u</sub> = ${nr(q.Tu, 0)} K · T<sub>b</sub> = ${nr(q.Tb, 0)} K` : `T = ${nr(T, 0)} K`}`); }
+      else { const O = Q.out, q = f < Q.soi ? null : O.find((x) => x.phi >= f), xb = vp0.reduce((s_, [fr, f0, df, m]) => s_ + fr * (f <= f0 ? 0 : 1 - Math.exp(-6.908 * Math.pow((f - f0) / df, m + 1))), 0);
+        cil.pozeaza(alfa, T, f >= (Q.soc ?? 99) ? xb : 0, 0.02, Tmn, Tmx, 0, turboColor, { jet: { S: q && (q.injecteaza || f < Q.soi + Q.durInj + 3) ? q.S : 0, teta: q ? q.teta : 20 } });
+        U.SC.hud(`φ = <b>${nr(f, 1)}°</b> față de PMI · ${q && q.injecteaza ? "injecția" : f >= (Q.soc ?? 99) ? "arderea" : "comprimarea"}<br>${q ? `penetrația ${nr(q.Sliber * 1e3, 1)} mm · ` : ""}T = ${nr(T, 0)} K · x<sub>b</sub> = ${nr(xb * 100, 0)} %`); }
+      st.afis(); tg += dt; if (tg > 0.2) { tg = 0; grafice(); }
+    },
+    raport() { return z.rez.innerHTML + z.ver.innerHTML; }
+  };
 }
 
 /* ------------------------------------------------------------------ montarea */
 function listaStudii(ctx) {
   const t = ctx.tip, m4 = t === "MOTO" && ctx.S && ctx.S.d && +ctx.S.d.tau === 4;
-  if (t === "MAS" || t === "MAC" || m4) return [{ id: "port", nume: "Canalul de admisie – curgere și tumble (CFD 2D)" }, { id: "comp", nume: "Comprimarea în cilindrul proiectat" }, { id: "cref", nume: "Test de referință: comprimarea izentropă" }, { id: "ard", nume: t === "MAC" ? "Injecția și arderea" : "Arderea", st: "date lipsă" }];
+  if (t === "MAS" || t === "MAC" || m4) return [{ id: "port", nume: "Canalul de admisie – curgere și tumble (CFD 3D)" }, { id: "comp", nume: "Comprimarea în cilindrul proiectat" }, { id: "cref", nume: "Test de referință: comprimarea izentropă" }, { id: "ard", nume: t === "MAC" ? "Injecția și arderea (jeturi, autoaprindere)" : "Arderea – frontul de flacără" }];
   if (t === "MOTO") return [{ id: "comp", nume: "Comprimarea în cilindru" }, { id: "cref", nume: "Test de referință: comprimarea izentropă" }];
   if (t === "BEV" || t === "LCV") return [{ id: "placa", nume: "Placa de răcire a bateriei proiectate" }, { id: "pref", nume: "Test de referință: placa la 1000 W" }];
   if (t === "HEV") return [{ id: "placa", nume: "Placa de răcire a bateriei" }, { id: "pref", nume: "Test de referință: placa la 1000 W" }, { id: "cref", nume: "Test de referință: comprimarea izentropă" }];
@@ -179,7 +275,7 @@ export default {
       rows.push([`Comprimarea adiabatică (40 volume): p / T la PMS`, `${nr(f.p / 1e5, 2)} bar / ${nr(f.T, 1)} K (izentropa ${nr(iz.p2 / 1e5, 2)} bar / ${nr(iz.T2, 1)} K)`]); }
     if (t === "BEV" || t === "LCV" || t === "HEV") { const b = dateBaterie(ctx), I = b.P * 1e3 / b.U, Q = I * I * b.Rint, r = placaRacire({ Lx: 1.2, Ly: 0.8, t: 0.003, k: 205, Q, md: 0.1, cp: 4180, Tin: 25, h: 1500, lc: 0.02, nTreceri: 8, nx: 90, ny: 60 });
       rows.push([`Placa de răcire: Q = ${nr(Q, 0)} W la ${nr(b.P, 1)} kW, ṁ = 0,1 kg/s`, `T<sub>max</sub> placă ${nr(r.Tmax, 2)} °C, ΔT lichid ${nr(r.dTf, 3)} K (bilanț ${nr(Q / 418, 3)} K)`]); }
-    if (t === "MAS" || t === "MAC") rows.push(["Canalul de admisie", "planul de experimente CFD 2D se rulează în modulul F (tabelul designurilor și concluziile se preiau în memoriu din studiu)"]);
+    if (t === "MAS" || t === "MAC") rows.push(["Canalul de admisie", "planul de experimente CFD 3D se rulează în modulul F (tabelul designurilor și concluziile se preiau în memoriu din studiu)"]);
     return rows.length ? `<table class="tabel"><tbody>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</tbody></table>` : "";
   }
 };

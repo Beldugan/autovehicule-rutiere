@@ -174,6 +174,7 @@ export function studiuPort(corp, ctx, U) {
     if (m.tip === "progres") stare(`designul ${st.sel} pe rețeaua fină: α = ${Math.round(m.a)}°RAC…`);
     if (m.tip === "detaliu") {
       st.det = m; st.k = 0; const v = [];
+      { const kk = m.K.filter((q) => q[0] >= 340 && q[0] <= 360).map((q) => q[1]); if (kk.length) window.PCMAI_CFD = { uTDC: Math.sqrt((2 / 3) * kk.reduce((x, y) => x + y, 0) / kk.length), design: st.sel }; }
       m.cadre.forEach((c) => { if (c.a < 30 || c.a > 200) return; for (let j = 0; j < c.M.length; j += 2) if (!c.T[j]) v.push(c.M[j]); }); v.sort((a, b) => a - b);
       st.vmax = Math.max(5, Math.ceil((v.length ? v[Math.floor(v.length * 0.99)] : 50) / 5) * 5); $q('[data-a="vmax"]').value = st.vmax;
       if (st.v3) st.v3.distruge(); const gz = $q(".po-3d-sc"); gz.innerHTML = "";
