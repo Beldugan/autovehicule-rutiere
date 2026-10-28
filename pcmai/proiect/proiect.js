@@ -27,9 +27,9 @@
       csv: "Tura zilnică (CSV)", ciclu: true, indrumar: "Proiectarea sistemelor de propulsie electrice ale autoutilitarelor", icon: "lcv" }
   };
   const MODULE = [
-    { id: "M", nume: "Modulul M · dinamică multicorp", reper: "reper: AVL EXCITE M", fis: "modul-m.js" },
-    { id: "S", nume: "Modulul S · simulare de sistem", reper: "reper: AVL CRUISE M", fis: "modul-s.js" },
-    { id: "F", nume: "Modulul F · CFD", reper: "reper: AVL FIRE M", fis: "modul-f.js" }
+    { id: "M", nume: "Modulul M · dinamică multicorp", reper: "mecanism, angrenaje, vibrații", fis: "modul-m.js" },
+    { id: "S", nume: "Modulul S · simulare de sistem", reper: "vehiculul pe ciclu, fluxuri de putere", fis: "modul-s.js" },
+    { id: "F", nume: "Modulul F · CFD", reper: "câmpuri în cilindru și în placa de răcire", fis: "modul-f.js" }
   ];
   const ICON = {
     mas: '<path d="M6 20h20M9 20v-7h14v7M12 13V9h8v4M16 9V5M14 5h4" /><circle cx="16" cy="25" r="2"/>',
@@ -123,7 +123,7 @@
       <div id="pc-raport" class="doar-tipar-pc"></div>
     </section>
   </main>
-  <footer class="subsol"><p>Calculele capitolelor sunt cele ale îndrumarelor de proiect (aceleași relații și aceleași rezultate ca exemplele rezolvate). Modulele M, S și F sunt simulatoare interne, cu teste de referință analitice; reperele AVL EXCITE M, CRUISE M și FIRE M indică doar tipul de studiu – rezultatele nu sunt rezultate AVL.</p>
+  <footer class="subsol"><p>Calculele capitolelor sunt cele ale îndrumarelor de proiect (aceleași relații și aceleași rezultate ca exemplele rezolvate). Modulele M, S și F sunt simulatoare interne, fiecare verificat cu teste de referință analitice.</p>
   <p>Ș.l. univ. dr. ing. Camil Tudor · ${esc(PORTAL.cadru)} · ${esc(PORTAL.univ)}, ${PORTAL.an}</p></footer>`;
   Tema.leaga();
 
