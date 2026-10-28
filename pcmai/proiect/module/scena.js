@@ -8,6 +8,17 @@ export { THREE, RoundedBoxGeometry };
 
 export const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 export const mat = (o) => { const m = new THREE.MeshStandardMaterial(o); m.envMapIntensity = 0.8; return m; };
+/** culorile de post-procesare (CAE): fiecare piesă are culoarea ei, carcasele sunt gri deschis și se pot face transparente sau secționa */
+export const CAE = { arbore: 0x2e9e3e, piston: 0xf07c1c, biela: 0x2bb3d4, lagar: 0xf2c41a, roata: 0xc8382c, rotor: 0xb8281f, dif: 0x35b9d6, carcasa: 0xd4d6d8, stator: 0x9aa3ab, bobinaj: 0x2bb3d4, port: 0x2e9e3e, soare: 0xf2c41a, satelit: 0x35b9d6, coroana: 0xc8382c };
+export function matCAE(culoare, o = {}) { const m = new THREE.MeshStandardMaterial(Object.assign({ color: culoare, roughness: 0.42, metalness: 0.12 }, o)); m.envMapIntensity = 0.6; return m; }
+/** materialul carcaselor: față dublă; fețele interioare (vizibile după secționare) se colorează uniform, ca fața de tăietură */
+export function matCarcasa(culoare = CAE.carcasa, o = {}) {
+  const m = new THREE.MeshStandardMaterial(Object.assign({ color: culoare, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide }, o)); m.envMapIntensity = 0.5;
+  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n if (!gl_FrontFacing) gl_FragColor.rgb = vec3(0.70, 0.72, 0.75);"); };
+  m.userData.carcasa = true; return m;
+}
+/** contur CAE (muchiile vii ale piesei) */
+export function contur(mesh, unghi = 28, opac = 0.35) { const l = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, unghi), new THREE.LineBasicMaterial({ color: 0x2a2f36, transparent: true, opacity: opac })); l.userData.faraCadru = true; l.userData.contur = true; mesh.add(l); return mesh; }
 export const MAT = () => ({
   otel: mat({ color: 0x9aa3ad, roughness: 0.32, metalness: 0.9 }), otelI: mat({ color: 0x6b737c, roughness: 0.45, metalness: 0.85 }),
   crom: mat({ color: 0xe8ecf0, roughness: 0.1, metalness: 1 }), alu: mat({ color: 0xc9ced3, roughness: 0.38, metalness: 0.75 }),
@@ -49,12 +60,12 @@ export function sageata(culoare, raza = 0.004) {
 
 /** scena: gazda = elementul .mod-scena; o = { cam:[x,y,z], tinta:[x,y,z], min, max, fundal } */
 export function creeazaScena(gazda, o = {}) {
-  gazda.innerHTML = `<canvas></canvas><div class="mod-hud" hidden></div><div class="mod-leg" hidden></div><div class="mod-eticheta-prov">${o.prov || "vizualizare internă"}</div><button type="button" class="btn-ecran">⛶ Ecran complet</button>`;
+  gazda.innerHTML = `<canvas></canvas><div class="mod-hud" hidden></div><div class="mod-leg" hidden></div><div class="mod-eticheta-prov">${o.prov || "vizualizare internă"}</div><button type="button" class="btn-ecran">⛶ Ecran complet</button><div class="mod-vederi" role="group" aria-label="Vederea"><button type="button" data-v="opac">Opac</button><button type="button" data-v="transp">Transparent</button><button type="button" data-v="sect">Secționat</button></div>`;
   const canvas = gazda.querySelector("canvas");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.localClippingEnabled = true;
   const scene = new THREE.Scene(), pm = new THREE.PMREMGenerator(renderer);
   scene.environment = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture;
   const camera = new THREE.PerspectiveCamera(34, 1.6, 0.002, 60); camera.position.set(...(o.cam || [0.5, 0.35, 0.6]));
@@ -64,7 +75,7 @@ export function creeazaScena(gazda, o = {}) {
   const U = o.umbra || 1; Object.assign(sun.shadow.camera, { left: -U, right: U, top: U, bottom: -U, near: 0.1, far: 8 }); sun.shadow.bias = -0.0005; scene.add(sun);
   scene.add(new THREE.HemisphereLight(0xffffff, 0x404850, 0.55));
   const tema = () => { const t = document.documentElement.getAttribute("data-theme"), inchis = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
-    scene.background = new THREE.Color(o.fundal ?? (inchis ? 0x161b22 : 0xdde3ea)); };
+    scene.background = new THREE.Color(o.fundal ?? (inchis ? 0x1f242b : 0xffffff)); };
   tema(); window.addEventListener("schimbare-tema", tema);
   // etichetele HTML ancorate pe puncte 3D
   const etichete = [];
@@ -86,7 +97,7 @@ export function creeazaScena(gazda, o = {}) {
   let activ = true, f = null, tP = performance.now(), cerere = 0;
   function bucla(t) {
     cerere = requestAnimationFrame(bucla);
-    const dt = Math.min(0.1, (t - tP) / 1000); tP = t;
+    const dt = Math.max(0, Math.min(0.1, (t - tP) / 1000)); tP = t;
     if (!activ || !gazda.getClientRects().length) return;
     const w = gazda.clientWidth, h = gazda.clientHeight;
     if (canvas.width !== Math.round(w * renderer.getPixelRatio()) || canvas.height !== Math.round(h * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
@@ -95,8 +106,32 @@ export function creeazaScena(gazda, o = {}) {
   }
   cerere = requestAnimationFrame(bucla);
   if (typeof ecranComplet === "function") ecranComplet(gazda, gazda.querySelector(".btn-ecran"));
-  return {
-    THREE, scene, camera, renderer, ctl, canvas, gazda, eticheta, legenda,
+  // vederile: opac / transparent / secționat (se aplică pieselor marcate „carcasă”; planul de secțiune trece prin centrul machetei)
+  const plan = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0), planuri = [plan];
+  let vedere = "transp";
+  function aplicaVedere(v) {
+    if (v) vedere = v;
+    gazda.querySelectorAll(".mod-vederi button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === vedere));
+    const rad = api.grup || scene;
+    rad.traverse((x) => {
+      const m = x.material; if (!m) return;
+      const lista = Array.isArray(m) ? m : [m];
+      lista.forEach((mm) => {
+        const esteC = (mm.userData && mm.userData.carcasa) || (x.userData.contur && x.parent && x.parent.material && x.parent.material.userData && x.parent.material.userData.carcasa);
+        if (!esteC) return;
+        if (mm.userData.op0 == null) mm.userData.op0 = mm.opacity;
+        const tr = vedere === "transp";
+        mm.transparent = tr || mm.userData.op0 < 1; mm.opacity = tr ? (x.userData.contur ? 0.25 : 0.16) : mm.userData.op0; mm.depthWrite = !tr;
+        mm.clippingPlanes = vedere === "sect" ? planuri : null; mm.needsUpdate = true;
+      });
+      if (x.isMesh && x.material && x.material.userData && x.material.userData.carcasa) x.castShadow = vedere !== "transp";
+    });
+  }
+  gazda.querySelectorAll(".mod-vederi button").forEach((b) => b.addEventListener("click", () => aplicaVedere(b.dataset.v)));
+  const api = {
+    THREE, scene, camera, renderer, ctl, canvas, gazda, eticheta, legenda, aplicaVedere, plan,
+    /** vederea implicită a studiului și planul de secțiune (normala spre partea îndepărtată) */
+    vedere(v, normala, c = 0) { if (normala) { plan.normal.set(...normala).normalize(); plan.constant = c; } aplicaVedere(v); },
     hud(html) { hud.hidden = !html; if (html && hud._h !== html) { hud.innerHTML = html; hud._h = html; } },
     animatie(fn) { f = fn; },
     activ(b) { activ = b; tP = performance.now(); },
@@ -107,12 +142,14 @@ export function creeazaScena(gazda, o = {}) {
       const sz = box.getSize(new THREE.Vector3()), cen = box.getCenter(new THREE.Vector3());
       if (!Number.isFinite(sz.x) || sz.length() === 0) { camera.position.set(...c); ctl.target.set(...t); ctl.update(); return; }
       const dir = new THREE.Vector3(c[0] - t[0], c[1] - t[1], c[2] - t[2]).normalize(), r = sz.length() / 2;
-      const d = (r / Math.sin((camera.fov * Math.PI) / 360)) * (camera.aspect < 1.3 ? 1.25 : 1.0);
+      const d = (r / Math.sin((camera.fov * Math.PI) / 360)) * (camera.aspect < 1.3 ? 1.0 : 0.78);
       ctl.target.copy(cen); camera.position.copy(cen).addScaledVector(dir, d); camera.near = d / 200; camera.far = d * 20; camera.updateProjectionMatrix(); ctl.update();
+      plan.constant = -plan.normal.dot(cen) + (this.decalajSectiune || 0); aplicaVedere();
     },
     goleste(grup) { grup.traverse((x) => { if (x.geometry) x.geometry.dispose(); }); while (grup.children.length) grup.remove(grup.children[0]); etichete.splice(0).forEach((e) => e.el.remove()); },
     distruge() { cancelAnimationFrame(cerere); renderer.dispose(); }
   };
+  return api;
 }
 
 /* ------------------------------------------------------------------ grafice 2D (canvas, scara portalului) */

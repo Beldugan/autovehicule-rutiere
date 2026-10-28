@@ -53,8 +53,8 @@ export function studiuReductor(corp, ctx, H) {
     r = { p, i, i12, i34, n1, T1, sursa, s1, s2, Pin, Pout, Pp, RA, RB, md, J, k };
     // macheta
     sc3.goleste(sc3.grup); red = reductorEV([p.z1, p.z2, p.z3, p.z4], [p.m1 / 1000, p.m2 / 1000]); red.G.position.set(0, 0.09, 0.05); sc3.grup.add(red.G);
-    sc3.incadreaza([0.9, 0.45, 0.35], [0, 0, 0]);
-    et = { a1: sc3.eticheta(""), a2: sc3.eticheta(""), a3: sc3.eticheta(""), f1: sc3.eticheta(""), f2: sc3.eticheta("") };
+    sc3.vedere("sect", [0, 0, -1]); sc3.incadreaza([0.35, 0.4, 1], [0, 0, 0]);
+    et = { a1: sc3.eticheta(""), a2: sc3.eticheta(""), a3: sc3.eticheta(""), f1: { pune() {}, text() {} }, f2: { pune() {}, text() {} } };
     rezultate();
   }
   function rezultate() {
@@ -96,11 +96,11 @@ export function studiuReductor(corp, ctx, H) {
       red.pozeaza(st.fi, r.i12, r.i34, r.s1.Ft, r.s2.Ft, sc);
       const g = red.G.position;
       et.a1.pune(V3(-0.12, 0.15, 0).add(g)); et.a1.text(`motor <b>${nr(r.n1, 0)} rot/min</b> · ${nr(r.T1, 0)} N·m`);
-      et.a2.pune(V3(0.12, -red.a12 + 0.06, 0.05).add(g)); et.a2.text(`intermediar <b>${nr(-r.s1.n2, 0)} rot/min</b>`);
-      et.a3.pune(V3(0.12, -red.a12 - 0.05, -red.a34).add(g)); et.a3.text(`diferențial <b>${nr(r.s2.n2 * -1 * -1, 0)} rot/min</b> · ${nr(r.s2.M2, 0)} N·m`);
+      et.a2.pune(V3(0.2, -red.a12, 0.08).add(g)); et.a2.text(`intermediar <b>${nr(-r.s1.n2, 0)} rot/min</b>`);
+      et.a3.pune(V3(0.12, -red.a12 - 0.12, -red.a34).add(g)); et.a3.text(`diferențial <b>${nr(r.s2.n2 * -1 * -1, 0)} rot/min</b> · ${nr(r.s2.M2, 0)} N·m`);
       et.f1.pune(red.contact1.clone().add(g)); et.f1.text(`F<sub>t1</sub> <b>${nr(r.s1.Ft / 1e3, 2)} kN</b> · f<sub>z1</sub> ${nr(r.s1.f, 0)} Hz`);
       et.f2.pune(red.contact2.clone().add(g)); et.f2.text(`F<sub>t2</sub> <b>${nr(r.s2.Ft / 1e3, 2)} kN</b>`);
-      sc3.hud(`P = <b>${nr(r.Pin / 1e3, 1)} kW</b> · i = <b>${nr(r.i, 3)}</b> · animație încetinită de ${nr(1 / st.k, 0)} ori`);
+      sc3.hud(`P = <b>${nr(r.Pin / 1e3, 1)} kW</b> · i = <b>${nr(r.i, 3)}</b> · animație încetinită de ${nr(1 / st.k, 0)} ori<br>F<sub>t1</sub> = <b>${nr(r.s1.Ft / 1e3, 2)} kN</b>, f<sub>z1</sub> = <b>${nr(r.s1.f, 0)} Hz</b> · F<sub>t2</sub> = <b>${nr(r.s2.Ft / 1e3, 2)} kN</b>, f<sub>z2</sub> = <b>${nr(r.s2.f, 0)} Hz</b>`);
     },
     raport() { return z.rez.innerHTML + z.ver.innerHTML; }
   };
@@ -145,7 +145,7 @@ export function studiuPlanetar(corp, ctx, H) {
   let pl, r, f = { s: 0, c: 0, r: 0 }, et;
   function calc() {
     const p = H.citeste(z.par); r = MC.willis(p.Ns, p.Nr, { nc: p.nc, nr: p.nr, Tc: p.Tc }); r.p = p;
-    sc3.goleste(sc3.grup); pl = planetar(p.Ns, p.Nr, Math.round((p.Nr - p.Ns) / 2)); sc3.grup.add(pl.G); sc3.incadreaza([0.36, 0.14, 0.3], [0, 0, 0]);
+    sc3.goleste(sc3.grup); pl = planetar(p.Ns, p.Nr, Math.round((p.Nr - p.Ns) / 2)); sc3.grup.add(pl.G); sc3.vedere("sect", [-1, 0, 0]); sc3.incadreaza([0.36, 0.14, 0.3], [0, 0, 0]);
     et = [sc3.eticheta(""), sc3.eticheta(""), sc3.eticheta("")];
     const ref = p.Ns === 30 && p.Nr === 78 && p.nc === 2000 && p.nr === 1000 && p.Tc === 100;
     const lim1 = { P: 30e3, T: 60, n: 10000 }, ok1 = Math.abs(r.ns) <= lim1.n && Math.abs(r.Ts) <= lim1.T && Math.abs(r.Ps * 1e3) <= lim1.P;

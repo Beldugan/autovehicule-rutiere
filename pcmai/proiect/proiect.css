@@ -218,3 +218,8 @@
 
 .mod-rez { margin-top: .6rem; }
 .mod-rez .tabel td:first-child { min-width: 14rem; }
+.mod-scena .mod-vederi { position: absolute; right: .5rem; top: 2.6rem; display: flex; flex-direction: column; gap: .2rem; z-index: 6; }
+.mod-scena .mod-vederi button { font-size: .72rem; padding: .2rem .5rem; background: rgba(255, 255, 255, .88); color: #1e293b; border: 1px solid rgba(15, 23, 42, .18); border-radius: 6px; }
+.mod-scena .mod-vederi button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.mod-scena { background: #fff; }
+.mod-scena .mod-eticheta-prov { color: rgba(30, 41, 59, .55); }
