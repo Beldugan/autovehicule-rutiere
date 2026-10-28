@@ -4,9 +4,9 @@
 import { grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii, turboColor } from "./scena.js";
 import { creeazaCompresie, izentrop, placaRacire } from "./cfd.js";
 import { placaCFD } from "./cfd3d.js";
-import { cilindruReal } from "./cilindru-real.js?v=4";
+import { cilindruReal } from "./cilindru-real.js?v=5";
 import { ardereMAS, testFlacaraLibera, sprayMAC } from "./ardere.js?v=2";
-import { studiuPort } from "./port-ui.js?v=9";
+import { studiuPort } from "./port-ui.js?v=11";
 import { creeazaUI } from "./ui.js";
 
 const U = creeazaUI("post-procesare a câmpurilor calculate");

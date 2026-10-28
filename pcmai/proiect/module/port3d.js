@@ -58,16 +58,24 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
     const A = new THREE.Group(); A.position.x = x;
     const sup = contur(new THREE.Mesh(new THREE.LatheGeometry(profil(yTijaSus), 64), metal(culS)), 35, 0.35); A.add(sup);
     // arcul elicoidal (lungimea se modifică odată cu ridicarea), talerul, tachetul-pahar
-    const spire = 7, Ra = 0.15 * D, pts = []; for (let k = 0; k <= spire * 32; k++) { const t = k / (spire * 32), f = t * spire * Math.PI * 2; pts.push(V3(Ra * Math.cos(f), t, Ra * Math.sin(f))); }
+    const spire = 7, Ra = 0.11 * D, pts = []; for (let k = 0; k <= spire * 32; k++) { const t = k / (spire * 32), f = t * spire * Math.PI * 2; pts.push(V3(Ra * Math.cos(f), t, Ra * Math.sin(f))); }
     const arc = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), spire * 48, 0.014 * D, 8, false), metal(0x7d838a, { metalness: 0.6 })); A.add(arc);
-    const taler = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.17 * D, 0.1 * D, 0.04 * D, 32), metal(0xa7adb4)), 30, 0.35); A.add(taler);
-    const tachet = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.2 * D, 0.2 * D, 0.2 * D, 40), metal(0x8d96a0)), 30, 0.35); A.add(tachet);
+    const taler = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.13 * D, 0.08 * D, 0.04 * D, 32), metal(0xa7adb4)), 30, 0.35); A.add(taler);
+    const tachet = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.15 * D, 0.15 * D, 0.2 * D, 40), metal(0x8d96a0)), 30, 0.35); A.add(tachet);
     const yArc0 = yH + 0.005 * D;
     // arborele cu came: profilul polar r(ψ) = r0 + L(α), cu ψ = −90° − α/2 (contactul pe verticală cu tachetul plan)
-    const r0 = 0.2 * D, Lm = g.Lmax, cs = new THREE.Shape(); for (let k = 0; k <= 360; k++) { const psi = k * RAD, a = (((2 * (-Math.PI / 2 - psi)) / RAD) % 720 + 720) % 720, r = r0 + legea(a); const X = r * Math.cos(psi), Y = r * Math.sin(psi); k ? cs.lineTo(X, Y) : cs.moveTo(X, Y); }
-    const camG = new THREE.ExtrudeGeometry(cs, { depth: 0.16 * D, bevelEnabled: false, curveSegments: 4 }); camG.translate(0, 0, -0.08 * D);
+    const r0 = 0.125 * D, Lm = g.Lmax, cs = new THREE.Shape(); for (let k = 0; k <= 360; k++) { const psi = k * RAD, a = (((2 * (-Math.PI / 2 - psi)) / RAD) % 720 + 720) % 720, r = r0 + legea(a); const X = r * Math.cos(psi), Y = r * Math.sin(psi); k ? cs.lineTo(X, Y) : cs.moveTo(X, Y); }
+    const camG = new THREE.ExtrudeGeometry(cs, { depth: 0.13 * D, bevelEnabled: true, bevelThickness: 0.008 * D, bevelSize: 0.006 * D, bevelSegments: 1, curveSegments: 4 }); camG.translate(0, 0, -0.065 * D);
     const cama = contur(new THREE.Mesh(camG, metal(0x9ba1a8)), 30, 0.35); const yCam = yTijaSus + 0.2 * D + 0.01 * D + r0; cama.position.y = yCam; A.add(cama);
-    const ax = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * D, 0.11 * D, 1.3 * D, 32), metal(0x9ba1a8)); ax.rotation.x = Math.PI / 2; ax.position.y = yCam; A.add(ax);
+    // arborele cu came în lungul axei arborelui cotit (z): tubul, fusurile cu capacele lagărelor (fixate în chiulasă), flanșa roții de distribuție
+    const arb = new THREE.Group(); arb.position.y = yCam; A.add(arb);
+    arb.add(new THREE.Mesh(new THREE.CylinderGeometry(0.065 * D, 0.065 * D, 1.5 * D, 32).rotateX(Math.PI / 2), metal(0x9ba1a8)));
+    [-0.42, 0.42].forEach((zz) => { const f = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.1 * D, 0.1 * D, 0.12 * D, 32).rotateX(Math.PI / 2), metal(0xb7bdc4)), 30, 0.3); f.position.z = zz * D; arb.add(f);
+      const cap = contur(new THREE.Mesh(new THREE.BoxGeometry(0.3 * D, 0.13 * D, 0.13 * D), matCarcasa(0xc9cdd2)), 30, 0.35); cap.position.set(0, 0.075 * D, zz * D); arb.add(cap);
+      const su = contur(new THREE.Mesh(new THREE.BoxGeometry(0.3 * D, 0.13 * D, 0.13 * D), matCarcasa(0xc9cdd2)), 30, 0.35); su.position.set(0, -0.08 * D, zz * D); arb.add(su);
+      [-1, 1].forEach((sx) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * D, 0.022 * D, 0.03 * D, 6), metal(0x5b6168)); b.position.set(sx * 0.11 * D, 0.155 * D, zz * D); arb.add(b); }); });
+    const roata = contur(new THREE.Mesh(new THREE.CylinderGeometry(0.22 * D, 0.22 * D, 0.08 * D, 48).rotateX(Math.PI / 2), metal(0xaeb4bb)), 30, 0.3); roata.position.z = 0.78 * D; arb.add(roata);
+    const ax = arb;
     fara(A); G.add(A);
     return (a) => { const L = legea(a); sup.position.y = -L; const ySus = yTijaSus - L; taler.position.y = ySus - 0.12 * D; tachet.position.y = ySus + 0.1 * D;
       const lA = taler.position.y - 0.02 * D - yArc0; arc.position.y = yArc0; arc.scale.y = Math.max(0.05 * D, lA); cama.rotation.z = (a / 2) * RAD; };
@@ -85,7 +93,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   /* ---------------- pistonul, segmenții, bolțul, biela, arborele cotit */
   const Hp = 0.62 * D, pr = [[0, 0], [0.497 * D, 0], [0.497 * D, -0.05 * D], [0.49 * D, -0.05 * D], [0.49 * D, -0.07 * D], [0.497 * D, -0.07 * D], [0.497 * D, -0.1 * D], [0.49 * D, -0.1 * D], [0.49 * D, -0.12 * D], [0.497 * D, -0.12 * D], [0.497 * D, -0.15 * D], [0.49 * D, -0.15 * D], [0.49 * D, -0.175 * D], [0.497 * D, -0.175 * D], [0.497 * D, -Hp], [0.45 * D, -Hp], [0.45 * D, -0.2 * D], [0, -0.2 * D]].map(([r, y]) => new THREE.Vector2(r, y));
   const piston = new THREE.Group();
-  piston.add(contur(new THREE.Mesh(new THREE.LatheGeometry(pr, 72), metal(0xc6cacf, { metalness: 0.5 })), 30, 0.3));
+  piston.add(contur(new THREE.Mesh(new THREE.LatheGeometry(pr.slice().reverse(), 72), metal(0xc6cacf, { metalness: 0.5 })), 30, 0.3));
   [-0.06, -0.11, -0.162].forEach((y) => { const s = new THREE.Mesh(new THREE.TorusGeometry(0.494 * D, 0.008 * D, 8, 64).rotateX(Math.PI / 2), metal(0x3a3f45)); s.position.y = y * D; piston.add(s); });
   const yBolt = -0.36 * D, bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * D, 0.11 * D, 0.86 * D, 32), metal(0xaab0b6)); bolt.rotation.x = Math.PI / 2; bolt.position.y = yBolt; piston.add(bolt);
   fara(piston); G.add(piston);
@@ -133,7 +141,7 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const dare = new THREE.LineSegments(gT, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })); dare.frustumCulled = false; dare.renderOrder = 4; fara(dare); G.add(dare);
   const gP = new THREE.BufferGeometry(); gP.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3)); gP.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3));
   const part = new THREE.Points(gP, new THREE.PointsMaterial({ size: 0.028 * D, vertexColors: true, sizeAttenuation: true })); part.frustumCulled = false; fara(part); G.add(part);
-  const st = { vmax: 50, prag: 0.04, camp: "v", Tmin: 300, Tmax: 2600, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
+  const st = { vmax: 50, prag: 0.04, camp: "v", Tmin: 300, Tmax: 2600, pMin: 0, pMax: 6e6, pGal: 1e5, pf: null, contur: true, orizontal: true, vectori: true, particule: true, termic: false, mef: true, sMax: 1 };
   // câmpul termic al chiulasei: T(x, z) pe placa de foc, scăzând exponențial spre fața superioară (grosimea de pătrundere ≈ 0,25·D)
   function coloreazaChiulasa() { const cc = gCh.attributes.color.array, pp = gCh.attributes.position.array, th = ext.termic;
     for (let j = 0; j < cc.length / 3; j++) { if (!st.termic || !th) { cc[3 * j] = cc[3 * j + 1] = cc[3 * j + 2] = 1; continue; }
@@ -145,6 +153,9 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
   const leg2 = document.createElement("div"); leg2.className = "po-leg2"; gazda.appendChild(leg2);
   function legenda2(titlu, sub, vmin, vmax, u) { if (titlu == null) { leg2.hidden = true; return; } leg2.hidden = false;
     leg2.innerHTML = `<b>${titlu}</b><br><span>${sub}</span><br><span>Unitate: ${u}</span><div class="po-leg2-b">${Array.from({ length: 10 }, (_, k) => { const t = 1 - k / 9, c = culoareJet(t); return `<div><i style="background:rgb(${c.join(",")})"></i>${(vmin + (vmax - vmin) * t).toPrecision(4)}${k === 0 ? " Max" : k === 9 ? " Min" : ""}</div>`; }).join("")}</div>`; }
+  /** presiunea: în cilindru presiunea ciclului (uniformă, ipoteza Mach mic), în canale presiunea din galerii */
+  function umpleP(t, T, a, b, pc, sectZ) { const d = t.image.data; for (let s_ = 0; s_ < a * b; s_++) { const q = s_ * 4; if (T[s_]) { d[q + 3] = 0; continue; }
+    const cil_ = !sectZ || y0 + (Math.floor(s_ / a) + 0.5) * h < 0, pv = cil_ ? pc : st.pGal, c = culoareJet((pv - st.pMin) / (st.pMax - st.pMin)); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 235; } t.needsUpdate = true; }
   function umpleT(t, V, T, a, b) { const d = t.image.data; for (let s_ = 0; s_ < a * b; s_++) { const q = s_ * 4; if (T[s_]) { d[q + 3] = 0; continue; } const c = culoareJet((V[s_] - st.Tmin) / (st.Tmax - st.Tmin)); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 235; } t.needsUpdate = true; }
   function umple(t, M, T, a, b) { const d = t.image.data; for (let s = 0; s < a * b; s++) { const q = s * 4; if (T[s]) { d[q + 3] = 0; continue; } const v = M[s] / st.vmax; if (v < st.prag) { d[q + 3] = 0; continue; } const c = culoareJet(v); d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = Math.round(120 + 120 * Math.min(1, (v - st.prag) / 0.15)); } /* aerul practic în repaus (sub prag) nu se colorează */ t.needsUpdate = true; }
   let ultimCadru = -1;
@@ -158,9 +169,9 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
     const dA = C.length > 1 ? C[1].a - C[0].a : 2, kf = Math.max(0, Math.min(C.length - 1, (a - C[0].a) / dA)), k0 = Math.floor(kf), k1 = Math.min(C.length - 1, k0 + 1), f = kf - k0, c = C[Math.round(kf)];
     pZ.visible = st.contur; pY.visible = st.orizontal; vec.visible = st.vectori; part.visible = dare.visible = st.particule;
     if (Math.round(kf) !== ultimCadru || st.reface) { ultimCadru = Math.round(kf); st.reface = false;
-      const tC = st.camp === "T" && c.Tz;
-      if (st.contur) (tC ? umpleT(tZ, c.Tz, c.T, nx, ny) : umple(tZ, c.M, c.T, nx, ny));
-      if (st.orizontal) { (tC ? umpleT(tY, c.Thz, c.Th, nx, nz) : umple(tY, c.Mh, c.Th, nx, nz)); pY.position.y = c.yh; }
+      const tC = st.camp === "T" && c.Tz, pC = st.camp === "p" && st.pf, pc = pC ? st.pf(a) : 0;
+      if (st.contur) (pC ? umpleP(tZ, c.T, nx, ny, pc, true) : tC ? umpleT(tZ, c.Tz, c.T, nx, ny) : umple(tZ, c.M, c.T, nx, ny));
+      if (st.orizontal) { (pC ? umpleP(tY, c.Th, nx, nz, pc, false) : tC ? umpleT(tY, c.Thz, c.Th, nx, nz) : umple(tY, c.Mh, c.Th, nx, nz)); pY.position.y = c.yh; }
       if (st.vectori) { const A = gV.attributes.position.array; let q = 0; const L = pas * h * 1.1;
         for (let j = 0; j < ny; j += pas) for (let i = 0; i < nx; i += pas) { const s = i + nx * j, U = c.U[s], V = c.V[s], m = Math.hypot(U, V), x = x0 + (i + 0.5) * h, y = y0 + (j + 0.5) * h;
           if (c.T[s] || m < 0.03 * st.vmax) { A.fill(0, q, q + 18); q += 18; continue; }
@@ -171,12 +182,12 @@ export function scenaPort3D(gazda, geo, R, ext = {}) {
       const A = gP.attributes.position.array, Cc = gP.attributes.color.array, TA = gT.attributes.position.array, TC = gT.attributes.color.array, P0 = C[k0].P, P1 = C[k1].P, V0 = C[k0].Pv;
       const lim = 0.25 * D; // salt mai mare decât atât între cadre = particulă reinjectată (fără dâră)
       for (let k = 0; k < NP; k++) { const i3 = k * 3; let X = P0[i3];
-        const modT = st.camp === "T" && C[k0].Pt;
-        if (X !== X || (!modT && V0[k] < st.prag * st.vmax)) { A[i3] = 0; A[i3 + 1] = 1e3; A[i3 + 2] = 0; TA.fill(0, k * NT * 6, (k + 1) * NT * 6); continue; }
+        const modT = st.camp === "T" && C[k0].Pt, modP = st.camp === "p" && st.pf;
+        if (X !== X || (!modT && !modP && V0[k] < st.prag * st.vmax)) { A[i3] = 0; A[i3 + 1] = 1e3; A[i3 + 2] = 0; TA.fill(0, k * NT * 6, (k + 1) * NT * 6); continue; }
         let x = X, y = P0[i3 + 1], z = P0[i3 + 2]; const X1 = P1[i3];
         if (X1 === X1 && Math.abs(X1 - X) + Math.abs(P1[i3 + 1] - y) + Math.abs(P1[i3 + 2] - z) < lim) { x += (X1 - X) * f; y += (P1[i3 + 1] - y) * f; z += (P1[i3 + 2] - z) * f; }
         A[i3] = x; A[i3 + 1] = y; A[i3 + 2] = z;
-        const col = culoareJet(modT ? (C[k0].Pt[k] - st.Tmin) / (st.Tmax - st.Tmin) : V0[k] / st.vmax), r = lin(col[0]), gg = lin(col[1]), b = lin(col[2]); Cc[i3] = r; Cc[i3 + 1] = gg; Cc[i3 + 2] = b;
+        const col = culoareJet(modP ? ((y < 0 ? st.pf(a) : st.pGal) - st.pMin) / (st.pMax - st.pMin) : modT ? (C[k0].Pt[k] - st.Tmin) / (st.Tmax - st.Tmin) : V0[k] / st.vmax), r = lin(col[0]), gg = lin(col[1]), b = lin(col[2]); Cc[i3] = r; Cc[i3 + 1] = gg; Cc[i3 + 2] = b;
         // dâra: segmentele dintre pozițiile din cadrele anterioare
         let ax = x, ay = y, az = z;
         for (let s = 0; s < NT; s++) { const kk = k0 - s, q = (k * NT + s) * 6; if (kk < 0) { TA.fill(0, q, q + 6); continue; } const Pp = C[kk].P, bx = Pp[i3], by = Pp[i3 + 1], bz = Pp[i3 + 2];

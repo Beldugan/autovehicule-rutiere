@@ -13,7 +13,9 @@ const RAD = Math.PI / 180;
 const lege = (phi, dur, L) => (phi >= 0 && phi <= dur ? L * Math.pow(Math.sin((Math.PI * phi) / dur), 2) : 0);
 const mod = (a, p) => ((a % p) + p) % p;
 const metal = (c, o = {}) => matCAE(c, Object.assign({ metalness: 0.6, roughness: 0.3 }, o));
-const lathe = (pts, n = 64) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(Math.max(0, r), y)), n);
+// profilul se dă de sus în jos; LatheGeometry cere ordinea de jos în sus pentru normale spre exterior (altfel fețele de sus nu se văd)
+const ordine = (pts) => (pts.length && pts[0][1] > pts[pts.length - 1][1] ? pts.slice().reverse() : pts);
+const lathe = (pts, n = 64) => new THREE.LatheGeometry(ordine(pts).map(([r, y]) => new THREE.Vector2(Math.max(0, r), y)), n);
 const fara = (o) => { o.traverse((x) => (x.userData.faraCadru = true)); return o; };
 const C = (m, a = 32, op = 0.3) => contur(m, a, op);
 

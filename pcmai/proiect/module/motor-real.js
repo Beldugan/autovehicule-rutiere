@@ -10,7 +10,9 @@ import { roata } from "./angrenaj.js";
 import { traseuCurea, banda, dintiCurea, roataDintata, rola, fuliePolyV } from "./distributie.js?v=1";
 
 const ax = (g) => { g.rotateZ(Math.PI / 2); return g; };
-const lathe = (pts, seg = 64) => { const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(Math.max(0, r), y)), seg); return g; };
+// LatheGeometry cere profilul de jos în sus (normale spre exterior); profilele de aici sunt date de sus în jos
+const ordine = (pts) => (pts.length && pts[0][1] > pts[pts.length - 1][1] ? pts.slice().reverse() : pts);
+const lathe = (pts, seg = 64) => { const g = new THREE.LatheGeometry(ordine(pts).map(([r, y]) => new THREE.Vector2(Math.max(0, r), y)), seg); return g; };
 const latheX = (pts, seg = 64) => ax(lathe(pts, seg));
 /** profil de fus cu racordări la capete (r, lungime, raza racordării) – pentru lathe pe axa X */
 const profilFus = (r, l, rr, n = 5) => { const P = [[0, -l / 2]]; for (let k = 0; k <= n; k++) { const a = (k / n) * Math.PI / 2; P.push([r - rr + rr * Math.sin(a), -l / 2 + rr - rr * Math.cos(a)]); }

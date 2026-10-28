@@ -28,7 +28,7 @@ export function creeazaSolver3D(geo, o = {}) {
   const iu = (i, j, k) => i + (nx + 1) * (j + ny * k), iv = (i, j, k) => i + nx * (j + (ny + 1) * k), iw = (i, j, k) => i + nx * (j + ny * k);
   const u = new Float32Array(nu_), v = new Float32Array(nv_), w = new Float32Array(nw_), uN = new Float32Array(nu_), vN = new Float32Array(nv_), wN = new Float32Array(nw_);
   const p = new Float32Array(n), dv = new Float32Array(n), tip = new Uint8Array(n), stat = new Uint8Array(n), inlet = new Uint8Array(n), outlet = new Uint8Array(n), cil = new Uint8Array(n), canalE = new Uint8Array(n);
-  const Tq = new Float32Array(n), TqN = new Float32Array(n), cic = o.ciclu || null;
+  const Tq = new Float32Array(n), TqN = new Float32Array(n), tipV = new Uint8Array(n), cic = o.ciclu || null;
   const rP = geo.wP / 2, R2 = (D / 2) ** 2;
   // distanța 3D la linia mediană (aflată în planul z = 0)
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
@@ -167,6 +167,10 @@ export function creeazaSolver3D(geo, o = {}) {
   /** temperatura: transportul (semi-lagrangian) și sursele ciclului în cilindrul închis */
   const dist = new Float32Array(n), ordine = []; const bj = [0, -0.01 * D, 0];
   function temperatura(a, dt) {
+    // celulele descoperite de piston (sau de supape) în acest pas preiau temperatura vecinilor fluizi; altfel ar păstra valori vechi
+    for (let c = 0; c < n; c++) if (!tip[c] && tipV[c]) { let sT_ = 0, m = 0; for (const d of [-1, 1, -nx, nx, -sxy, sxy]) { const e = c + d; if (e >= 0 && e < n && !tip[e] && !tipV[e]) { sT_ += Tq[e]; m++; } }
+      if (!m) for (const d of [2 * nx, 3 * nx, 4 * nx]) { const e = c + d; if (e < n && !tip[e] && !tipV[e]) { sT_ += Tq[e]; m++; break; } }
+      if (m) Tq[c] = sT_ / m; }
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const c = id(i, j, k); if (tip[c]) { TqN[c] = Tq[c]; continue; }
       if (inlet[c]) { TqN[c] = cic.T0; continue; } const X = xc(i), Y = yc(j), Z = zc(k); TqN[c] = sT(X - dt * Uc(i, j, k), Y - dt * Vc(i, j, k), Z - dt * Wc(i, j, k)); }
     Tq.set(TqN);
@@ -186,7 +190,7 @@ export function creeazaSolver3D(geo, o = {}) {
     for (let a = a0; a <= a1 + 1e-9; a += dA) {
       const yp0 = geo.yPiston(a), yp1 = geo.yPiston(a + dA); vp = (yp1 - yp0) / dt; vval = -(geo.Lv(a + dA) - geo.Lv(a)) / dt;
       vvalE = -(Le(a + dA) - Le(a)) / dt; divCil = cic ? cic.la(a).div : null;
-      masca(a); conditii(); advectie(dt); conditii(); proiectie(dt, itP); conditii();
+      tipV.set(tip); masca(a); conditii(); advectie(dt); conditii(); proiectie(dt, itP); conditii();
       if (Lcur < 1e-5) franeazaCanal(dt, om, -1); if (cic && LEcur < 1e-5) franeazaCanal(dt, om, 1);
       if (cic) temperatura(a, dt);
       const am = ((a % 720) + 720) % 720;

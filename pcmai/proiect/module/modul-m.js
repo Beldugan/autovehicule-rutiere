@@ -4,7 +4,7 @@
 import { creeazaScena, grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii, V3 } from "./scena.js";
 import * as MC from "./multicorp.js";
 import { mecanismulMotor, reductorEV, planetar, linieArbori } from "./macheta3d.js";
-import { motorReal } from "./motor-real.js?v=4";
+import { motorReal } from "./motor-real.js?v=5";
 
 const T3 = (s) => `<span class="mod-prov">${s}</span>`;
 const nr = (v, d = 2) => fx(v, d);

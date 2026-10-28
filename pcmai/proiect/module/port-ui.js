@@ -4,7 +4,7 @@
    unghiuri, norul de puncte masă reținută – tumble, datele paralele, evoluțiile masei, tumble/swirl și energiei cinetice turbulente. */
 import { fx, concluzie } from "./scena.js";
 import { creeazaGeometrie } from "./cfd2d.js?v=2";
-import { scenaPort3D, culoareJet } from "./port3d.js?v=8";
+import { scenaPort3D, culoareJet } from "./port3d.js?v=10";
 import { bielaMEF, chiulasaTermic } from "./fem2d.js?v=2";
 
 const nr = (v, d = 2) => fx(v, d);
@@ -155,7 +155,7 @@ export function studiuPort(corp, ctx, U) {
     <div class="po-3d"><div class="po-3d-sc mod-scena"><p class="nota" style="padding:1rem">Se calculează designul de bază…</p></div></div>
     <div class="po-faze" role="group" aria-label="Faza"><span>Faza:</span><button type="button" data-f="tot" aria-pressed="true">Ciclul complet</button><button type="button" data-f="adm">Admisia</button><button type="button" data-f="comp">Comprimarea</button><button type="button" data-f="ard">Arderea</button><button type="button" data-f="dest">Destinderea</button><button type="button" data-f="evac">Evacuarea</button>
       <span class="po-sep"></span><button type="button" data-a="pas-">◀ 1°</button><button type="button" data-a="ingheata">❄ Îngheață</button><button type="button" data-a="pas+">1° ▶</button>
-      <label>mărimea afișată <select data-a="camp"><option value="v">viteza</option><option value="T">temperatura</option></select></label></div>
+      <label>mărimea afișată <select data-a="camp"><option value="v">viteza</option><option value="T">temperatura</option><option value="p">presiunea</option></select></label></div>
     <div class="po-anim"><button type="button" data-a="play">⏸ Pauză</button><label>viteza <select data-a="vit"><option value="10">×0,25</option><option value="20">×0,5</option><option value="40" selected>×1</option><option value="80">×2</option></select></label>
       <label>α <input type="range" data-a="alfa" min="0" max="720" step="1" value="0" style="width:280px"></label><output data-a="av">0</output>°RAC
       <label><input type="checkbox" data-v="contur" checked> secțiunea mediană</label><label><input type="checkbox" data-v="orizontal" checked> planul orizontal</label><label><input type="checkbox" data-v="vectori" checked> vectori</label><label><input type="checkbox" data-v="particule" checked> particule</label><label><input type="checkbox" data-v="mef" checked> biela – tensiuni (MEF)</label><label><input type="checkbox" data-v="termic"> chiulasa – temperatură</label>
@@ -173,7 +173,7 @@ export function studiuPort(corp, ctx, U) {
   const axe = [{ nume: "Canal_θ", f: (d) => d.par.theta, fmt: (v) => v.toFixed(1) }, { nume: "Cot_b/D", f: (d) => d.par.b, fmt: (v) => v.toFixed(3) }, { nume: "PreScaun_h/D", f: (d) => d.par.hps, fmt: (v) => v.toFixed(3) },
     { nume: "Masa_cilindru", f: (d) => d.rez.mIVC * 1e6, fmt: (v) => v.toFixed(1) }, { nume: "TKE_cilindru", f: (d) => d.rez.tke, fmt: (v) => v.toFixed(2) }, { nume: "Tumble", f: (d) => d.rez.tumble, fmt: (v) => v.toFixed(3) }];
   const titlu = (k, s) => { const e = corp.querySelector(`[data-t="${k}"]`); if (e) e.textContent = s; };
-  const lucrator = () => new Worker(new URL("./port-worker.js?v=5", import.meta.url), { type: "module" });
+  const lucrator = () => new Worker(new URL("./port-worker.js?v=6", import.meta.url), { type: "module" });
   const stare = (s) => { $q(".po-stare").textContent = s; };
   function ruleaza() {
     st.W.forEach((w) => w.terminate()); st.W = [];
@@ -268,7 +268,9 @@ export function studiuPort(corp, ctx, U) {
   $q('[data-a="ingheata"]').addEventListener("click", () => opreste(st.ruleaza));
   [["pas-", -1], ["pas+", 1]].forEach(([a, d]) => $q(`[data-a="${a}"]`).addEventListener("click", () => { opreste(true); st.k = Math.max(0, Math.min(720, Math.round(st.k) + d)); redesen(); }));
   $q('[data-a="camp"]').addEventListener("change", (e) => { if (!st.v3) return; st.v3.st.camp = e.target.value; st.v3.st.reface = true; legendaCamp(); });
-  function legendaCamp() { if (!st.v3) return; if (st.v3.st.camp === "T") { st.v3.st.Tmin = Math.round(cc.T0 / 50) * 50; st.v3.st.Tmax = Math.ceil(cc.TbMax / 100) * 100; st.v3.legenda(st.v3.st.Tmax, (x) => nr(x, 0), "Temperatura", "K", st.v3.st.Tmin); } else st.v3.legenda(st.vmax, (x) => nr(x, 0)); }
+  function legendaCamp() { if (!st.v3) return; const v_ = st.v3.st; v_.pf = (a) => cc.p(Math.max(0, Math.min(720, Math.round(a)))); v_.pGal = p0;
+    if (v_.camp === "p") { let pm = 0; for (let a = 0; a <= 720; a++) pm = Math.max(pm, cc.p(a)); v_.pMin = 0; v_.pMax = Math.ceil(pm / 5e5) * 5e5; st.v3.legenda(v_.pMax / 1e5, (x) => nr(x, 0), "Presiunea", "bar", 0); return; }
+    if (st.v3.st.camp === "T") { st.v3.st.Tmin = Math.round(cc.T0 / 50) * 50; st.v3.st.Tmax = Math.ceil(cc.TbMax / 100) * 100; st.v3.legenda(st.v3.st.Tmax, (x) => nr(x, 0), "Temperatura", "K", st.v3.st.Tmin); } else st.v3.legenda(st.vmax, (x) => nr(x, 0)); }
   bp.addEventListener("click", () => opreste(st.ruleaza));
   $q('[data-a="vit"]').addEventListener("change", (e) => { st.vit = +e.target.value; });
   sl.addEventListener("input", () => { st.k = +sl.value; st.ruleaza = false; bp.textContent = "▶ Pornește"; redesen(); });
