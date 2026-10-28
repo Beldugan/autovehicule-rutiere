@@ -36,26 +36,37 @@ export function creeazaCompresie(o) {
     }
     return F;
   }
-  function rhs(mm, mmu, ee, hcur, wp) {
-    // nodurile: z_j = j/N · h; viteza nodului w_j = j/N · w_p (pistonul la z = h se mișcă cu w_p = dh/dt)
-    const dz = hcur / N, P = []; for (let i = 0; i < N; i++) P.push(prim(mm[i], mmu[i], ee[i], dz));
-    const sl = P.map((_, i) => (i === 0 || i === N - 1 ? [0, 0, 0] : [0, 1, 2].map((k) => minmod(P[i][k] - P[i - 1][k], P[i + 1][k] - P[i][k]))));
-    const dm = new Float64Array(N), dmu = new Float64Array(N), de = new Float64Array(N);
-    let smax = 0;
-    for (let j = 0; j <= N; j++) {
-      const w = (j / N) * wp; let F;
-      if (j === 0) { const [r, u, p] = P[0], c = Math.sqrt(g * p / r), ps = p - r * c * u; F = [0, ps, 0]; }            // chiulasa: perete fix
-      else if (j === N) { const [r, u, p] = P[N - 1], c = Math.sqrt(g * p / r), ps = p + r * c * (u - wp); F = [0, ps, ps * wp]; } // pistonul: perete mobil
-      else {
-        const L = P[j - 1].map((v, k) => v + 0.5 * sl[j - 1][k]), Rr = P[j].map((v, k) => v - 0.5 * sl[j][k]);
-        if (L[0] <= 0 || L[2] <= 0 || Rr[0] <= 0 || Rr[2] <= 0) F = flux(P[j - 1], P[j], w); else F = flux(L, Rr, w);
-      }
-      if (j > 0) { dm[j - 1] -= F[0]; dmu[j - 1] -= F[1]; de[j - 1] -= F[2]; }
-      if (j < N) { dm[j] += F[0]; dmu[j] += F[1]; de[j] += F[2]; }
-    }
-    P.forEach(([r, u, p]) => { smax = Math.max(smax, Math.abs(u) + Math.abs(wp) + Math.sqrt(g * p / r)); });
-    return { dm, dmu, de, smax, dz };
+  // tablouri de lucru prealocate (fără alocări în bucla de timp)
+  const Pr = new Float64Array(N), Pu = new Float64Array(N), Pp = new Float64Array(N), Sr = new Float64Array(N), Su = new Float64Array(N), Sp = new Float64Array(N);
+  const K1 = [new Float64Array(N), new Float64Array(N), new Float64Array(N)], K2 = [new Float64Array(N), new Float64Array(N), new Float64Array(N)];
+  const F = new Float64Array(3);
+  function fluxHLL(rL, uL, pL, rR, uR, pR, w) {
+    const cL = Math.sqrt(g * pL / rL), cR = Math.sqrt(g * pR / rR), sL = Math.min(uL - cL, uR - cR) - w, sR = Math.max(uL + cL, uR + cR) - w;
+    const EL = pL / (g - 1) + 0.5 * rL * uL * uL, ER = pR / (g - 1) + 0.5 * rR * uR * uR;
+    const f0L = rL * uL - w * rL, f1L = rL * uL * uL + pL - w * rL * uL, f2L = (EL + pL) * uL - w * EL;
+    const f0R = rR * uR - w * rR, f1R = rR * uR * uR + pR - w * rR * uR, f2R = (ER + pR) * uR - w * ER;
+    if (sL >= 0) { F[0] = f0L; F[1] = f1L; F[2] = f2L; return; }
+    if (sR <= 0) { F[0] = f0R; F[1] = f1R; F[2] = f2R; return; }
+    const d = 1 / (sR - sL);
+    F[0] = (sR * f0L - sL * f0R + sL * sR * (rR - rL)) * d; F[1] = (sR * f1L - sL * f1R + sL * sR * (rR * uR - rL * uL)) * d; F[2] = (sR * f2L - sL * f2R + sL * sR * (ER - EL)) * d;
   }
+  function rhs(mm, mmu, ee, hcur, wp, K) {
+    // nodurile: z_j = j/N · h; viteza nodului w_j = j/N · w_p (pistonul la z = h se mișcă cu w_p = dh/dt)
+    const dz = hcur / N, [dm, dmu, de] = K;
+    for (let i = 0; i < N; i++) { const r = mm[i] / dz, u = mmu[i] / mm[i]; Pr[i] = r; Pu[i] = u; Pp[i] = (g - 1) * (ee[i] / dz - 0.5 * r * u * u); dm[i] = dmu[i] = de[i] = 0; }
+    Sr[0] = Su[0] = Sp[0] = Sr[N - 1] = Su[N - 1] = Sp[N - 1] = 0;
+    for (let i = 1; i < N - 1; i++) { Sr[i] = minmod(Pr[i] - Pr[i - 1], Pr[i + 1] - Pr[i]); Su[i] = minmod(Pu[i] - Pu[i - 1], Pu[i + 1] - Pu[i]); Sp[i] = minmod(Pp[i] - Pp[i - 1], Pp[i + 1] - Pp[i]); }
+    { const r = Pr[0], u = Pu[0], p = Pp[0], c = Math.sqrt(g * p / r), ps = p - r * c * u; dmu[0] += ps; }                         // chiulasa: perete fix
+    { const r = Pr[N - 1], u = Pu[N - 1], p = Pp[N - 1], c = Math.sqrt(g * p / r), ps = p + r * c * (u - wp); dmu[N - 1] -= ps; de[N - 1] -= ps * wp; } // pistonul: perete mobil
+    for (let j = 1; j < N; j++) {
+      const w = (j / N) * wp, a = j - 1;
+      let rL = Pr[a] + 0.5 * Sr[a], uL = Pu[a] + 0.5 * Su[a], pL = Pp[a] + 0.5 * Sp[a], rR = Pr[j] - 0.5 * Sr[j], uR = Pu[j] - 0.5 * Su[j], pR = Pp[j] - 0.5 * Sp[j];
+      if (rL <= 0 || pL <= 0 || rR <= 0 || pR <= 0) { rL = Pr[a]; uL = Pu[a]; pL = Pp[a]; rR = Pr[j]; uR = Pu[j]; pR = Pp[j]; }
+      fluxHLL(rL, uL, pL, rR, uR, pR, w);
+      dm[a] -= F[0]; dmu[a] -= F[1]; de[a] -= F[2]; dm[j] += F[0]; dmu[j] += F[1]; de[j] += F[2];
+    }
+  }
+  const m1 = new Float64Array(N), mu1 = new Float64Array(N), e1 = new Float64Array(N);
   const iesire = [];
   function inregistreaza() {
     const dz = hc / N; let Mt = 0, Et = 0, pm = 0, Tm = 0, Tmax = -Infinity, Tmin = Infinity; const camp = { p: [], T: [], u: [] };
@@ -77,10 +88,10 @@ export function creeazaCompresie(o) {
       if (dt >= dtMax - 1e-15) dt = dtMax;
       // RK2 SSP: rețeaua: h(t + dt) = h + w_p·dt (w_p constant pe segment)
       const h0 = hc, h1 = h0 + wp * dt;
-      const k1 = rhs(m, mu, en, h0, wp);
-      const m1 = m.map((v, i) => v + dt * k1.dm[i]), mu1 = mu.map((v, i) => v + dt * k1.dmu[i]), e1 = en.map((v, i) => v + dt * k1.de[i]);
-      const k2 = rhs(m1, mu1, e1, h1, wp);
-      for (let i = 0; i < N; i++) { m[i] = 0.5 * (m[i] + m1[i] + dt * k2.dm[i]); mu[i] = 0.5 * (mu[i] + mu1[i] + dt * k2.dmu[i]); en[i] = 0.5 * (en[i] + e1[i] + dt * k2.de[i]); }
+      rhs(m, mu, en, h0, wp, K1);
+      for (let i = 0; i < N; i++) { m1[i] = m[i] + dt * K1[0][i]; mu1[i] = mu[i] + dt * K1[1][i]; e1[i] = en[i] + dt * K1[2][i]; }
+      rhs(m1, mu1, e1, h1, wp, K2);
+      for (let i = 0; i < N; i++) { m[i] = 0.5 * (m[i] + m1[i] + dt * K2[0][i]); mu[i] = 0.5 * (mu[i] + mu1[i] + dt * K2[1][i]); en[i] = 0.5 * (en[i] + e1[i] + dt * K2[2][i]); }
       hc = h1; aG += dt * om * 180 / Math.PI; pasi++;
       if (Math.abs(aG - aNext) < 1e-9) aG = aNext;
       if (aG >= urmIes - 1e-9) { inregistreaza(); urmIes += 1; }

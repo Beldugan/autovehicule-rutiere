@@ -4,6 +4,7 @@
    • planetar – mecanismul planetar simplu (soare, sateliți, coroană, port-sateliți);
    • linieArbori – lanțul P2 (motor termic, ambreiaj K0, mașina electrică, cutia) și varianta P0 cu starter-generatorul pe curea. */
 import { THREE, V3, mat, MAT, sageata, turboColor, CAE, matCAE, matCarcasa, contur } from "./scena.js";
+import { roata } from "./angrenaj.js";
 
 const cil = (r, h, s = 32) => new THREE.CylinderGeometry(r, r, h, s);
 const ax = (g) => { g.rotateZ(Math.PI / 2); return g; };   // cilindru cu axa pe X
@@ -100,24 +101,8 @@ export function mecanismulMotor(o) {
 
 /* ------------------------------------------------------------------ roți dințate */
 /** roată dințată cu dinți trapezoidali (profil aproximativ), axa pe X; m = modulul [m], b = lățimea [m] */
-export function roataDintata(z, m, b, material, inel = false) {
-  const rp = (m * z) / 2, ra = rp + m, rf = rp - 1.25 * m, sh = new THREE.Shape();
-  const N = z, dA = (2 * Math.PI) / N;
-  for (let k = 0; k < N; k++) {
-    const a0 = k * dA, pts = [[rf, a0 - dA * 0.27], [ra, a0 - dA * 0.13], [ra, a0 + dA * 0.13], [rf, a0 + dA * 0.27], [rf, a0 + dA * 0.5]];
-    pts.forEach(([r, a], j) => { const x = r * Math.cos(a), y = r * Math.sin(a); if (k === 0 && j === 0) sh.moveTo(x, y); else sh.lineTo(x, y); });
-  }
-  if (inel) { // coroană cu dantură interioară: conturul exterior + găura cu dinți
-    const out = new THREE.Shape(); out.absarc(0, 0, ra + 3.5 * m, 0, Math.PI * 2, false);
-    const h = new THREE.Path(); const ri = rp - m, rr = rp + 1.25 * m;
-    for (let k = 0; k < N; k++) { const a0 = k * dA, pts = [[rr, a0 - dA * 0.27], [ri, a0 - dA * 0.13], [ri, a0 + dA * 0.13], [rr, a0 + dA * 0.27], [rr, a0 + dA * 0.5]];
-      pts.forEach(([r, a], j) => { const x = r * Math.cos(a), y = r * Math.sin(a); if (k === 0 && j === 0) h.moveTo(x, y); else h.lineTo(x, y); }); }
-    out.holes.push(h);
-    const g = new THREE.ExtrudeGeometry(out, { depth: b, bevelEnabled: false, curveSegments: 48 }); g.translate(0, 0, -b / 2); g.rotateY(Math.PI / 2);
-    const ms = new THREE.Mesh(g, material); ms.castShadow = true; return ms;
-  }
-  const hole = new THREE.Path(); hole.absarc(0, 0, Math.max(rf * 0.28, 0.004), 0, Math.PI * 2, true); sh.holes.push(hole);
-  const g = new THREE.ExtrudeGeometry(sh, { depth: b, bevelEnabled: false, curveSegments: 6 }); g.translate(0, 0, -b / 2); g.rotateY(Math.PI / 2);
+export function roataDintata(z, m, b, material, inel = false, beta = 0) {
+  const g = roata(z, m, { b, interior: inel, Rext: (m * z) / 2 + 4.5 * m, beta, spite: z > 40 && !inel ? 6 : 0 });
   const ms = new THREE.Mesh(g, material); ms.castShadow = true; return ms;
 }
 
@@ -161,11 +146,11 @@ export function reductorEV(z, mn) {
   for (let k = 0; k < 5; k++) { const n = new THREE.Mesh(ax(new THREE.TorusGeometry(0.13, 0.006, 6, 48)).rotateY(Math.PI / 2), mC); n.position.x = -0.2 + k * 0.04; G.add(n); }
   const capac = contur(new THREE.Mesh(ax(cil(0.1, 0.02, 48)), mC)); capac.position.x = -0.24; G.add(capac);
   // angrenajele (roșu), diferențialul (cyan), planetarele
-  const g1 = contur(roataDintata(z[0], mn[0], b1, mR), 40, 0.2); g1.position.x = x1; ax1.add(g1);
-  const g2 = contur(roataDintata(z[1], mn[0], b1, mR), 40, 0.2); g2.position.x = x1; ax2.add(g2);
+  const g1 = contur(roataDintata(z[0], mn[0], b1, mR, false, 0.35), 40, 0.2); g1.position.x = x1; ax1.add(g1);
+  const g2 = contur(roataDintata(z[1], mn[0], b1, mR, false, -0.35), 40, 0.2); g2.position.x = x1; ax2.add(g2);
   const arb2 = contur(new THREE.Mesh(ax(cil(0.015, 0.16)), mA)); arb2.position.x = 0.09; ax2.add(arb2);
-  const g3 = contur(roataDintata(z[2], mn[1], b2, mR), 40, 0.2); g3.position.x = x2; ax2.add(g3);
-  const g4 = contur(roataDintata(z[3], mn[1], b2, mR), 40, 0.2); g4.position.x = x2; ax3.add(g4);
+  const g3 = contur(roataDintata(z[2], mn[1], b2, mR, false, -0.3), 40, 0.2); g3.position.x = x2; ax2.add(g3);
+  const g4 = contur(roataDintata(z[3], mn[1], b2, mR, false, 0.3), 40, 0.2); g4.position.x = x2; ax3.add(g4);
   const dif = contur(new THREE.Mesh(new THREE.SphereGeometry(0.048, 32, 20), mD)); dif.scale.set(0.8, 1, 1); dif.position.x = x2 - 0.045; ax3.add(dif);
   const planL = contur(new THREE.Mesh(ax(cil(0.013, 0.4)), mD)); planL.position.x = x2 - 0.25; ax3.add(planL);
   const planR = contur(new THREE.Mesh(ax(cil(0.013, 0.2)), mD)); planR.position.x = x2 + 0.11; ax3.add(planR);

@@ -1716,6 +1716,9 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
   }
   const CICLU = [["stop", 6], ["pornire", 4], ["acc", 5], ["croaziera", 6], ["franare", 5], ["stop", 4]];
   function pas(dt, st) {
+    // comanda externă (aplicația de proiect PCMAI): regimul, viteza, turația, puterea și SOC vin din simularea proiectului
+    const ext = optiuni.extern ? optiuni.extern() : null;
+    if (ext) { st.ciclu = false; st.mas = null; if (ext.reg && ext.reg !== st.reg) { st.reg = ext.reg; st.tReg = 0; } }
     if (st.ciclu) { st.tc += dt; let t = st.tc, i = 0; while (i < CICLU.length && t > CICLU[i][1]) { t -= CICLU[i][1]; i++; } if (i >= CICLU.length) { st.tc = 0; i = 0; } const r = st.tip === "fh" || st.tip === "phev" ? (CICLU[i][0] === "pornire" ? "ev" : CICLU[i][0]) : CICLU[i][0]; if (r !== st.reg) { st.reg = r; st.tReg = 0; } }
     // măsurarea în curs
     if (st.mas && !st.mas.gata) { const m = st.mas; m.t += dt;
@@ -1733,6 +1736,7 @@ function construiesteHibrid({ caroserie, sasiu, roti, optiuni, ctxMotor }) {
     st.Pel += (st.PelT - st.Pel) * Math.min(1, dt / 0.3);
     { const f = Math.min(1, Math.abs(st.Pel) / Pmax), k = Math.min(1, dt / 3); TE.bat += (25 + 22 * f + (r === "priza" ? 8 : 0) - TE.bat) * k; TE.inv += (30 + 55 * f - TE.inv) * k; TE.mot += (32 + 85 * f - TE.mot) * k; TE.obc += ((r === "priza" ? 62 : 25) - TE.obc) * k; }
     const cap = { ss: 0.8, mh: 0.5, fh: 1.3, phev: 13, bev: 64 }[tip] * 3600; st.soc = Math.max(0.15, Math.min(0.97, st.soc - st.Pel * dt * 4 / cap));
+    if (ext) { st.v = ext.v; st.rpm = ext.rpm; st.Pel = ext.Pel; if (ext.soc != null) st.soc = ext.soc; }
     // animațiile: roțile, motorul, mașinile electrice, fluxurile
     roti.forEach(rr => { rr.rot.rotation.z -= st.v / CAR.Rroata * dt; });
     mot.actualizeaza({ rpm: st.rpm, tps: r === "acc" ? 40 : 10, tEv: st.rpm > 0 ? 380 : 60 }, dt);

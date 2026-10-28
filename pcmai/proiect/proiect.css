@@ -223,3 +223,8 @@
 .mod-scena .mod-vederi button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
 .mod-scena { background: #fff; }
 .mod-scena .mod-eticheta-prov { color: rgba(30, 41, 59, .55); }
+.mod-grila.cu-v3d { grid-template-columns: minmax(0, 2.1fr) minmax(240px, 1fr); }
+.mod-v3d [data-reg], .mod-v3d [data-h="ciclu"], .mod-v3d [data-tipb] { display: none; }
+.mod-v3d .v3d-scena { height: clamp(360px, 58vh, 600px); }
+.mod-v3d .v3d-grup input[type=checkbox], .mod-v3d .v3d-grup select { width: auto; }
+.mod-v3d .v3d-grup:first-child > .v3d-et { display: none; }

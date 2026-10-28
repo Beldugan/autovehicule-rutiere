@@ -4,6 +4,7 @@
 import { creeazaScena, grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii, V3 } from "./scena.js";
 import * as MC from "./multicorp.js";
 import { mecanismulMotor, reductorEV, planetar, linieArbori } from "./macheta3d.js";
+import { motorReal } from "./motor-real.js";
 
 const T3 = (s) => `<span class="mod-prov">${s}</span>`;
 const nr = (v, d = 2) => fx(v, d);
@@ -18,11 +19,12 @@ function dateMotor(ctx, sursa = "0D") {
     if (sursa === "0D" && X) { try { pa = X.pAlfa0D(r, X.model0D(r)); src = "modelul 0D Vibe–Woschni (cap. 12 al îndrumarului)"; } catch (e) { pa = null; } }
     if (!pa) { const xs = r.diagrama.map((q) => q.alfa), ys = r.diagrama.map((q) => q.p); pa = []; for (let a = 0; a <= 720; a++) pa.push([a, interp(xs, ys, a)]); src = "diagrama ciclului de calcul (cap. 8)"; }
     const mase = X ? X.MASE[d.tip] : { m_p: 0.4, m_b: 0.8 };
-    return { D: r.D_r / 1000, S: r.S_r / 1000, lam: d.lam, i: d.i_cil, tau: d.tau, n: d.n_P, P_ind: r.P_ind, pa, src, m_p: mase.m_p, m_b: mase.m_b, eticheta: `${d.tip} ${d.P_nom} kW la ${d.n_P} rot/min` };
+    return { D: r.D_r / 1000, S: r.S_r / 1000, lam: d.lam, i: d.i_cil, tau: d.tau, n: d.n_P, P_ind: r.P_ind, pa, src, m_p: mase.m_p, m_b: mase.m_b, eticheta: `${d.tip} ${d.P_nom} kW la ${d.n_P} rot/min`,
+      eps: d.eps, tip: d.tip, dist: { dsa: d.dsa, isa: d.isa, dse: d.dse, ise: d.ise } };
   }
   if (tip === "MOTO" && R.r) {
     const r = R.r, d = S.d, pa = R.pa.map((q) => [q[0], q[2]]);
-    return { D: r.D_cil / 1000, S: r.S_cil / 1000, lam: d.lam, i: 1, tau: d.tau, n: d.n_P, P_ind: null, pa, src: "diagrama indicată a motorului (cap. 5 al îndrumarului)", m_p: S.m.m_p, m_b: S.m.m_b, eticheta: `${d.tau}T, ${fx(r.V_h ? r.V_h * 1000 : Math.PI * r.D_cil ** 2 / 4 * r.S_cil / 1000, 0)} cm³` };
+    return { D: r.D_cil / 1000, S: r.S_cil / 1000, lam: d.lam, i: 1, tau: d.tau, n: d.n_P, P_ind: null, pa, src: "diagrama indicată a motorului (cap. 5 al îndrumarului)", m_p: S.m.m_p, m_b: S.m.m_b, eticheta: `${d.tau}T, ${fx(r.V_h ? r.V_h * 1000 : Math.PI * r.D_cil ** 2 / 4 * r.S_cil / 1000, 0)} cm³`, eps: d.eps || 10, tip: "MAS" };
   }
   return null;
 }
@@ -94,7 +96,7 @@ function studiuMecanism(corp, ctx, dm) {
     mt = MC.momentTotal(sim.alfa, sim.M, ord.dec, per);
     pMax = Math.max(...ys); Fmax = Math.max(...sim.Fg.map(Math.abs), ...sim.S.map(Math.abs));
     sc3.goleste(sc3.grup);
-    mec = mecanismulMotor({ D: g.D, S: d2.S, L: g.L, i: d2.i, man: ord.man, e: g.e }); sc3.grup.add(mec.G);
+    mec = motorReal({ D: g.D, S: d2.S, L: g.L, i: d2.i, man: ord.man, e: g.e, eps: d2.eps || 10, tip: d2.tip, tau: d2.tau, dist: d2.dist, dec: ord.dec }); sc3.grup.add(mec.G);
     const Lm = d2.i * mec.pas + g.L; sc3.incadreaza([Lm * 0.9, g.L * 1.6, Lm * 1.25], [0, g.L * 0.75, 0]);
     sc3.et = { Fg: sc3.eticheta(""), N: sc3.eticheta(""), T: sc3.eticheta("") };
     rezultate(p, d2);
@@ -169,7 +171,7 @@ function studiuReferinta(corp, ctx, varianta) {
   const z = zonaLucru(corp, comenziAnim("°", 360), `<p class="nota" style="grid-column:1/-1">Mișcarea impusă numai arborelui (ω = ${nr(om, 1)} rad/s); masele nu influențează cinematica unui mecanism rigid cu mișcare impusă. Se compară soluția multicorp exactă cu relațiile aproximative ale îndrumarului și cu relația geometrică exactă.</p>`), sc3 = z.sc3;
   const st = { alfa: 0, ruleaza: true }; const afis = legaAnim(z, st, 360);
   const geo = { R: R0.R, L: R0.L, e: 0, D: R0.D };
-  sc3.goleste(sc3.grup); const mec = mecanismulMotor({ D: R0.D, S: 2 * R0.R, L: R0.L, i: 1, man: [0] }); sc3.grup.add(mec.G);
+  sc3.goleste(sc3.grup); const mec = motorReal({ D: R0.D, S: 2 * R0.R, L: R0.L, i: 1, man: [0], eps: R0.eps || 10, tip: "MAS", tau: 4, dec: [0] }); sc3.grup.add(mec.G);
   Object.values(mec.sageti).forEach((s) => (s.visible = false));
   sc3.incadreaza([0.35, 0.22, 0.42], [0, R0.L * 0.8, 0]);
   const et = sc3.eticheta("");

@@ -6,6 +6,10 @@ import * as SI from "./sistem.js";
 import { schemaFlux, cilindruArdere } from "./flux3d.js";
 import { creeazaUI } from "./ui.js";
 
+/** regimul pentru autovehiculul 3D: stop / pornire / acc / croaziera / franare / ev */
+function regim(v, dv, Pw, termic, hib) { if (v < 0.3 && Math.abs(Pw) < 0.3) return "stop"; if (Pw < -0.3) return "franare"; if (hib && !termic) return "ev"; return dv > 0.02 ? (v < 4 ? "pornire" : "acc") : "croaziera"; }
+const tipV3D = (arh, tipH) => (arh === "PS" ? "fh" : arh === "P0" ? "mh" : arh === "BEV" || arh === "LCV" ? "bev" : "phev");
+const PRINC = new Set(["bat", "em", "ice", "gen", "mg1", "roti"]);
 const U = creeazaUI("vizualizare a simulării interne");
 const nr = (v, d = 2) => fx(v, d);
 const yl = (arrs, cu0 = true) => { const l = lim(arrs.flat(), cu0); return { ymin: l[0], ymax: l[1] }; };
@@ -31,7 +35,7 @@ function studiuCiclu0D(corp, ctx) {
     Z = X.model0D(r, vp, o); Z2 = X.model0D(r, vp, Object.assign({}, o, { pas: p.pas / 2 })); mot = X.model0D(r, vp, Object.assign({}, o, { eta_c: 1e-9 }));
     pa = X.pAlfa0D(r, Z);
     Tmn = Math.min(...Z.arr.map((q) => q.T)); Tmx = Z.T_max;
-    U.SC.goleste(U.SC.grup); cil = cilindruArdere({ D: r.D_r / 1000, S: r.S_r / 1000, L: r.S_r / 2 / D.lam / 1000, eps: D.eps, tip: D.tip }); U.SC.grup.add(cil.G); sc3.incadreaza([0.3, 0.12, 0.3], [0, 0, 0]);
+    U.SC.goleste(U.SC.grup); cil = cilindruArdere({ D: r.D_r / 1000, S: r.S_r / 1000, L: r.S_r / 2 / D.lam / 1000, eps: D.eps, tip: D.tip }); U.SC.grup.add(cil.G); sc3.vedere("sect", [0, 0, -1]); sc3.incadreaza([0.3, 0.12, 0.5], [0, 0, 0]);
     U.SC.legenda("Temperatura gazelor", Tmn, Tmx, "K", (v) => nr(v, 0));
     const dW = Math.abs(Z.W_hp - Z2.W_hp) / Math.abs(Z2.W_hp) * 100, pcMot = mot.arr.reduce((a, q) => (Math.abs(q.phi) < Math.abs(a.phi) ? q : a)).p;
     z.rez.innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Mărime</th><th class="num">Model 0D</th><th class="num">Ciclul de calcul</th><th>Unitate</th></tr></thead><tbody>
@@ -149,10 +153,10 @@ function studiuRedare(corp, ctx) {
   const sp = seriiProiect(ctx);
   if (!sp) { corp.innerHTML = `<div class="mod-incomplet">Simularea capitolului 5 nu este disponibilă.</div>`; return null; }
   const H = sp.hist, N = H.length, hib = sp.arh === "P2" || sp.arh === "S" || sp.arh === "PS";
-  const z = U.zonaLucru(corp, "", `<p class="nota" style="grid-column:1/-1">Redarea simulării ${sp.titlu}, calculată de motorul de calcul al îndrumarului (model cvasistatic, pas de 1 s). Particulele arată sensul și mărimea puterii pe fiecare legătură: albastru – electric, portocaliu – mecanic, verde – recuperare${hib ? ", chihlimbar – combustibil" : ""}.</p>`), sc3 = z.sc3;
-  const st = U.redare(z, N, (k) => `${H[k].t.toFixed(0)} s`, 10);
-  const fl = schemaFlux(sp.arh); U.SC.grup.add(fl.G); sc3.incadreaza([3, 2.6, 4], [0, 0.4, 0]);
-  const et = {}; Object.entries(fl.N).forEach(([k, n]) => { et[k] = U.SC.eticheta(n.et); });
+  const z = U.zonaLucru(corp, "", `<p class="nota" style="grid-column:1/-1">Redarea simulării ${sp.titlu}, calculată de motorul de calcul al îndrumarului (model cvasistatic, pas de 1 s), pe autovehiculul 3D al laboratoarelor: viteza, turația motorului termic, puterea bateriei, SOC și fluxurile de energie urmează rezultatele proiectului secundă cu secundă.</p>`, "v3d");
+  const st = U.redare(z, N, (k) => `${H[k].t.toFixed(0)} s`, 5);
+  const kc = () => H[Math.floor(st.k)], kp = () => H[Math.max(0, Math.floor(st.k) - 1)];
+  U.vehicul(z.v3d, tipV3D(sp.arh), () => { const q = kc(), p = kp(); return { v: q.v / 3.6, rpm: hib ? (q.Pice > 0.3 ? Math.max(900, q.nI || 0) : 0) : 0, Pel: q.Pb, soc: q.soc, reg: regim(q.v / 3.6, (q.v - p.v) / 3.6, q.Pw, hib && q.Pice > 0.3, hib) }; });
   const G1 = grafic(z.graf, "Viteza vehiculului"), G2 = grafic(z.graf, hib ? "Puterile: la roată, termic, baterie" : "Puterile: la roată, motor, baterie"), G3 = grafic(z.graf, "Starea de încărcare a bateriei (SOC)");
   const t = H.map((q) => q.t), Ns = Math.max(1, Math.floor(N / 900));
   const tr = (k) => rar(H, Ns).map(k);
@@ -169,10 +173,7 @@ function studiuRedare(corp, ctx) {
   return {
     pas(dt) {
       if (st.ruleaza) st.k = (st.k + dt * st.viteza) % (N - 1);
-      const k = Math.floor(st.k), q = H[k], P = puteriFlux(sp.arh, q); fl.seteaza(P); fl.anim(dt, st.ruleaza ? q.v / 3.6 * Math.min(1, st.viteza / 5) : 0);
-      const val = { bat: q.Pb, inv: q.Pb, em: hib ? q.P2 : q.Pem, red: q.Pw, roti: q.Pw, ice: q.Pice, rez: (q.f || 0) * 43.5, gen: q.P1, mg1: q.P1, pl: q.Pice, k0: q.Pice };
-      Object.entries(fl.N).forEach(([kk, n]) => { const e = et[kk]; e.pune(n.p.clone().add(V3(0, (n.h || 0.2) / 2 + 0.08, 0))); const v = val[kk]; e.text(`${n.et}${v != null && Number.isFinite(v) ? ` <b>${nr(v, 1)} kW</b>` : ""}`); });
-      U.SC.hud(`t = <b>${q.t.toFixed(0)} s</b> · v = <b>${nr(q.v, 1)} km/h</b> · SOC = <b>${nr(q.soc * 100, 1)} %</b>${q.Tb != null ? ` · T<sub>bat</sub> = <b>${nr(q.Tb, 1)} °C</b>` : ""}`);
+      const k = Math.floor(st.k);
       st.afis(); tg += dt; if (tg > 0.25 && k !== kAnt) { tg = 0; kAnt = k; desen(); }
     },
     raport() { return z.rez.innerHTML + z.ver.innerHTML; }
@@ -194,9 +195,10 @@ function studiuDinamic(corp, ctx, referinta) {
   const par = `${U.camp("m", "masa", d0.m, 10, "kg")}${U.camp("Crr", "rezistența la rulare C<sub>rr</sub>", d0.Crr, 0.001)}${U.camp("CdA", "C<sub>x</sub>·A", d0.CdA, 0.01, "m²")}${U.camp("eta_tr", "η baterie → roată", d0.eta_tr, 0.01)}${U.camp("eta_reg", "η roată → baterie", d0.eta_reg, 0.01)}
     ${U.camp("aux", "auxiliari", d0.aux / 1e3, 0.1, "kW")}${U.camp("i", "raportul de transmitere", d0.i, 0.1)}${U.camp("T_em", "cuplul maxim EM", d0.T_em, 5, "N·m")}${U.camp("P_em", "puterea maximă EM", d0.P_em / 1e3, 1, "kW")}
     ${U.alege("cic", "ciclul", [["120", "ciclul didactic de 120 s"], ...(window.WLTC3B && !moto ? [["wltc", "WLTC clasa 3b"]] : [])], "120")}${U.bifa("rez", "baterie U<sub>oc</sub>–R<sub>int</sub>", !!referinta && !moto)}${U.bifa("reg", "recuperare activă", true)}`;
-  const z = U.zonaLucru(corp, "", par), sc3 = z.sc3;
-  const fl = schemaFlux(arh); U.SC.grup.add(fl.G); sc3.incadreaza(moto ? [1.6, 1.2, 2.2] : [3, 2.6, 4], [0, 0.4, 0]);
-  const et = {}; Object.entries(fl.N).forEach(([k, n]) => { et[k] = U.SC.eticheta(n.et); });
+  const z = U.zonaLucru(corp, "", par, moto ? false : "v3d"), sc3 = z.sc3;
+  let fl = null; const et = {};
+  if (moto) { fl = schemaFlux(arh); U.SC.grup.add(fl.G); sc3.vedere("transp"); sc3.incadreaza([1.6, 1.2, 2.2], [0, 0.4, 0]); Object.entries(fl.N).forEach(([k, n]) => { if (PRINC.has(k)) et[k] = U.SC.eticheta(n.et); }); }
+  else U.vehicul(z.v3d, "bev", () => { if (!s || !st) return null; const k = Math.floor(st.k), H = s.H, kp = Math.max(0, k - 1); return { v: H.v[k] / 3.6, rpm: 0, Pel: H.Pb[k], soc: H.soc[k], reg: regim(H.v[k] / 3.6, (H.v[k] - H.v[kp]) / 3.6, H.T[k] * H.v[k], false, false) }; });
   const G1 = grafic(z.graf, "Viteza cerută și realizată (conducător PI cu anticipare)"), G2 = grafic(z.graf, "Puterea bateriei și cuplul motorului"), G3 = grafic(z.graf, "SOC, curentul și tensiunea bateriei");
   let st = null, s = null, s2 = null, cyc = null, d = null;
   function calc() {
@@ -235,10 +237,10 @@ function studiuDinamic(corp, ctx, referinta) {
     pas(dt) {
       if (st.ruleaza) st.k = (st.k + dt * st.viteza / cyc.dt) % (cyc.t.length - 1);
       const k = Math.floor(st.k), H = s.H, Pw = (H.T[k] * d.i / d.Rw) * H.v[k] / 3.6 / 1e3;
-      fl.seteaza({ Pb: H.Pb[k], Pem: H.T[k] * H.n[k] * Math.PI / 30 / 1e3, Pw }); fl.anim(dt, st.ruleaza ? H.v[k] / 3.6 * Math.min(1, st.viteza / 5) : 0);
+      if (fl) { fl.seteaza({ Pb: H.Pb[k], Pem: H.T[k] * H.n[k] * Math.PI / 30 / 1e3, Pw }); fl.anim(dt, st.ruleaza ? H.v[k] / 3.6 * Math.min(1, st.viteza / 5) : 0); }
       const val = { bat: H.Pb[k], inv: H.Pb[k], em: H.T[k] * H.n[k] * Math.PI / 30 / 1e3, red: Pw, roti: Pw };
-      Object.entries(fl.N).forEach(([kk, n]) => { et[kk].pune(n.p.clone().add(V3(0, (n.h || 0.2) / 2 + 0.08, 0))); et[kk].text(`${n.et}${val[kk] != null ? ` <b>${nr(val[kk], 1)} kW</b>` : ""}`); });
-      U.SC.hud(`t = <b>${cyc.t[k].toFixed(1)} s</b> · v = <b>${nr(H.v[k], 1)}</b> / ${nr(H.vr[k], 1)} km/h · M<sub>EM</sub> = <b>${nr(H.T[k], 0)} N·m</b> · n = <b>${nr(H.n[k], 0)} rot/min</b><br>SOC = <b>${nr(H.soc[k] * 100, 2)} %</b>${H.I[k] ? ` · I = <b>${nr(H.I[k], 1)} A</b> · U = <b>${nr(H.U[k], 1)} V</b>` : ""}${H.Fbr[k] > 1 ? " · frâna mecanică activă" : ""}`);
+      if (fl) Object.entries(fl.N).forEach(([kk, n]) => { if (!et[kk]) return; et[kk].pune(n.p.clone().add(V3(0, (n.h || 0.2) / 2 + 0.08, 0))); et[kk].text(`${n.et}${val[kk] != null ? ` <b>${nr(val[kk], 1)} kW</b>` : ""}`); });
+      if (fl) U.SC.hud(`t = <b>${cyc.t[k].toFixed(1)} s</b> · v = <b>${nr(H.v[k], 1)}</b> / ${nr(H.vr[k], 1)} km/h · M<sub>EM</sub> = <b>${nr(H.T[k], 0)} N·m</b> · n = <b>${nr(H.n[k], 0)} rot/min</b><br>SOC = <b>${nr(H.soc[k] * 100, 2)} %</b>${H.I[k] ? ` · I = <b>${nr(H.I[k], 1)} A</b> · U = <b>${nr(H.U[k], 1)} V</b>` : ""}${H.Fbr[k] > 1 ? " · frâna mecanică activă" : ""}`);
       st.afis(); tg += dt; if (tg > 0.25) { tg = 0; desen(); }
     },
     raport() { return z.rez.innerHTML + z.ver.innerHTML; }
@@ -270,14 +272,13 @@ function extraMotoE() {
 function studiuHibrid(corp, ctx) {
   const arhP = ctx.S && ctx.S.hib ? ctx.S.hib.arch : "P2", tipP = ctx.S && ctx.S.hib ? ctx.S.hib.tip : "HEV";
   const implicit = tipP === "PHEV" ? "PHEV" : arhP;
-  const z = U.zonaLucru(corp, "", `${U.alege("arh", "arhitectura", [["P0", "Mild hybrid 48 V – P0"], ["P2", "Full hybrid paralel P2"], ["S", "Hibrid serie"], ["PS", "Serie-paralel (planetar)"], ["PHEV", "Plug-in P2 (CD → CS)"]], implicit)}${U.camp("rep", "repetări ale ciclului", implicit === "S" ? 30 : 1, 1)}${U.camp("soc0", "SOC inițial", "", 0.01)}`), sc3 = z.sc3;
+  const z = U.zonaLucru(corp, "", `${U.alege("arh", "arhitectura", [["P0", "Mild hybrid 48 V – P0"], ["P2", "Full hybrid paralel P2"], ["S", "Hibrid serie"], ["PS", "Serie-paralel (planetar)"], ["PHEV", "Plug-in P2 (CD → CS)"]], implicit)}${U.camp("rep", "repetări ale ciclului", implicit === "S" ? 30 : 1, 1)}${U.camp("soc0", "SOC inițial", "", 0.01)}`, "v3d");
   const Gv = grafic(z.graf, "Viteza și modul de funcționare"), Gp = grafic(z.graf, "Puterile termicului, ale mașinii electrice și ale bateriei"), Gs = grafic(z.graf, "Starea de încărcare a bateriei");
-  let st = null, fl = null, et = {}, R = null, arh = null, cyc = null, ser = null;
+  let st = null, fl = null, et = {}, R = null, arh = null, cyc = null, ser = null, arhV = null;
   function calc() {
     const p = U.citeste(z.par); arh = p.arh;
-    U.SC.goleste(U.SC.grup); et = {};
-    fl = schemaFlux(arh === "PHEV" ? "PHEV" : arh); U.SC.grup.add(fl.G); sc3.incadreaza([3, 2.6, 4], [0, 0.4, 0]);
-    Object.entries(fl.N).forEach(([k, n]) => { et[k] = U.SC.eticheta(n.et); });
+    if (arh !== arhV) { arhV = arh; U.vehicul(z.v3d, tipV3D(arh === "PHEV" ? "P2" : arh), () => { if (!ser || !st) return null; const k = Math.floor(st.k), kp = Math.max(0, k - 1), v = (ser.v[k] || 0) / 3.6, dv = ((ser.v[k] || 0) - (ser.v[kp] || 0)) / 3.6, Pw = (ser.Pice[k] || 0) + (ser.Pem[k] || 0);
+      return { v, rpm: ser.n ? ser.n[k] : ser.Pice[k] > 0.3 ? 1100 + 45 * ser.Pice[k] : 0, Pel: ser.Pb[k], soc: ser.soc[k], reg: regim(v, dv, Pw, ser.Pice[k] > 0.3, true) }; }); }
     const D = SI.DATE[arh], o = Number.isFinite(p.soc0) ? { soc0: p.soc0 } : {};
     let ver = [], extra = "";
     if (arh === "PHEV") {
@@ -295,7 +296,7 @@ function studiuHibrid(corp, ctx) {
     } else {
       cyc = SI.ciclu(arh === "S" ? 0.5 : 0.1, undefined, Math.max(1, Math.round(p.rep)));
       R = arh === "P0" ? SI.simMHEV(D, cyc) : arh === "P2" ? SI.simP2(D, cyc, o) : arh === "S" ? SI.simSerie(D, cyc, o) : SI.simPS(D, cyc, o);
-      const H = R.H; ser = { t: cyc.t, v: H.v, Pice: H.Pice, Pem: arh === "PS" ? H.P2 : arh === "S" ? H.Pem : H.Pem, P1: H.P1 || H.Pgen, Pb: H.Pb, soc: H.soc, mod: H.mod || H.on.map((x) => (x ? "grup pornit" : "grup oprit")) };
+      const H = R.H; ser = { t: cyc.t, v: H.v, Pice: H.Pice, Pem: arh === "PS" ? H.P2 : arh === "S" ? H.Pem : H.Pem, P1: H.P1 || H.Pgen, Pb: H.Pb, soc: H.soc, mod: H.mod || H.on.map((x) => (x ? "grup pornit" : "grup oprit")), n: H.n || H.nc || (H.on ? H.on.map((x) => (x ? 2500 : 0)) : null) };
       const R2 = arh === "P0" ? SI.simMHEV(D, SI.ciclu(0.05)) : arh === "P2" ? SI.simP2(D, SI.ciclu(0.05), o) : arh === "PS" ? SI.simPS(D, SI.ciclu(0.05), o) : null;
       const R1 = arh === "P0" ? SI.simMHEV(D, SI.ciclu(0.1)) : arh === "P2" ? SI.simP2(D, SI.ciclu(0.1), o) : arh === "PS" ? SI.simPS(D, SI.ciclu(0.1), o) : null;
       const dF = R2 ? Math.abs(R1.fuel_kg - R2.fuel_kg) / Math.max(1e-12, R2.fuel_kg) * 100 : null;
@@ -338,10 +339,9 @@ function studiuHibrid(corp, ctx) {
         : arh === "S" ? { Pf, Pice: ser.Pice[k], Pgen: ser.P1[k], Pb: ser.Pb[k], Pem: ser.Pem[k], Pw: ser.Pem[k] * 0.85 }
         : arh === "PS" ? { Pf, Pice: ser.Pice[k], P1m: -ser.P1[k], P1e: -ser.P1[k], Pring: ser.Pice[k] * 0.72, P2e: ser.Pem[k], Pb: ser.Pb[k], Pw: ser.Pem[k] + ser.Pice[k] * 0.72 }
         : { Pf, Pice: ser.Pice[k], Pem: ser.Pem[k], Pax: ser.Pice[k] + ser.Pem[k], Pw: (ser.Pice[k] + ser.Pem[k]) * 0.95, Pb: ser.Pb[k] };
-      fl.seteaza(P); fl.anim(dt, st.ruleaza ? v / 3.6 * Math.min(1, st.viteza / 5) : 0);
+      void P;
       const val = { bat: ser.Pb[k], inv: ser.Pb[k], em: ser.Pem[k], ice: ser.Pice[k], rez: Pf, gen: ser.P1 ? ser.P1[k] : null, mg1: ser.P1 ? ser.P1[k] : null, roti: P.Pw, red: P.Pw };
-      Object.entries(fl.N).forEach(([kk, n]) => { et[kk].pune(n.p.clone().add(V3(0, (n.h || 0.2) / 2 + 0.08, 0))); et[kk].text(`${n.et}${val[kk] != null && Number.isFinite(val[kk]) ? ` <b>${nr(val[kk], 1)} kW</b>` : ""}`); });
-      U.SC.hud(`t = <b>${(ser.t[k] || 0).toFixed(1)} s</b>${ser.v[k] != null ? ` · v = <b>${nr(v, 1)} km/h</b>` : ""} · SOC = <b>${nr(ser.soc[k] * 100, 2)} %</b><br>mod: <b>${ser.mod[k] || "–"}</b>`);
+      void val;
       st.afis(); tg += dt; if (tg > 0.3) { tg = 0; desen(); }
     },
     raport() { return z.rez.innerHTML + z.ver.innerHTML; }
@@ -352,7 +352,7 @@ function studiuHibrid(corp, ctx) {
 function studiuMotoTransmisie(corp, ctx) {
   const R = ctx.R, S = ctx.S, d = S.d;
   const z = U.zonaLucru(corp, "", `${U.camp("n", "turația motorului", 6000, 100, "rot/min")}${U.camp("ip", "raportul primar", 3, 0.05)}${U.camp("ig", "raportul treptei", 1, 0.05)}${U.camp("i0", "transmisia finală", 3, 0.05)}${U.camp("rw", "raza dinamică a roții", 0.3, 0.005, "m")}`), sc3 = z.sc3;
-  const fl = schemaFlux("MOTO_T"); U.SC.grup.add(fl.G); sc3.incadreaza([1.6, 1.1, 2.2], [0, 0.4, 0]); const et = {}; Object.entries(fl.N).forEach(([k, n]) => { et[k] = U.SC.eticheta(n.et); });
+  const fl = schemaFlux("MOTO_T"); U.SC.grup.add(fl.G); sc3.incadreaza([1.6, 1.1, 2.2], [0, 0.4, 0]); const et = {}; Object.entries(fl.N).forEach(([k, n]) => { if (PRINC.has(k)) et[k] = U.SC.eticheta(n.et); });
   const G = grafic(z.graf, "Viteza în fiecare treaptă a motocicletei proiectate în funcție de turație");
   let r = null;
   function calc() {
@@ -367,7 +367,7 @@ function studiuMotoTransmisie(corp, ctx) {
   }
   z.par.addEventListener("change", calc); calc();
   return { pas(dt) { const p = U.citeste(z.par), P = (R.car && R.car.M_max ? R.car.M_max : 40) * p.n * Math.PI / 30 / 1e3 * 0.6; fl.seteaza({ Pf: P / 0.3, Pice: P, Pw: P * 0.92 }); fl.anim(dt, r.v / 3.6);
-      Object.entries(fl.N).forEach(([kk, n]) => { et[kk].pune(n.p.clone().add(V3(0, (n.h || 0.2) / 2 + 0.06, 0))); }); et.roti.text(`roata <b>${nr(r.nr, 0)} rot/min</b> · <b>${nr(r.v, 1)} km/h</b>`); U.SC.hud(`n = <b>${p.n} rot/min</b> · i = <b>${nr(r.it, 2)}</b>`); },
+      Object.entries(fl.N).forEach(([kk, n]) => { if (!et[kk]) return; et[kk].pune(n.p.clone().add(V3(0, (n.h || 0.2) / 2 + 0.06, 0))); }); et.roti.text(`roata <b>${nr(r.nr, 0)} rot/min</b> · <b>${nr(r.v, 1)} km/h</b>`); U.SC.hud(`n = <b>${p.n} rot/min</b> · i = <b>${nr(r.it, 2)}</b>`); },
     raport() { return z.rez.innerHTML + z.ver.innerHTML; } };
 }
 
@@ -391,12 +391,12 @@ export default {
       const f = { "0d": (k) => studiuCiclu0D(k, c), n: (k) => studiuTuratie(k, c), soi: (k) => studiuSOI(k, c), red: (k) => studiuRedare(k, c), din: (k) => studiuDinamic(k, c),
         ref: (k) => studiuDinamic(k, c, { d: SI.DATE.BEV, extra: extraBEV }), hib: (k) => studiuHibrid(k, c), tr: (k) => studiuMotoTransmisie(k, c),
         me: (k) => studiuDinamic(k, c, { d: SI.DATE.MOTO_E, moto: true, extra: extraMotoE }) };
-      try { U.studiu = f[id](sk.corp); shell.stareModul("S", "ok", "calculat"); }
+      try { U.studiu = f[id](sk.corp); if (U.studiu) U.studiu.gazda = sk.corp; shell.stareModul("S", "ok", "calculat"); }
       catch (e) { console.error(e); sk.corp.insertAdjacentHTML("beforeend", `<div class="alerta">Studiul nu s-a putut calcula: ${e.message}</div>`); shell.stareModul("S", "inv", "eroare de calcul"); }
     }
     const lista = listaStudii(c);
     comutatorStudii(sk.studii, lista, porneste, lista[0].id); porneste(lista[0].id);
-    return { actualizeaza(n) { c = n; porneste(id0); }, arata(b) { if (U.SC) U.SC.activ(b); } };
+    return { actualizeaza(n) { c = n; porneste(id0); }, arata(b) { U.activ = b; if (U.SC) U.SC.activ(b); } };
   },
   raport(ctx) {
     const t = ctx.tip, R = ctx.R;
