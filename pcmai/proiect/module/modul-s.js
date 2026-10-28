@@ -4,7 +4,7 @@
 import { grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii, V3, turboColor } from "./scena.js";
 import * as SI from "./sistem.js";
 import { schemaFlux } from "./flux3d.js";
-import { cilindruReal } from "./cilindru-real.js?v=5";
+import { cilindruReal } from "./cilindru-real.js?v=8";
 import { creeazaUI } from "./ui.js";
 
 /** regimul pentru autovehiculul 3D: stop / pornire / acc / croaziera / franare / ev */

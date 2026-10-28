@@ -143,7 +143,7 @@ export function cilindruReal(o) {
   const gm = new THREE.MeshStandardMaterial({ color: 0x3366ff, transparent: true, opacity: 0.6, roughness: 0.4, depthWrite: false, side: THREE.DoubleSide, emissive: 0x000000 });
   const gaz = new THREE.Mesh(gG, gm); gaz.renderOrder = 1; fara(gaz); G.add(gaz);
   const planCrown = new THREE.Plane(V3(0, 1, 0), 0);
-  const flM = new THREE.MeshStandardMaterial({ color: 0xffb04a, emissive: 0xff6a00, emissiveIntensity: 1.5, transparent: true, opacity: 0.6, depthWrite: false, clippingPlanes: [planCrown] });
+  const flM = new THREE.MeshStandardMaterial({ color: 0xffb04a, emissive: 0xff6a00, emissiveIntensity: 1.5, transparent: true, opacity: 0.6, depthWrite: false, clippingPlanes: [planCrown, new THREE.Plane(V3(0, -1, 0), yApex + 0.002 * D)] });   // flacăra rămâne între piston și chiulasă
   const gFl = new THREE.SphereGeometry(1, 64, 40), bazaFl = Float32Array.from(gFl.attributes.position.array), zgomot = new Float32Array(gFl.attributes.position.count);
   for (let k = 0; k < zgomot.length; k++) { const x = bazaFl[3 * k], y = bazaFl[3 * k + 1], z = bazaFl[3 * k + 2];   // frontul încrețit de turbulență: sumă de armonici pe direcții
     zgomot[k] = 0.5 * Math.sin(7 * x + 3 * y) * Math.cos(6 * z - 2 * y) + 0.3 * Math.sin(13 * y + 11 * z) * Math.cos(9 * x) + 0.2 * Math.sin(23 * x - 17 * z + 5 * y); }
@@ -155,8 +155,38 @@ export function cilindruReal(o) {
   const flux = (drumuri, cul) => { const n = 260, g = new THREE.BufferGeometry(), P = new Float32Array(n * 3), curbe = drumuri.map((d) => new THREE.CatmullRomCurve3(d.slice().reverse())), s = Float32Array.from({ length: n }, () => Math.random());
     g.setAttribute("position", new THREE.BufferAttribute(P, 3)); const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: cul, size: 0.035 * D, transparent: true, opacity: 0.9, depthWrite: false })); fara(pts); pts.frustumCulled = false; G.add(pts);
     const off = Array.from({ length: n }, () => V3((Math.random() - 0.5) * 0.18 * D, (Math.random() - 0.5) * 0.18 * D, (Math.random() - 0.5) * 0.18 * D));
-    return (v, dt, intrare) => { pts.visible = v > 0.02; if (!pts.visible) return; for (let k = 0; k < n; k++) { s[k] = (s[k] + dt * v * 1.6) % 1; const c = curbe[k % curbe.length], t = intrare ? s[k] : 1 - s[k], q = c.getPoint(t); P[3 * k] = q.x + off[k].x; P[3 * k + 1] = q.y + off[k].y; P[3 * k + 2] = q.z + off[k].z; } g.attributes.position.needsUpdate = true; }; };
-  const fluxA = flux(drumA, 0x3aa0ff), fluxE = flux(drumE, 0xff8a3a);
+    const fn = (v, dt, intrare) => { pts.visible = v > 0.02; if (!pts.visible) return; for (let k = 0; k < n; k++) { s[k] = (s[k] + dt * v * 1.6) % 1; const c = curbe[k % curbe.length], t = intrare ? s[k] : 1 - s[k], q = c.getPoint(t); P[3 * k] = q.x + off[k].x; P[3 * k + 1] = q.y + off[k].y; P[3 * k + 2] = q.z + off[k].z; } g.attributes.position.needsUpdate = true; }; fn.pts = pts; return fn; };
+  const fluxA = flux(drumA, 0x3aa0ff), fluxE = flux(drumE, 0xff8a3a), fluxC = flux(drumA, 0xffb020);
+  /* combustibilul: particule de lichid / vapori (MAC – în jeturi; MAS – amestec omogen în cilindru), consumate odată cu arderea;
+     injectorul din canal la MAS (jetul spre talerele supapelor de admisie) */
+  const NFC = 1600, gC = new THREE.BufferGeometry(), PC = new Float32Array(NFC * 3), CC = new Float32Array(NFC * 3), sF = new Float32Array(NFC), lF = [], uF = new Float32Array(NFC), vF = new Float32Array(NFC);
+  for (let k = 0; k < NFC; k++) { sF[k] = Math.pow(Math.random(), 0.7); const r = Math.sqrt(Math.random()), f = Math.random() * Math.PI * 2; lF.push([r * Math.cos(f), r * Math.sin(f)]); uF[k] = Math.random(); vF[k] = Math.random(); }
+  gC.setAttribute("position", new THREE.BufferAttribute(PC, 3)); gC.setAttribute("color", new THREE.BufferAttribute(CC, 3));
+  const comb = new THREE.Points(gC, new THREE.PointsMaterial({ size: 0.028 * D, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false })); comb.frustumCulled = false; fara(comb); G.add(comb);
+  const injP = new THREE.Group(); if (!mac) { const pa = drumA[0][2], pb = V3(0, yRoof(zvA) + 0.05 * D, zvA);
+    const corpI = C(new THREE.Mesh(new THREE.CylinderGeometry(0.05 * D, 0.05 * D, 0.45 * D, 16), matCAE(0x26292d))); const dirI = pb.clone().sub(pa).normalize(); corpI.quaternion.setFromUnitVectors(V3(0, 1, 0), dirI.clone().negate()); corpI.position.copy(pa).addScaledVector(dirI, -0.22 * D); injP.add(corpI);
+    const con = new THREE.Mesh(new THREE.ConeGeometry(0.16 * D, 1, 20, 1, true), new THREE.MeshStandardMaterial({ color: 0xe0a100, emissive: 0xb06a00, emissiveIntensity: 0.5, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+    con.userData.dir = dirI; con.userData.p0 = pa.clone(); con.userData.L = pa.distanceTo(pb); injP.userData.con = con; injP.add(con); fara(injP); G.add(injP); }
+  const cul3 = (o_, k, r, g_, b) => { o_[3 * k] = r; o_[3 * k + 1] = g_; o_[3 * k + 2] = b; };
+  function combustibil(c, yCr, culoare) {
+    if (!c) { comb.visible = false; if (injP.userData.con) injP.userData.con.visible = false; return; } comb.visible = true;
+    const Pt = PC, Cc = CC, nInj = Math.round(c.fInj * NFC), nArs = Math.round(Math.min(c.xb, c.fInj) * NFC);
+    if (mac) { const dirs = Array.from({ length: 7 }, (_, j) => { const u = (j / 7) * Math.PI * 2; return V3(Math.cos(u), -0.5, Math.sin(u)).normalize(); });
+      const S = Math.max(0.02 * D, c.S || 0), tg = Math.tan(((c.teta || 20) * RAD) / 2);
+      for (let k = 0; k < NFC; k++) { if (k >= nInj || k < nArs) { Pt[3 * k + 1] = -1e3; continue; }
+        const d_ = dirs[k % 7], e1 = V3(-d_.z, 0, d_.x).normalize(), e2 = d_.clone().cross(e1), s_ = sF[k] * S * (k / Math.max(1, nInj) * 0.3 + 0.7), lat = s_ * tg;
+        const p_ = V3(0, yVarf, 0).addScaledVector(d_, s_).addScaledVector(e1, lF[k][0] * lat).addScaledVector(e2, lF[k][1] * lat); if (p_.y < yCr + 0.005 * D) p_.y = yCr + 0.005 * D;
+        Pt[3 * k] = p_.x; Pt[3 * k + 1] = p_.y; Pt[3 * k + 2] = p_.z;
+        const lichid = sF[k] < 0.35 && c.fVap < 0.999 && k > c.fVap * NFC * 0.9, arde = c.xb > 0.002 && k < nArs + NFC * 0.08;
+        if (arde) cul3(Cc, k, 1, 0.42, 0.08); else if (lichid) cul3(Cc, k, 0.55, 0.32, 0.02); else cul3(Cc, k, 1, 0.86, 0.35); } }
+    else { const rf = c.rf ?? 0;
+      for (let k = 0; k < NFC; k++) { if (k >= nInj) { Pt[3 * k + 1] = -1e3; continue; }
+        const x = lF[k][0] * 0.47 * D, z_ = lF[k][1] * 0.47 * D, yT = yRoof(z_) - 0.01 * D, y = yCr + 0.01 * D + vF[k] * Math.max(0, yT - yCr - 0.02 * D);
+        const dF = Math.hypot(x, y - yVarf, z_); if ((rf > 0 && dF < rf) || (c.xb > 0.98)) { Pt[3 * k + 1] = -1e3; continue; }
+        Pt[3 * k] = x; Pt[3 * k + 1] = y; Pt[3 * k + 2] = z_; const marg = rf > 0 && dF < rf * 1.12; if (marg) cul3(Cc, k, 1, 0.45, 0.1); else cul3(Cc, k, 1, 0.82, 0.3); }
+      const con = injP.userData.con; if (con) { con.visible = !!c.injPort; if (c.injPort) { const L_ = con.userData.L * Math.min(1, c.injPort); con.scale.set(1, L_, 1); con.quaternion.setFromUnitVectors(V3(0, 1, 0), con.userData.dir.clone().negate()); con.position.copy(con.userData.p0).addScaledVector(con.userData.dir, L_ / 2); } } }
+    gC.attributes.position.needsUpdate = true; gC.attributes.color.needsUpdate = true;
+  }
   const col = new THREE.Color(); let tP = 0;
 
   return {
@@ -177,19 +207,24 @@ export function cilindruReal(o) {
       culoare(Math.max(0, Math.min(1, (T - Tmin) / (Tmax - Tmin))), col); gm.color.copy(col); gm.emissive.copy(col).multiplyScalar(0.35);
       planCrown.constant = -yCr;
       // frontul flăcării: volumul ars ≈ x_b·V (sferă din bujie, limitată de alezaj); la MAC: jeturile și flacăra difuzivă în camera din piston
-      const V = Ap * (yDeck - yCr) + Vc - vBol, rf = Math.cbrt(Math.max(0, Math.min(1, xb)) * V * 3 / (2 * Math.PI));
+      const V = Ap * (yDeck - yCr) + Vc - vBol, xb_ = Math.max(0, Math.min(1, xb)), yb_ = (3 * xb_) / (1 + 2 * xb_), rf = Math.cbrt(yb_ * V * 3 / (2 * Math.PI));   // fracția volumică arsă (ρ_u/ρ_b ≈ 3)
       flacara.visible = xb > 0.002 && xb < 0.995; const rr = Math.min(rf, D / 2 * 0.99);
       if (opt.rf != null) { const r_ = Math.min(opt.rf, 1.5 * D); flacara.visible = opt.rf > 0 && (xb < 0.995); flacara.scale.set(r_, r_, r_); flacara.position.y = yVarf; increteste(opt.zbarcire || 0);
         if (opt.tFl != null) { culoare(opt.tFl, col); flM.color.copy(col); flM.emissive.copy(col); } }
       else if (mac) { flacara.scale.set(rr, Math.min(rf, (yApex - yCr) + 0.25 * D), rr); flacara.position.y = yCr + 0.02 * D; increteste(mac ? 0.12 : 0); }
-      else { flacara.scale.set(rr, rr * 0.9, rr); flacara.position.y = yVarf; }
+      else { flacara.scale.set(rr, rr * 0.9, rr); flacara.position.y = yVarf; increteste(opt.zbarcire || 0); if (opt.tFl != null) { culoare(opt.tFl, col); flM.color.copy(col); flM.emissive.copy(col); } }
       flM.emissiveIntensity = 0.6 + 8 * Math.min(1, dxb * 20); flM.opacity = 0.35 + 0.4 * Math.min(1, dxb * 30);
       jeturi.visible = !!injectie && mac;
       if (opt.jet) jeturi.visible = opt.jet.S > 0;
       jeturi.children.forEach((j) => { const u = (j.userData.k / 7) * Math.PI * 2, ln = opt.jet ? opt.jet.S : D * 0.38 * (injectie || 0), d = V3(Math.cos(u), -0.5, Math.sin(u)).normalize(), lat = opt.jet ? Math.max(0.2, (ln * Math.tan((opt.jet.teta * RAD) / 2)) / (0.05 * D)) : 1; j.scale.set(lat, Math.max(1e-3, ln), lat); j.quaternion.setFromUnitVectors(V3(0, 1, 0), d.clone().negate()); j.position.set(0, yVarf, 0).addScaledVector(d, ln / 2); });
       // fluxurile: admisia în timpul ridicării supapelor de admisie, evacuarea la ridicarea celor de evacuare
       const dt = Math.min(0.1, Math.abs(alfa - tP) / 360 + 0.004); tP = alfa;
-      fluxA(la / Lmax, dt, true); fluxE(le / Lmax, dt, false);
+      fluxA(la / Lmax, dt, true); fluxE(le / Lmax, dt, false); fluxC(!mac && opt.comb && opt.comb.injPort ? la / Lmax : 0, dt, true);
+      if (opt.tAdm != null) { culoare(opt.tAdm, col); fluxA.pts.material.color.copy(col); } if (opt.tEv != null) { culoare(opt.tEv, col); fluxE.pts.material.color.copy(col); }
+      if (opt.comb && opt.comb.rf == null) opt.comb.rf = xb > 0.002 ? rf : 0;
+      combustibil(opt.comb, yCr, culoare);
+      // jeturile care ard (flacăra difuzivă în lungul jeturilor la MAC)
+      if (mac && opt.comb) jeturi.children.forEach((j) => { const ard = opt.comb.xb > 0.002; j.material.color.setHex(ard ? 0xff7a1a : 0xe0a100); j.material.emissive.setHex(ard ? 0xff4400 : 0xc77800); j.material.emissiveIntensity = ard ? 0.8 + 6 * Math.min(1, dxb * 20) : 0.6; });
     }
   };
 }

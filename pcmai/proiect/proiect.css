@@ -260,3 +260,6 @@
 .po-faze button[aria-pressed="true"] { background: #1d4f91; color: #fff; border-color: #1d4f91; }
 .po-faze .po-sep { width: 1px; height: 1.4rem; background: #c5cbd2; margin: 0 .3rem; }
 .po-faze label { display: inline-flex; gap: .35rem; align-items: center; margin-left: .4rem; }
+.ard-live { margin: .5rem 0; }
+.ard-live .ard-tab { font-size: .85rem; }
+.ard-live .ard-tab th { text-align: left; background: var(--suprafata-2, #eef1f4); }

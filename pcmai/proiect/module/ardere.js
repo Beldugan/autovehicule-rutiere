@@ -91,3 +91,40 @@ export function sprayMAC(o) {
   const impact = out.find((q) => q.Sliber >= o.Rbol);
   return { out, durInj, mdot, tInj, soc, intarziere: soc != null ? soc - o.soi : NaN, s1, s2, impact: impact ? impact.phi : null };
 }
+
+/** ciclul complet al cilindrului pe 0…720 °RAC (α = 0 la PMI-admisie), pe grade:
+    admisia (umplerea după aria supapei, amestecarea aerului proaspăt cu gazele reziduale), comprimarea–arderea–destinderea
+    (modelul 0D Vibe–Woschni al proiectului), evacuarea liberă și forțată (orificiu compresibil, destinderea izentropă),
+    combustibilul: injectat (MAS – în canal, odată cu aerul; MAC – direct, între SOI și EOI), vaporizat, ars (x_b·m_f).
+    o = { D, S, L, eps, n, dist, Lmax, dv, pa [Pa], Ta, pe [Pa], arr (φ, p [MPa], T, x), mf [kg], Hu [J/kg], tip, soi, eoi (° față de PMI-ardere) } */
+export function cicluMotor(o) {
+  const Rg = 287, ga = 1.33, Ap = (Math.PI * o.D * o.D) / 4, Rm = o.S / 2, Vc = (Ap * o.S) / (o.eps - 1), om = (o.n * Math.PI) / 30;
+  const xP = (a) => { const r = a * RAD; return Rm * (1 - Math.cos(r)) + o.L - Math.sqrt(o.L * o.L - (Rm * Math.sin(r)) ** 2); }, V = (a) => Vc + Ap * xP(a);
+  const d = o.dist, aIVC = 180 + d.isa, aEVO = 540 - d.dse, durA = 180 + d.isa + d.dsa, durE = 180 + d.dse + d.ise;
+  const lege = (f, dur) => (f >= 0 && f <= dur ? o.Lmax * Math.sin((Math.PI * f) / dur) ** 2 : 0);
+  const La = (a) => lege((((a + d.dsa) % 720) + 720) % 720, durA), Le = (a) => lege((((a - aEVO) % 720) + 720) % 720, durE);
+  const A = o.arr, z = (a, k) => { const f = a - 360, j = Math.max(0, Math.min(A.length - 1, Math.round((f - A[0].phi) / (A[1].phi - A[0].phi)))); return A[j][k]; };
+  // evacuarea liberă și forțată
+  const pE0 = z(aEVO, "p") * 1e6, TE0 = z(aEVO, "T"), VE0 = V(aEVO), mE0 = (pE0 * VE0) / (Rg * TE0), ev = {}; let m = mE0, mOut = 0;
+  for (let a = aEVO; a <= 720 + 1e-9; a += 0.25) { const Vv = V(a), p = pE0 * Math.pow(m / mE0, ga) * Math.pow(VE0 / Vv, ga), T = (p * Vv) / (m * Rg), r = o.pe / p, rc = Math.pow(2 / (ga + 1), ga / (ga - 1));
+    const psi = p <= o.pe ? 0 : r <= rc ? Math.sqrt(ga) * Math.pow(2 / (ga + 1), (ga + 1) / (2 * (ga - 1))) : Math.sqrt(((2 * ga) / (ga - 1)) * (Math.pow(r, 2 / ga) - Math.pow(r, (ga + 1) / ga)));
+    const mdot = 0.7 * Math.PI * o.dv * Le(a) * (p / Math.sqrt(Rg * T)) * psi;
+    if (Math.abs(a - Math.round(a)) < 1e-9) ev[Math.round(a)] = { p, T, m, mOut };
+    const dm = (mdot * 0.25 * RAD) / om; m = Math.max(1e-9, m - dm); mOut += dm; }
+  const mr = ev[720].m, Tr = ev[720].T, mIVC = (o.pa * V(aIVC)) / (Rg * o.Ta), mFresh = Math.max(0, mIVC - mr);
+  let sA = 0; const cumA = []; for (let a = 0; a <= 720; a++) { if (a <= aIVC) sA += La(a); cumA.push(sA); }
+  const out = [];
+  for (let a = 0; a <= 720; a++) {
+    let faza, p, T, mg, mAer, mRez, mfInj, mfVap, xb = 0;
+    if (a < aIVC) { const f = cumA[a] / cumA[Math.round(aIVC)]; mAer = mFresh * f; mRez = mr; mg = mRez + mAer; T = (mRez * Tr + mAer * o.Ta) / mg; p = a < 20 ? o.pe + (o.pa - o.pe) * (a / 20) : o.pa; faza = "admisia"; }
+    else if (a < aEVO) { p = z(a, "p") * 1e6; T = z(a, "T"); xb = Math.max(0, Math.min(1, z(a, "x"))); mAer = mFresh; mRez = mr; mg = mIVC;
+      faza = xb < 0.002 ? (o.tip === "MAC" && a >= 360 + o.soi ? "injecția" : "comprimarea") : xb < 0.98 ? "arderea" : "destinderea"; }
+    else { const q = ev[a]; p = q.p; T = q.T; mg = q.m; mAer = 0; mRez = q.m; xb = 1; faza = "evacuarea"; }
+    if (o.tip === "MAC") { const f = (x) => Math.max(0, Math.min(1, x)), fi = f((a - 360 - o.soi) / (o.eoi - o.soi)), fv = f((a - 360 - o.soi - 2) / (o.eoi - o.soi + 2));
+      mfInj = a >= aEVO ? o.mf : o.mf * fi; mfVap = a >= aEVO ? o.mf : o.mf * fv; }
+    else { mfInj = a < aIVC ? o.mf * (cumA[a] / cumA[Math.round(aIVC)]) : o.mf; mfVap = mfInj; }
+    const mfArs = o.mf * xb;
+    out.push({ a, faza, p, T, mg, mAer: a < aEVO ? mAer : 0, mRez, mfInj, mfVap, mfArs, xb, Q: mfArs * o.Hu, La: La(a), Le: Le(a), mOut: a >= aEVO ? ev[a].mOut : 0 });
+  }
+  return { out, mFresh, mr, Tr, mIVC, aIVC, aEVO, La, Le, V };
+}
