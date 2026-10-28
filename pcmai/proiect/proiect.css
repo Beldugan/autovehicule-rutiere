@@ -228,3 +228,20 @@
 .mod-v3d .v3d-scena { height: clamp(360px, 58vh, 600px); }
 .mod-v3d .v3d-grup input[type=checkbox], .mod-v3d .v3d-grup select { width: auto; }
 .mod-v3d .v3d-grup:first-child > .v3d-et { display: none; }
+/* tabloul de post-procesare al optimizării canalului de admisie (stilul post-procesoarelor CFD) */
+.po-bara { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .3rem 0 .5rem; }
+.po-bara label { display: flex; gap: .35rem; align-items: center; font-size: .85rem; }
+.po-bara .mod-progres { flex: 1 1 140px; min-width: 120px; }
+.po-stare { flex-basis: 100%; }
+.po-tablou { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 6px; background: #d5d9de; padding: 6px; border-radius: 6px; }
+.po-col { display: grid; gap: 6px; align-content: start; }
+.po-mij { grid-template-rows: 1fr 1fr; }
+.po-pan { background: #fff; border: 1px solid #9aa3ab; display: flex; flex-direction: column; min-width: 0; }
+.po-t { background: linear-gradient(#4f8a3c, #3a6f2b); color: #fff; font: 600 11.5px/1.2 system-ui, sans-serif; padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.po-c { width: 100%; height: 230px; display: block; }
+.po-mij .po-c { height: 352px; }
+.po-nor { cursor: pointer; }
+.po-anim { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; font-size: .85rem; margin: .4rem 0; }
+.po-anim input[type=range] { width: 220px; }
+@media (max-width: 1100px) { .po-tablou { grid-template-columns: 1fr 1fr; } .po-mij { grid-column: 1 / -1; grid-row: 1; grid-template-columns: 1fr 1fr; grid-template-rows: auto; } }
+@media (max-width: 680px) { .po-tablou { grid-template-columns: 1fr; } .po-mij { grid-template-columns: 1fr; } .po-mij .po-c { height: 300px; } }

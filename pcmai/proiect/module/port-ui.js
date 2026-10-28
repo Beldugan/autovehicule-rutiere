@@ -1,0 +1,185 @@
+/* Studiul „Optimizarea canalului de admisie”: planul de experimente numerice (hipercub latin) pe parametrii canalului,
+   simulările CFD 2D (Web Worker), tabloul de post-procesare: câmpul vitezei cu vectori la mai multe unghiuri, norul de puncte
+   masă reținută – tumble, diagrama datelor paralele, evoluțiile masei, raportului de tumble și energiei cinetice turbulente rezolvate. */
+import { fx, concluzie, tabelVerificare } from "./scena.js";
+
+const nr = (v, d = 2) => fx(v, d);
+/* ------------------------------------------------------------------ scala de culori „albastru–roșu” a post-procesoarelor */
+function culoare(x) { x = Math.max(0, Math.min(1, x)); const st = [[0, [0, 0, 255]], [0.25, [0, 200, 255]], [0.5, [40, 220, 60]], [0.75, [255, 220, 0]], [1, [220, 20, 20]]];
+  for (let k = 1; k < st.length; k++) if (x <= st[k][0]) { const [a, ca] = st[k - 1], [b, cb] = st[k], t = (x - a) / (b - a); return ca.map((c, j) => Math.round(c + (cb[j] - c) * t)); } return st[4][1]; }
+const css = (c) => `rgb(${c.join(",")})`;
+function pregatesteCanvas(cv) { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth || 400, h = cv.clientHeight || 260; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h }; }
+
+/** câmpul vitezei pe secțiune: contur neted, pereți gri, vectori, bara de culori, unghiul de RAC */
+export function desenCamp(cv, cadru, geo, vmax, titluA) {
+  const { g, w, h } = pregatesteCanvas(cv); const { nx, ny } = geo;
+  g.fillStyle = "#f2f4f6"; g.fillRect(0, 0, w, h);
+  const ml = 70, mt = 26, sc = Math.min((w - ml - 10) / nx, (h - mt - 8) / ny), ox = ml + (w - ml - 10 - sc * nx) / 2, oy = mt;
+  const off = document.createElement("canvas"); off.width = nx; off.height = ny; const ox2 = off.getContext("2d"), img = ox2.createImageData(nx, ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const c = j * nx + i, k = ((ny - 1 - j) * nx + i) * 4, t = cadru.T[c];
+    let rgb; if (t === 0) rgb = culoare(cadru.M[c] / vmax); else if (t === 1) rgb = [196, 201, 207]; else if (t === 2) rgb = [150, 156, 163]; else rgb = [120, 126, 133];
+    img.data[k] = rgb[0]; img.data[k + 1] = rgb[1]; img.data[k + 2] = rgb[2]; img.data[k + 3] = 255; }
+  ox2.putImageData(img, 0, 0);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.drawImage(off, ox, oy, nx * sc, ny * sc);
+  // vectorii vitezei (albi, cu contur închis), lungimea proporțională cu viteza
+  const pas = Math.max(2, Math.round(nx / 28)), Lm = pas * sc * 0.95;
+  g.lineWidth = 1;
+  for (let j = 1; j < ny; j += pas) for (let i = 1; i < nx; i += pas) { const c = j * nx + i; if (cadru.T[c]) continue; const U = cadru.U[c], V = cadru.V[c], m = Math.hypot(U, V); if (m < vmax * 0.02) continue;
+    const l = Math.min(1, m / vmax) * Lm, x = ox + (i + 0.5) * sc, y = oy + (ny - j - 0.5) * sc, ux = U / m, uy = -V / m, x2 = x + ux * l, y2 = y + uy * l;
+    [["#1b2733", 2.2], ["#ffffff", 1]].forEach(([s, lw]) => { g.strokeStyle = s; g.lineWidth = lw; g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.moveTo(x2, y2); g.lineTo(x2 - (ux * 0.35 - uy * 0.22) * l, y2 - (uy * 0.35 + ux * 0.22) * l); g.moveTo(x2, y2); g.lineTo(x2 - (ux * 0.35 + uy * 0.22) * l, y2 - (uy * 0.35 - ux * 0.22) * l); g.stroke(); }); }
+  // bara de culori și eticheta unghiului
+  const bx = 14, by = mt + 18, bh = Math.min(h - by - 20, 170), grd = g.createLinearGradient(0, by + bh, 0, by); [0, 0.25, 0.5, 0.75, 1].forEach((t) => grd.addColorStop(t, css(culoare(t))));
+  g.fillStyle = grd; g.fillRect(bx, by, 12, bh); g.strokeStyle = "#333"; g.strokeRect(bx, by, 12, bh);
+  g.fillStyle = "#111"; g.font = "10px system-ui"; g.textAlign = "left"; g.fillText("Viteza: modul (m/s)", 4, by - 8);
+  for (let k = 0; k <= 5; k++) { const v = (vmax * k) / 5, y = by + bh - (bh * k) / 5; g.fillText(v.toFixed(1), bx + 16, y + 3); }
+  g.font = "italic 11px system-ui"; g.textAlign = "center"; g.fillText(titluA, ox + (nx * sc) / 2, 16);
+}
+
+/** grafic liniar în stilul post-procesorului (grilă fină, ramă, legendă în colț) */
+export function desenLinie(cv, serii, xlab, ylab, titlu, xm = null) {
+  const { g, w, h } = pregatesteCanvas(cv), m = { l: 58, r: 12, t: 26, b: 36 }, W = w - m.l - m.r, H = h - m.t - m.b;
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, w, h);
+  const pts = serii.flatMap((s) => s.pts).filter((p) => Number.isFinite(p[1]));
+  if (!pts.length) return;
+  let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0])), y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
+  if (y1 === y0) { y1 += 1; y0 -= 1; } const dy = (y1 - y0) * 0.06; y0 -= dy; y1 += dy;
+  const X = (x) => m.l + ((x - x0) / (x1 - x0)) * W, Y = (y) => m.t + H - ((y - y0) / (y1 - y0)) * H;
+  g.strokeStyle = "#d9dde1"; g.lineWidth = 1; g.font = "9px system-ui"; g.fillStyle = "#333";
+  for (let k = 0; k <= 8; k++) { const x = x0 + ((x1 - x0) * k) / 8; g.beginPath(); g.moveTo(X(x), m.t); g.lineTo(X(x), m.t + H); g.stroke(); g.textAlign = "center"; g.fillText(x.toFixed(0), X(x), m.t + H + 12); }
+  for (let k = 0; k <= 6; k++) { const y = y0 + ((y1 - y0) * k) / 6; g.beginPath(); g.moveTo(m.l, Y(y)); g.lineTo(m.l + W, Y(y)); g.stroke(); g.textAlign = "right"; g.fillText(Math.abs(y) < 0.01 && y !== 0 ? y.toExponential(1) : y.toPrecision(3), m.l - 4, Y(y) + 3); }
+  g.strokeStyle = "#555"; g.strokeRect(m.l, m.t, W, H);
+  serii.forEach((s) => { g.strokeStyle = s.c || "#d9534f"; g.lineWidth = s.lw || 1.2; g.setLineDash(s.dash || []); g.beginPath(); let f = true; s.pts.forEach(([x, y]) => { if (!Number.isFinite(y)) { f = true; return; } f ? g.moveTo(X(x), Y(y)) : g.lineTo(X(x), Y(y)); f = false; }); g.stroke(); g.setLineDash([]); });
+  if (xm != null) { g.strokeStyle = "#1d4f91"; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(X(xm), m.t); g.lineTo(X(xm), m.t + H); g.stroke(); g.setLineDash([]); }
+  g.fillStyle = "#111"; g.font = "10px system-ui"; g.textAlign = "center"; g.fillText(xlab, m.l + W / 2, h - 6); g.fillText(titlu, m.l + W / 2, 14);
+  g.save(); g.translate(12, m.t + H / 2); g.rotate(-Math.PI / 2); g.fillText(ylab, 0, 0); g.restore();
+  // legenda
+  const lw = 130; g.fillStyle = "#fff"; g.strokeStyle = "#999"; g.fillRect(m.l + W - lw - 4, m.t + 4, lw, 14 * serii.length + 4); g.strokeRect(m.l + W - lw - 4, m.t + 4, lw, 14 * serii.length + 4);
+  serii.forEach((s, k) => { const y = m.t + 14 + k * 14; g.strokeStyle = s.c || "#d9534f"; g.setLineDash(s.dash || []); g.beginPath(); g.moveTo(m.l + W - lw, y - 3); g.lineTo(m.l + W - lw + 18, y - 3); g.stroke(); g.setLineDash([]); g.fillStyle = "#222"; g.textAlign = "left"; g.fillText(s.nume, m.l + W - lw + 22, y); });
+}
+
+/** norul de puncte al designurilor (masa reținută – tumble), cu designul de bază și designul selectat */
+export function desenNor(cv, D, sel, baza) {
+  const { g, w, h } = pregatesteCanvas(cv), m = { l: 64, r: 14, t: 14, b: 44 }, W = w - m.l - m.r, H = h - m.t - m.b;
+  g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); if (!D.length) return null;
+  const xs = D.map((d) => d.rez.mIVC * 1e6), ys = D.map((d) => d.rez.tumble);
+  let x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys); const ex = (x1 - x0 || 1) * 0.08, ey = (y1 - y0 || 0.1) * 0.1; x0 -= ex; x1 += ex; y0 -= ey; y1 += ey;
+  const X = (x) => m.l + ((x - x0) / (x1 - x0)) * W, Y = (y) => m.t + H - ((y - y0) / (y1 - y0)) * H;
+  g.strokeStyle = "#e1e4e8"; g.font = "10px system-ui"; g.fillStyle = "#333";
+  for (let k = 0; k <= 7; k++) { const x = x0 + ((x1 - x0) * k) / 7; g.beginPath(); g.moveTo(X(x), m.t); g.lineTo(X(x), m.t + H); g.stroke(); g.textAlign = "center"; g.fillText(x.toFixed(1), X(x), m.t + H + 13); }
+  for (let k = 0; k <= 6; k++) { const y = y0 + ((y1 - y0) * k) / 6; g.beginPath(); g.moveTo(m.l, Y(y)); g.lineTo(m.l + W, Y(y)); g.stroke(); g.textAlign = "right"; g.fillText(y.toFixed(2), m.l - 4, Y(y) + 3); }
+  g.strokeStyle = "#444"; g.strokeRect(m.l, m.t, W, H);
+  g.font = "bold 13px system-ui"; g.fillStyle = "#111"; g.textAlign = "center"; g.fillText("Masa_cilindru [mg]", m.l + W / 2, h - 8);
+  g.save(); g.translate(14, m.t + H / 2); g.rotate(-Math.PI / 2); g.fillText("Tumble_Y", 0, 0); g.restore();
+  const pos = D.map((d) => [X(d.rez.mIVC * 1e6), Y(d.rez.tumble)]);
+  pos.forEach(([x, y], k) => { g.beginPath(); g.arc(x, y, 5.5, 0, Math.PI * 2); g.fillStyle = k === sel ? "#0b3d3a" : "#2a8a84"; g.fill(); if (k === sel) { g.strokeStyle = "#000"; g.lineWidth = 2; g.strokeRect(x - 9, y - 9, 18, 18); g.lineWidth = 1; } });
+  if (baza != null && pos[baza]) { const [x, y] = pos[baza]; g.fillStyle = "rgba(29,79,145,.35)"; g.strokeStyle = "#1d4f91"; g.fillRect(x - 7, y - 7, 14, 14); g.strokeRect(x - 7, y - 7, 14, 14); }
+  return pos;
+}
+
+/** datele paralele pe axe radiale (diagrama „spider”): toate designurile, cel selectat îngroșat, cu valorile în casete */
+export function desenParalel(cv, D, axe, sel) {
+  const { g, w, h } = pregatesteCanvas(cv); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); if (!D.length) return;
+  const cx = w / 2, cy = h / 2 + 6, R = Math.min(w, h) * 0.36, n = axe.length;
+  const lim = axe.map((a) => { const v = D.map(a.f); const mi = Math.min(...v), ma = Math.max(...v); return [mi, ma === mi ? mi + 1 : ma]; });
+  const P = (k, t) => { const an = -Math.PI / 2 + (k / n) * Math.PI * 2; return [cx + R * t * Math.cos(an), cy + R * t * Math.sin(an)]; };
+  g.strokeStyle = "#cfd4da"; g.lineWidth = 1; for (let r = 1; r <= 4; r++) { g.beginPath(); for (let k = 0; k <= n; k++) { const [x, y] = P(k % n, r / 4); k ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  axe.forEach((a, k) => { const [x, y] = P(k, 1.0); g.strokeStyle = "#666"; g.beginPath(); g.moveTo(cx, cy); g.lineTo(x, y); g.stroke();
+    g.fillStyle = "#111"; g.font = "bold 10px system-ui"; g.textAlign = x < cx - 5 ? "right" : x > cx + 5 ? "left" : "center"; g.fillText(a.nume, x + (x < cx ? -4 : 4), y + (y < cy ? -6 : 14)); });
+  const linie = (d, st, lw) => { g.strokeStyle = st; g.lineWidth = lw; g.beginPath(); axe.forEach((a, k) => { const t = 0.15 + 0.85 * (a.f(d) - lim[k][0]) / (lim[k][1] - lim[k][0]), [x, y] = P(k, t); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.stroke(); };
+  D.forEach((d, k) => { if (k !== sel) linie(d, "rgba(42,138,132,.38)", 1); });
+  if (D[sel]) { linie(D[sel], "#000", 2.6); axe.forEach((a, k) => { const v = a.f(D[sel]), t = 0.15 + 0.85 * (v - lim[k][0]) / (lim[k][1] - lim[k][0]), [x, y] = P(k, t), s = a.fmt(v);
+    g.font = "11px system-ui"; const tw = g.measureText(s).width + 8; g.fillStyle = "#f4f2e6"; g.strokeStyle = "#333"; g.lineWidth = 1; g.fillRect(x - tw / 2, y - 9, tw, 17); g.strokeRect(x - tw / 2, y - 9, tw, 17); g.fillStyle = "#111"; g.textAlign = "center"; g.fillText(s, x, y + 4); }); }
+}
+
+/* ------------------------------------------------------------------ studiul */
+function hipercub(N, seed = 7) {
+  let s = seed; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  const perm = () => { const a = Array.from({ length: N }, (_, k) => k); for (let k = N - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
+  const p1 = perm(), p2 = perm(), p3 = perm();
+  return Array.from({ length: N }, (_, k) => ({ theta: 15 + 30 * (p1[k] + rnd()) / N, b: -0.25 + 0.5 * (p2[k] + rnd()) / N, hps: 0.1 + 0.35 * (p3[k] + rnd()) / N }));
+}
+
+export function studiuPort(corp, ctx, U) {
+  const t = ctx.tip, R = ctx.R;
+  let g, n, eti;
+  if (t === "MAS" || t === "MAC") { const d = R.date; g = { D: R.D_r / 1000, S: R.S_r / 1000, L: R.S_r / 2 / d.lam / 1000, eps: d.eps, dsa: d.dsa, isa: d.isa, Lmax: 0.1 * R.D_r / 1000 }; n = d.n_P; eti = `${d.tip}, D × S = ${nr(R.D_r, 1)} × ${nr(R.S_r, 1)} mm, ε = ${d.eps}`; }
+  else { const r = R.r, d = ctx.S.d; g = { D: r.D_cil / 1000, S: r.S_cil / 1000, L: r.S_cil / 2 / d.lam / 1000, eps: d.eps || 10, dsa: 20, isa: 50, Lmax: 0.1 * r.D_cil / 1000 }; n = d.n_P; eti = `motocicletă 4T, D × S = ${nr(r.D_cil, 1)} × ${nr(r.S_cil, 1)} mm`; }
+  const p0 = t === "MAC" ? R.date.p_s * 1e6 : 1e5, T0 = t === "MAC" ? R.date.T_s : 300;
+  corp.innerHTML = `<div class="po-bara"><label>designuri <select data-p="N"><option>12</option><option selected>24</option><option>36</option></select></label>
+      <label>rețeaua planului <select data-p="nx"><option value="56">56 celule</option><option value="72" selected>72 celule</option></select></label>
+      <label>rețeaua designului afișat <select data-p="nd"><option value="96" selected>96 celule</option><option value="128">128 celule</option></select></label>
+      <button type="button" class="primar" data-a="run">Rulează planul de experimente</button><div class="mod-progres"><i></i></div><span class="po-stare nota"></span></div>
+    <p class="nota">Secțiunea mediană prin supapa de admisie a motorului proiectat (${eti}, ${n} rot/min, faze dsa ${g.dsa}° / îsa ${g.isa}°, ridicarea maximă ${nr(g.Lmax * 1e3, 1)} mm). Parametrii canalului: unghiul θ, deplasarea cotului (spre tumble) b și înălțimea înainte de scaun h<sub>ps</sub>. Unghiurile sunt în °RAC cu 0 = PMI la începutul admisiei.</p>
+    <div class="po-tablou">
+      <div class="po-col"><div class="po-pan"><div class="po-t" data-t="c0"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="c1"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="c2"></div><canvas class="po-c"></canvas></div></div>
+      <div class="po-col po-mij"><div class="po-pan"><div class="po-t">Optimizare canal admisie: Masa_cilindru vs. Tumble_Y</div><canvas class="po-c po-nor"></canvas></div><div class="po-pan"><div class="po-t">Optimizare canal admisie: Date paralele</div><canvas class="po-c po-par"></canvas></div></div>
+      <div class="po-col"><div class="po-pan"><div class="po-t" data-t="m"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="tb"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="k"></div><canvas class="po-c"></canvas></div></div>
+    </div>
+    <div class="po-anim"><button type="button" data-a="play">⏸ Pauză</button><label>α <input type="range" data-a="alfa" min="0" max="360" step="1" value="0"></label><output data-a="av">0</output>°RAC · panoul de sus este animat; celelalte arată α = 90°, 150° și momentul închiderii admisiei</div>
+    <div class="mod-rez"></div><div class="mod-ver"></div>`;
+  const $q = (s) => corp.querySelector(s), cvs = [...corp.querySelectorAll(".po-col:first-child canvas")], cvR = [...corp.querySelectorAll(".po-col:last-child canvas")];
+  const st = { D: [], sel: 0, baza: 0, det: null, k: 0, ruleaza: true, w: null };
+  const axe = [{ nume: "Canal_θ", f: (d) => d.par.theta, fmt: (v) => v.toFixed(1) }, { nume: "Cot_b/D", f: (d) => d.par.b, fmt: (v) => v.toFixed(3) }, { nume: "PreScaun_h/D", f: (d) => d.par.hps, fmt: (v) => v.toFixed(3) },
+    { nume: "Masa_cilindru", f: (d) => d.rez.mIVC * 1e6, fmt: (v) => v.toFixed(1) }, { nume: "TKE_cilindru", f: (d) => d.rez.tke, fmt: (v) => v.toFixed(2) }, { nume: "Tumble_Y", f: (d) => d.rez.tumble, fmt: (v) => v.toFixed(3) }];
+  const titlu = (k, s) => { const e = corp.querySelector(`[data-t="${k}"]`); if (e) e.textContent = s; };
+  function lucrator() { if (st.w) st.w.terminate(); st.w = new Worker(new URL("./port-worker.js?v=1", import.meta.url), { type: "module" }); st.w.onmessage = mesaj; st.w.onerror = (e) => { $q(".po-stare").textContent = "eroare în simulare: " + e.message; }; return st.w; }
+  function ruleaza() {
+    const N = +$q('[data-p="N"]').value, nx = +$q('[data-p="nx"]').value, des = [{ theta: 30, b: 0, hps: 0.25 }].concat(hipercub(N - 1));
+    st.D = []; st.baza = 0; st.sel = 0; st.N = N; $q(".mod-progres i").style.width = "0%"; $q(".po-stare").textContent = `se simulează ${N} designuri…`;
+    lucrator().postMessage({ tip: "doe", designs: des, g, n, nx, p0, T0 });
+  }
+  function detaliu(k) {
+    st.sel = k; const d = st.D[k]; $q(".po-stare").textContent = `se calculează detaliat designul ${k} (rețea ${$q('[data-p="nd"]').value} celule)…`;
+    if (!st.wd) { st.wd = new Worker(new URL("./port-worker.js?v=1", import.meta.url), { type: "module" }); st.wd.onmessage = mesaj; }
+    st.wd.postMessage({ tip: "detaliu", par: d.par, g, n, nx: +$q('[data-p="nd"]').value, pasCadru: 2, p0, T0 });
+    redesen();
+  }
+  function mesaj(e) {
+    const m = e.data;
+    if (m.tip === "design") { st.D[m.k] = { par: m.par, rez: m.rez }; $q(".mod-progres i").style.width = `${((st.D.filter(Boolean).length) / st.N) * 100}%`; $q(".po-stare").textContent = `design ${m.k + 1} din ${st.N} …`; redesen(); }
+    if (m.tip === "gata") { // designul de compromis: maximul sumei normalizate (tumble + masă)
+      const D = st.D, nm = (f) => { const v = D.map(f), a = Math.min(...v), b = Math.max(...v); return (x) => (x - a) / (b - a || 1); }, ft = nm((d) => Math.abs(d.rez.tumble)), fm = nm((d) => d.rez.mIVC);
+      let best = 0; D.forEach((d, k) => { if (ft(Math.abs(d.rez.tumble)) + fm(d.rez.mIVC) > ft(Math.abs(D[best].rez.tumble)) + fm(D[best].rez.mIVC)) best = k; });
+      st.best = best; $q(".po-stare").textContent = `${D.length} designuri simulate; designul de compromis: ${best}. Clic pe un punct din nor pentru alt design.`; rezultate(); detaliu(best); }
+    if (m.tip === "detaliu") { st.det = m; st.k = 0; let vm = 0; m.cadre.forEach((c) => { c.M = new Float32Array(c.M.buffer || c.M); c.U = new Float32Array(c.U.buffer || c.U); c.V = new Float32Array(c.V.buffer || c.V); c.T = new Uint8Array(c.T.buffer || c.T); for (let j = 0; j < c.M.length; j++) if (c.M[j] > vm) vm = c.M[j]; });
+      // scala de culori: percentila 99 a vitezei în celulele de fluid pe cadrele cu supapa deschisă larg (vârfurile de la deschidere/închidere sunt saturate)
+      const v = []; m.cadre.forEach((c) => { if (c.a < 30 || c.a > 200) return; for (let j = 0; j < c.M.length; j += 3) if (!c.T[j]) v.push(c.M[j]); }); v.sort((a, b) => a - b);
+      const p99 = v.length ? v[Math.floor(v.length * 0.99)] : vm; st.vmax = Math.max(5, Math.ceil(p99 / 5) * 5); $q(".po-stare").textContent = `designul ${st.sel}: m = ${nr(m.mIVC * 1e6, 1)} mg, η_v = ${nr(m.etaV, 3)}, C_d = ${nr(m.CdM, 3)}`; redesen(); rezultate(); }
+  }
+  function cadru(a) { const C = st.det.cadre; let b = C[0]; C.forEach((c) => { if (Math.abs(c.a - a) < Math.abs(b.a - a)) b = c; }); return b; }
+  function redesen() {
+    const D = st.D.filter(Boolean), pos = desenNor($q(".po-nor"), D, st.sel, st.baza); st.pos = pos;
+    desenParalel($q(".po-par"), D, axe, st.sel);
+    if (st.det) {
+      const geo = { nx: st.det.nx, ny: st.det.ny }, aIVC = 180 + g.isa, ang = [st.k, 90, aIVC];
+      ang.forEach((a, j) => { titlu("c" + j, `Optimizare canal admisie: ${Math.round(a)} °RAC – Design ${st.sel}`); desenCamp(cvs[j], cadru(a), geo, st.vmax, `Unghiul de RAC: ${a.toFixed(1)} (°)`); });
+      const base = st.D[st.baza];
+      titlu("m", `Masa în cilindru – Design ${st.sel}`); desenLinie(cvR[0], [{ nume: "Masa_cilindru", pts: st.det.M.filter((q, j) => j % 4 === 0).map(([a, m]) => [a, m * 1e6]) }], "Unghiul de RAC (°)", "Masa în cilindru (mg)", "Masa în cilindru", st.k);
+      titlu("tb", `Tumble – Design ${st.sel}`); desenLinie(cvR[1], [{ nume: "Tumble_Y", pts: st.det.T }, ...(base && st.sel !== st.baza ? [{ nume: "Tumble_Y (bază)", pts: base.rez.T, c: "#7a8796", dash: [4, 3] }] : [])], "Unghiul de RAC (°)", "Tumble_Y", "Tumble_Y", st.k);
+      titlu("k", `TKE – Design ${st.sel}`); desenLinie(cvR[2], [{ nume: "TKE cilindru", pts: st.det.K }, ...(base && st.sel !== st.baza ? [{ nume: "TKE (bază)", pts: base.rez.K, c: "#7a8796", dash: [4, 3] }] : [])], "Unghiul de RAC (°)", "TKE (m²/s²)", "Energia cinetică turbulentă rezolvată în cilindru", st.k);
+    }
+  }
+  function rezultate() {
+    const D = st.D, b = D[st.baza], s = D[st.sel]; if (!b || !s) return;
+    $q(".mod-rez").innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Design</th><th class="num">θ [°]</th><th class="num">b/D</th><th class="num">h<sub>ps</sub>/D</th><th class="num">Tumble_Y (PME)</th><th class="num">m reținută [mg]</th><th class="num">η<sub>v</sub></th><th class="num">TKE max compr. [m²/s²]</th><th class="num">C<sub>d</sub> mediu</th></tr></thead><tbody>
+      ${D.map((d, k) => `<tr${k === st.sel ? ' style="font-weight:600"' : ""}><td>${k}${k === st.baza ? " (bază)" : ""}${k === st.best ? " (compromis)" : ""}</td><td class="num">${nr(d.par.theta, 1)}</td><td class="num">${nr(d.par.b, 3)}</td><td class="num">${nr(d.par.hps, 3)}</td><td class="num">${nr(d.rez.tumble, 3)}</td><td class="num">${nr(d.rez.mIVC * 1e6, 1)}</td><td class="num">${nr(d.rez.etaV, 3)}</td><td class="num">${nr(d.rez.tke, 2)}</td><td class="num">${nr(d.rez.Cd, 3)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="nota">Modelul: secțiunea mediană 2D, curgere incompresibilă (compresibilitate uniformă după închiderea supapei), rețea carteziană decalată cu frontiere imersate (pistonul și supapa mobile), advecție semi-lagrangiană, proiecție cu ecuația Poisson. Masa reținută provine din modelul de umplere 0D al cilindrului real cu coeficientul de debit al supapei obținut din câmpul 2D. TKE este energia cinetică a fluctuațiilor rezolvate față de câmpul filtrat local (fără model de turbulență).</p>`;
+    const corr = (() => { const x = D.map((d) => d.rez.mIVC), y = D.map((d) => Math.abs(d.rez.tumble)), mx = x.reduce((a, c) => a + c, 0) / x.length, my = y.reduce((a, c) => a + c, 0) / y.length; let sxy = 0, sx = 0, sy = 0; x.forEach((v, k) => { sxy += (v - mx) * (y[k] - my); sx += (v - mx) ** 2; sy += (y[k] - my) ** 2; }); return sxy / Math.sqrt(sx * sy || 1); })();
+    $q(".mod-ver").innerHTML = `<h3>Concluzii</h3>${concluzie(corr < 0 ? "ok" : "av", `Coeficientul de corelație între masa reținută și |Tumble_Y| pe cele ${D.length} designuri este ${nr(corr, 2)}: ${corr < 0 ? "canalele care generează mai mult tumble restrâng debitul (compromis tipic umplere – mișcarea încărcăturii)" : "nu apare compromisul tipic în domeniul explorat"}.`)}
+      ${concluzie("ok", `Designul ${st.sel} față de cel de bază: tumble ${nr(s.rez.tumble, 3)} (bază ${nr(b.rez.tumble, 3)}), masa reținută ${nr(s.rez.mIVC * 1e6, 1)} mg (bază ${nr(b.rez.mIVC * 1e6, 1)} mg), TKE la sfârșitul comprimării ${nr(s.rez.tke, 2)} (bază ${nr(b.rez.tke, 2)}) m²/s².`)}
+      ${concluzie("nd", "Valorile absolute ale tumble-ului și TKE dintr-o secțiune 2D fără model de turbulență nu sunt predicții 3D validate; ierarhia designurilor și tendințele sunt rezultatul utilizabil al studiului.")}`;
+  }
+  $q('[data-a="run"]').addEventListener("click", ruleaza);
+  $q(".po-nor").addEventListener("click", (e) => { if (!st.pos) return; const r = e.target.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let b = -1, dm = 1e9; st.pos.forEach(([px, py], k) => { const d = Math.hypot(px - x, py - y); if (d < dm) { dm = d; b = k; } }); if (b >= 0 && dm < 20) detaliu(b); });
+  const bp = $q('[data-a="play"]'), sl = $q('[data-a="alfa"]');
+  bp.addEventListener("click", () => { st.ruleaza = !st.ruleaza; bp.textContent = st.ruleaza ? "⏸ Pauză" : "▶ Pornește"; });
+  sl.addEventListener("input", () => { st.k = +sl.value; st.ruleaza = false; bp.textContent = "▶ Pornește"; redesen(); });
+  window.addEventListener("resize", () => redesen());
+  ruleaza();
+  let tg = 0;
+  return {
+    pas(dt) { if (!st.det) return; if (st.ruleaza) st.k = (st.k + dt * 30) % 360; tg += dt; if (tg > 0.12) { tg = 0; const geo = { nx: st.det.nx, ny: st.det.ny }; titlu("c0", `Optimizare canal admisie: ${Math.round(st.k)} °RAC – Design ${st.sel}`); desenCamp(cvs[0], cadru(st.k), geo, st.vmax, `Unghiul de RAC: ${st.k.toFixed(1)} (°)`); if (document.activeElement !== sl) sl.value = Math.round(st.k); $q('[data-a="av"]').textContent = Math.round(st.k); } },
+    raport() { return $q(".mod-rez").innerHTML + $q(".mod-ver").innerHTML; },
+    distruge() { if (st.w) st.w.terminate(); if (st.wd) st.wd.terminate(); }
+  };
+}

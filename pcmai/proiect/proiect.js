@@ -5,7 +5,7 @@
    • salvarea proiectului în browser și în fișier, memoriul tipărit (PDF din dialogul de tipărire). */
 "use strict";
 (function () {
-  const V = "1";
+  const V = "2";
   const TIPURI = {
     MAS: { nume: "Autoturism cu MAS", sub: "motor cu aprindere prin scânteie · calcul termic, dinamic, 0D", dir: "mai", motor: "MAS",
       scripturi: ["tabele.js", "calc.js", "extra.js", "app.js"], exemple: [["exemplu", "MAS", "Exemplul MAS din îndrumar (cap. 10)"]],

@@ -84,11 +84,11 @@ const PORTAL = {
       nume: "Procese și caracteristici ale motoarelor cu ardere internă", scurt: "PCMAI", an: "anul III", sem: 1, cod: "MM3104", tip: "Proiect", dosar: "pcmai",
       indrumar: "Îndrumare de proiect PCMAI (C. Tudor, A.-M. Beldugan, 2026)",
       endpoint: "",
-      lucrari: []
+      lucrari: ["Proiectul PCMAI pe capitole: tipul autovehiculului, datele de intrare, calculul și modulele de simulare M, S, F"]
     }
   },
   /** descrierea din lista lucrărilor, pentru lucrările fără simulator */
-  descrieri: { "mf-l7": "colocviu · portofoliul lucrărilor + test recapitulativ notat automat · test de antrenament · anexe" },
+  descrieri: { "pcmai-l1": "proiect · MAS, MAC, BEV, HEV, motocicletă, autoutilitară electrică · dinamică multicorp, simulare de sistem, CFD (canal de admisie, comprimare, placa de răcire) · memoriu", "mf-l7": "colocviu · portofoliul lucrărilor + test recapitulativ notat automat · test de antrenament · anexe" },
   /** lucrările deja realizate în portal: cod → cale */
-  realizate: { "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "mf-l4": "mf/l4/", "mf-l5": "mf/l5/", "mf-l6": "mf/l6/", "mf-l7": "mf/l7/", "da-l1": "da/l1/", "da-l2": "da/l2/", "da-l3": "da/l3/", "da-l4": "da/l4/", "da-l5": "da/l5/", "da-l6": "da/l6/", "da-l7": "da/l7/", "saa-l1": "saa/l1/", "saa-l2": "saa/l2/", "saa-l3": "saa/l3/", "saa-l4": "saa/l4/", "saa-l5": "saa/l5/", "saa-l6": "saa/l6/", "saa-l7": "saa/l7/", "saa-l8": "saa/l8/", "mam1-l1": "mam1/l1/", "mam1-l2": "mam1/l2/", "mam1-l3": "mam1/l3/", "mam1-l4": "mam1/l4/", "mam1-l5": "mam1/l5/", "mam1-l6": "mam1/l6/", "mam1-l7": "mam1/l7/", "mam1-l8": "mam1/l8/", "mam1-l9": "mam1/l9/", "mam1-l10": "mam1/l10/" }
+  realizate: { "pcmai-l1": "pcmai/proiect/", "mf-l1": "mf/l1/", "mf-l2": "mf/l2/", "mf-l3": "mf/l3/", "mf-l4": "mf/l4/", "mf-l5": "mf/l5/", "mf-l6": "mf/l6/", "mf-l7": "mf/l7/", "da-l1": "da/l1/", "da-l2": "da/l2/", "da-l3": "da/l3/", "da-l4": "da/l4/", "da-l5": "da/l5/", "da-l6": "da/l6/", "da-l7": "da/l7/", "saa-l1": "saa/l1/", "saa-l2": "saa/l2/", "saa-l3": "saa/l3/", "saa-l4": "saa/l4/", "saa-l5": "saa/l5/", "saa-l6": "saa/l6/", "saa-l7": "saa/l7/", "saa-l8": "saa/l8/", "mam1-l1": "mam1/l1/", "mam1-l2": "mam1/l2/", "mam1-l3": "mam1/l3/", "mam1-l4": "mam1/l4/", "mam1-l5": "mam1/l5/", "mam1-l6": "mam1/l6/", "mam1-l7": "mam1/l7/", "mam1-l8": "mam1/l8/", "mam1-l9": "mam1/l9/", "mam1-l10": "mam1/l10/" }
 };
