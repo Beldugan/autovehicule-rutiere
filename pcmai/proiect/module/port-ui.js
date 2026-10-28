@@ -1,7 +1,11 @@
 /* Studiul „Optimizarea canalului de admisie”: planul de experimente numerice (hipercub latin) pe parametrii canalului,
-   simulările CFD 2D (Web Worker), tabloul de post-procesare: câmpul vitezei cu vectori la mai multe unghiuri, norul de puncte
-   masă reținută – tumble, diagrama datelor paralele, evoluțiile masei, raportului de tumble și energiei cinetice turbulente rezolvate. */
-import { fx, concluzie, tabelVerificare } from "./scena.js";
+   simulările CFD 3D (Web Workers în paralel), designul ales recalculat pe rețea fină cu animația 3D (domeniul, supapa și pistonul
+   mobile, planurile de secțiune, vectorii, particulele-trasor) și tabloul de post-procesare: câmpul vitezei cu vectori la mai multe
+   unghiuri, norul de puncte masă reținută – tumble, datele paralele, evoluțiile masei, tumble/swirl și energiei cinetice turbulente. */
+import { fx, concluzie } from "./scena.js";
+import { creeazaGeometrie } from "./cfd2d.js?v=2";
+import { scenaPort3D, culoareJet } from "./port3d.js?v=4";
+import { bielaMEF, chiulasaTermic } from "./fem2d.js?v=2";
 
 const nr = (v, d = 2) => fx(v, d);
 /* ------------------------------------------------------------------ scala de culori „albastru–roșu” a post-procesoarelor */
@@ -99,87 +103,148 @@ function hipercub(N, seed = 7) {
   return Array.from({ length: N }, (_, k) => ({ theta: 15 + 30 * (p1[k] + rnd()) / N, b: -0.25 + 0.5 * (p2[k] + rnd()) / N, hps: 0.1 + 0.35 * (p3[k] + rnd()) / N }));
 }
 
+
 export function studiuPort(corp, ctx, U) {
   const t = ctx.tip, R = ctx.R;
   let g, n, eti;
-  if (t === "MAS" || t === "MAC") { const d = R.date; g = { D: R.D_r / 1000, S: R.S_r / 1000, L: R.S_r / 2 / d.lam / 1000, eps: d.eps, dsa: d.dsa, isa: d.isa, Lmax: 0.1 * R.D_r / 1000 }; n = d.n_P; eti = `${d.tip}, D × S = ${nr(R.D_r, 1)} × ${nr(R.S_r, 1)} mm, ε = ${d.eps}`; }
-  else { const r = R.r, d = ctx.S.d; g = { D: r.D_cil / 1000, S: r.S_cil / 1000, L: r.S_cil / 2 / d.lam / 1000, eps: d.eps || 10, dsa: 20, isa: 50, Lmax: 0.1 * r.D_cil / 1000 }; n = d.n_P; eti = `motocicletă 4T, D × S = ${nr(r.D_cil, 1)} × ${nr(r.S_cil, 1)} mm`; }
-  const p0 = t === "MAC" ? R.date.p_s * 1e6 : 1e5, T0 = t === "MAC" ? R.date.T_s : 300;
+  if (t === "MAS" || t === "MAC") { const d = R.date; g = { D: R.D_r / 1000, S: R.S_r / 1000, L: R.S_r / 2 / d.lam / 1000, eps: d.eps, dsa: d.dsa, isa: d.isa, dse: d.dse, ise: d.ise, tipMotor: d.tip, Lmax: 0.1 * R.D_r / 1000 }; n = d.n_P; eti = `${d.tip}, D × S = ${nr(R.D_r, 1)} × ${nr(R.S_r, 1)} mm, ε = ${d.eps}`; }
+  else { const r = R.r, d = ctx.S.d; g = { D: r.D_cil / 1000, S: r.S_cil / 1000, L: r.S_cil / 2 / d.lam / 1000, eps: d.eps || 10, dsa: 20, isa: 50, dse: 50, ise: 20, tipMotor: "MAS", Lmax: 0.1 * r.D_cil / 1000 }; n = d.n_P; eti = `motocicletă 4T, D × S = ${nr(r.D_cil, 1)} × ${nr(r.S_cil, 1)} mm`; }
+  const p0 = t === "MOTO" ? 1e5 : R.date.p_s * 1e6, T0 = t === "MOTO" ? 300 : R.date.T_s, aIVC = 180 + g.isa;
+  /* solicitările motorului proiectat: presiunea pe ciclu → forța în bielă S(α) (gaze + inerție); biela prin MEF; câmpul termic al chiulasei */
+  const S3 = (() => { let pa, mp, mb, Qw = null; const X = window.PCMAI_EXTRA;
+    if (t === "MOTO") { pa = R.pa.map((q) => [q[0], q[2]]); mp = ctx.S.m.m_p; mb = ctx.S.m.m_b; }
+    else { const Z = X.model0D(R); pa = X.pAlfa0D(R, Z); mp = X.MASE[R.date.tip].m_p; mb = X.MASE[R.date.tip].m_b; Qw = Z.Qw; }
+    const Ap = Math.PI * g.D * g.D / 4, Rm = g.S / 2, lam = Rm / g.L, om = n * Math.PI / 30, mj = 1.3 * mp + 0.275 * mb, xs = pa.map((q) => q[0]);
+    const pI = (a) => { let k = xs.findIndex((x) => x >= a); if (k <= 0) return pa[Math.max(0, k)][1]; const f = (a - xs[k - 1]) / (xs[k] - xs[k - 1]); return pa[k - 1][1] + f * (pa[k][1] - pa[k - 1][1]); };
+    const forta = []; for (let a = 0; a <= 720; a++) { const ar = a * Math.PI / 180, acc = Rm * om * om * (Math.cos(ar) + lam * Math.cos(2 * ar)), F = (pI(a) - 0.1) * 1e6 * Ap - mj * acc; forta.push(F / Math.cos(Math.asin(lam * Math.sin(ar)))); }
+    const fe = bielaMEF({ D: g.D, L: g.L }), mx = (v) => v.reduce((m, x) => Math.max(m, x), 0), vC = mx(fe.comp), vT = mx(fe.intin);
+    let sMax = 0, aMax = 0; forta.forEach((S, a) => { const v = (S >= 0 ? vC : vT) * Math.abs(S) / 1e6; if (v > sMax) { sMax = v; aMax = a; } });
+    const qM = Qw != null ? 0.35 * Qw * 1000 * (n / 120) / Ap : 1.0e6;
+    const termic = chiulasaTermic({ D: g.D, xv: -0.25 * g.D, dv: 0.42 * g.D, q: qM });
+    return { forta, fe, sMax, aMax, Smax: Math.max(...forta), Smin: Math.min(...forta), termic, qM, qEstimat: Qw == null, vC, vT }; })();
   corp.innerHTML = `<div class="po-bara"><label>designuri <select data-p="N"><option>12</option><option selected>24</option><option>36</option></select></label>
-      <label>rețeaua planului <select data-p="nx"><option value="56">56 celule</option><option value="72" selected>72 celule</option></select></label>
-      <label>rețeaua designului afișat <select data-p="nd"><option value="96" selected>96 celule</option><option value="128">128 celule</option></select></label>
-      <button type="button" class="primar" data-a="run">Rulează planul de experimente</button><div class="mod-progres"><i></i></div><span class="po-stare nota"></span></div>
-    <p class="nota">Secțiunea mediană prin supapa de admisie a motorului proiectat (${eti}, ${n} rot/min, faze dsa ${g.dsa}° / îsa ${g.isa}°, ridicarea maximă ${nr(g.Lmax * 1e3, 1)} mm). Parametrii canalului: unghiul θ, deplasarea cotului (spre tumble) b și înălțimea înainte de scaun h<sub>ps</sub>. Unghiurile sunt în °RAC cu 0 = PMI la începutul admisiei.</p>
+      <label>rețeaua planului <select data-p="nx"><option value="14">14 celule pe alezaj</option><option value="16" selected>16 celule pe alezaj</option><option value="20">20 celule pe alezaj</option></select></label>
+      <label>rețeaua designului afișat <select data-p="nd"><option value="24">24 celule pe alezaj</option><option value="28" selected>28 celule pe alezaj</option><option value="36">36 celule pe alezaj</option></select></label>
+      <button type="button" class="primar" data-a="run">Rulează planul de experimente 3D</button><div class="mod-progres"><i></i></div><span class="po-stare nota"></span></div>
+    <p class="nota">Calcul CFD 3D al canalului de admisie și al cilindrului motorului proiectat (${eti}, ${n} rot/min, faze dsa ${g.dsa}° / îsa ${g.isa}°, ridicarea maximă ${nr(g.Lmax * 1e3, 1)} mm), de la deschiderea admisiei până la PMS-comprimare. Parametrii canalului: unghiul θ, deplasarea cotului b și înălțimea înainte de scaun h<sub>ps</sub>. Unghiurile sunt în °RAC cu 0 = PMS la începutul admisiei; tumble pozitiv = tumble direct (jetul trece peste supapă spre evacuare și coboară pe cămașa de acolo).</p>
+    <h3 class="po-h">Simularea 3D animată – designul afișat</h3>
+    <div class="po-3d"><div class="po-3d-sc mod-scena"><p class="nota" style="padding:1rem">Se calculează designul de bază…</p></div></div>
+    <div class="po-anim"><button type="button" data-a="play">⏸ Pauză</button><label>viteza <select data-a="vit"><option value="10">×0,25</option><option value="20">×0,5</option><option value="40" selected>×1</option><option value="80">×2</option></select></label>
+      <label>α <input type="range" data-a="alfa" min="0" max="360" step="2" value="0"></label><output data-a="av">0</output>°RAC
+      <label><input type="checkbox" data-v="contur" checked> secțiunea mediană</label><label><input type="checkbox" data-v="orizontal" checked> planul orizontal</label><label><input type="checkbox" data-v="vectori" checked> vectori</label><label><input type="checkbox" data-v="particule" checked> particule</label><label><input type="checkbox" data-v="mef" checked> biela – tensiuni (MEF)</label><label><input type="checkbox" data-v="termic"> chiulasa – temperatură</label>
+      <label>scala vitezei <input type="number" data-a="vmax" min="5" step="5" style="width:5rem"> m/s</label></div>
+    <h3 class="po-h">Tabloul de post-procesare</h3>
     <div class="po-tablou">
       <div class="po-col"><div class="po-pan"><div class="po-t" data-t="c0"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="c1"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="c2"></div><canvas class="po-c"></canvas></div></div>
-      <div class="po-col po-mij"><div class="po-pan"><div class="po-t">Optimizare canal admisie: Masa_cilindru vs. Tumble_Y</div><canvas class="po-c po-nor"></canvas></div><div class="po-pan"><div class="po-t">Optimizare canal admisie: Date paralele</div><canvas class="po-c po-par"></canvas></div></div>
+      <div class="po-col po-mij"><div class="po-pan"><div class="po-t">Optimizare canal admisie: Masa_cilindru vs. Tumble</div><canvas class="po-c po-nor"></canvas></div><div class="po-pan"><div class="po-t">Optimizare canal admisie: Date paralele</div><canvas class="po-c po-par"></canvas></div></div>
       <div class="po-col"><div class="po-pan"><div class="po-t" data-t="m"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="tb"></div><canvas class="po-c"></canvas></div><div class="po-pan"><div class="po-t" data-t="k"></div><canvas class="po-c"></canvas></div></div>
     </div>
-    <div class="po-anim"><button type="button" data-a="play">⏸ Pauză</button><label>α <input type="range" data-a="alfa" min="0" max="360" step="1" value="0"></label><output data-a="av">0</output>°RAC · panoul de sus este animat; celelalte arată α = 90°, 150° și momentul închiderii admisiei</div>
+    <div class="po-tablou po-sol"><div class="po-pan"><div class="po-t" data-t="mef">Biela – tensiunea echivalentă von Mises (MEF)</div><canvas class="po-c po-mef"></canvas></div><div class="po-pan"><div class="po-t">Chiulasa – temperatura plăcii de foc (regim staționar)</div><canvas class="po-c po-ter"></canvas></div></div>
     <div class="mod-rez"></div><div class="mod-ver"></div>`;
   const $q = (s) => corp.querySelector(s), cvs = [...corp.querySelectorAll(".po-col:first-child canvas")], cvR = [...corp.querySelectorAll(".po-col:last-child canvas")];
-  const st = { D: [], sel: 0, baza: 0, det: null, k: 0, ruleaza: true, w: null };
+  const st = { D: [], sel: 0, baza: 0, det: null, k: 0, ruleaza: true, vit: 40, W: [], wd: null, v3: null, gata: 0 };
   const axe = [{ nume: "Canal_θ", f: (d) => d.par.theta, fmt: (v) => v.toFixed(1) }, { nume: "Cot_b/D", f: (d) => d.par.b, fmt: (v) => v.toFixed(3) }, { nume: "PreScaun_h/D", f: (d) => d.par.hps, fmt: (v) => v.toFixed(3) },
-    { nume: "Masa_cilindru", f: (d) => d.rez.mIVC * 1e6, fmt: (v) => v.toFixed(1) }, { nume: "TKE_cilindru", f: (d) => d.rez.tke, fmt: (v) => v.toFixed(2) }, { nume: "Tumble_Y", f: (d) => d.rez.tumble, fmt: (v) => v.toFixed(3) }];
+    { nume: "Masa_cilindru", f: (d) => d.rez.mIVC * 1e6, fmt: (v) => v.toFixed(1) }, { nume: "TKE_cilindru", f: (d) => d.rez.tke, fmt: (v) => v.toFixed(2) }, { nume: "Tumble", f: (d) => d.rez.tumble, fmt: (v) => v.toFixed(3) }];
   const titlu = (k, s) => { const e = corp.querySelector(`[data-t="${k}"]`); if (e) e.textContent = s; };
-  function lucrator() { if (st.w) st.w.terminate(); st.w = new Worker(new URL("./port-worker.js?v=1", import.meta.url), { type: "module" }); st.w.onmessage = mesaj; st.w.onerror = (e) => { $q(".po-stare").textContent = "eroare în simulare: " + e.message; }; return st.w; }
+  const lucrator = () => new Worker(new URL("./port-worker.js?v=3", import.meta.url), { type: "module" });
+  const stare = (s) => { $q(".po-stare").textContent = s; };
   function ruleaza() {
-    const N = +$q('[data-p="N"]').value, nx = +$q('[data-p="nx"]').value, des = [{ theta: 30, b: 0, hps: 0.25 }].concat(hipercub(N - 1));
-    st.D = []; st.baza = 0; st.sel = 0; st.N = N; $q(".mod-progres i").style.width = "0%"; $q(".po-stare").textContent = `se simulează ${N} designuri…`;
-    lucrator().postMessage({ tip: "doe", designs: des, g, n, nx, p0, T0 });
+    st.W.forEach((w) => w.terminate()); st.W = [];
+    const N = +$q('[data-p="N"]').value, Ng = +$q('[data-p="nx"]').value, des = [{ theta: 30, b: 0, hps: 0.25 }].concat(hipercub(N - 1)).map((par, k) => ({ k, par }));
+    const nW = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+    st.D = []; st.baza = 0; st.N = N; st.gata = 0; st.nW = nW; st.best = null; $q(".mod-progres i").style.width = "0%";
+    stare(`se simulează în 3D ${N} designuri (${nW} fire de calcul în paralel)…`);
+    for (let w = 0; w < nW; w++) { const W = lucrator(); W.onmessage = mesaj; W.onerror = (e) => stare("eroare în simulare: " + e.message); W.postMessage({ tip: "doe", designs: des.filter((_, k) => k % nW === w), g, n, N: Ng, p0, T0, itP: 25, particule: 1 }); st.W.push(W); }
+    detaliu(0);
   }
   function detaliu(k) {
-    st.sel = k; const d = st.D[k]; $q(".po-stare").textContent = `se calculează detaliat designul ${k} (rețea ${$q('[data-p="nd"]').value} celule)…`;
-    if (!st.wd) { st.wd = new Worker(new URL("./port-worker.js?v=1", import.meta.url), { type: "module" }); st.wd.onmessage = mesaj; }
-    st.wd.postMessage({ tip: "detaliu", par: d.par, g, n, nx: +$q('[data-p="nd"]').value, pasCadru: 2, p0, T0 });
+    st.sel = k; const d = st.D[k] || { par: { theta: 30, b: 0, hps: 0.25 } }, N = +$q('[data-p="nd"]').value;
+    stare(`se calculează în 3D designul ${k} pe rețeaua fină (${N} celule pe alezaj)…`);
+    if (st.wd) st.wd.terminate(); st.wd = lucrator(); st.wd.onmessage = mesaj; st.wd.onerror = (e) => stare("eroare în simulare: " + e.message);
+    st.wd.postMessage({ tip: "detaliu", par: d.par, g, n, N, pasCadru: 2, p0, T0, itP: 30, particule: 3000 });
     redesen();
   }
   function mesaj(e) {
     const m = e.data;
-    if (m.tip === "design") { st.D[m.k] = { par: m.par, rez: m.rez }; $q(".mod-progres i").style.width = `${((st.D.filter(Boolean).length) / st.N) * 100}%`; $q(".po-stare").textContent = `design ${m.k + 1} din ${st.N} …`; redesen(); }
-    if (m.tip === "gata") { // designul de compromis: maximul sumei normalizate (tumble + masă)
-      const D = st.D, nm = (f) => { const v = D.map(f), a = Math.min(...v), b = Math.max(...v); return (x) => (x - a) / (b - a || 1); }, ft = nm((d) => Math.abs(d.rez.tumble)), fm = nm((d) => d.rez.mIVC);
-      let best = 0; D.forEach((d, k) => { if (ft(Math.abs(d.rez.tumble)) + fm(d.rez.mIVC) > ft(Math.abs(D[best].rez.tumble)) + fm(D[best].rez.mIVC)) best = k; });
-      st.best = best; $q(".po-stare").textContent = `${D.length} designuri simulate; designul de compromis: ${best}. Clic pe un punct din nor pentru alt design.`; rezultate(); detaliu(best); }
-    if (m.tip === "detaliu") { st.det = m; st.k = 0; let vm = 0; m.cadre.forEach((c) => { c.M = new Float32Array(c.M.buffer || c.M); c.U = new Float32Array(c.U.buffer || c.U); c.V = new Float32Array(c.V.buffer || c.V); c.T = new Uint8Array(c.T.buffer || c.T); for (let j = 0; j < c.M.length; j++) if (c.M[j] > vm) vm = c.M[j]; });
-      // scala de culori: percentila 99 a vitezei în celulele de fluid pe cadrele cu supapa deschisă larg (vârfurile de la deschidere/închidere sunt saturate)
-      const v = []; m.cadre.forEach((c) => { if (c.a < 30 || c.a > 200) return; for (let j = 0; j < c.M.length; j += 3) if (!c.T[j]) v.push(c.M[j]); }); v.sort((a, b) => a - b);
-      const p99 = v.length ? v[Math.floor(v.length * 0.99)] : vm; st.vmax = Math.max(5, Math.ceil(p99 / 5) * 5); $q(".po-stare").textContent = `designul ${st.sel}: m = ${nr(m.mIVC * 1e6, 1)} mg, η_v = ${nr(m.etaV, 3)}, C_d = ${nr(m.CdM, 3)}`; redesen(); rezultate(); }
+    if (m.tip === "design") { st.D[m.k] = { par: m.par, rez: m.rez }; const nf = st.D.filter(Boolean).length; $q(".mod-progres i").style.width = `${(nf / st.N) * 100}%`; stare(`design ${nf} din ${st.N} simulat în 3D…`); redesen(); }
+    if (m.tip === "gata" && ++st.gata === st.nW) {
+      const D = st.D, nm = (f) => { const v = D.map(f), a = Math.min(...v), b = Math.max(...v); return (x) => (x - a) / (b - a || 1); }, ft = nm((d) => d.rez.tumble), fm = nm((d) => d.rez.mIVC);
+      let best = 0; D.forEach((d, k) => { if (ft(d.rez.tumble) + fm(d.rez.mIVC) > ft(D[best].rez.tumble) + fm(D[best].rez.mIVC)) best = k; });
+      st.best = best; stare(`${D.length} designuri simulate în 3D; designul de compromis: ${best}. Clic pe un punct din nor pentru alt design.`); rezultate(); detaliu(best); }
+    if (m.tip === "progres") stare(`designul ${st.sel} pe rețeaua fină: α = ${Math.round(m.a)}°RAC…`);
+    if (m.tip === "detaliu") {
+      st.det = m; st.k = 0; const v = [];
+      m.cadre.forEach((c) => { if (c.a < 30 || c.a > 200) return; for (let j = 0; j < c.M.length; j += 2) if (!c.T[j]) v.push(c.M[j]); }); v.sort((a, b) => a - b);
+      st.vmax = Math.max(5, Math.ceil((v.length ? v[Math.floor(v.length * 0.99)] : 50) / 5) * 5); $q('[data-a="vmax"]').value = st.vmax;
+      if (st.v3) st.v3.distruge(); const gz = $q(".po-3d-sc"); gz.innerHTML = "";
+      st.v3 = scenaPort3D(gz, creeazaGeometrie(g, m.par), m, { fe: S3.fe, forta: S3.forta, sMax: S3.sMax, termic: S3.termic }); st.v3.st.vmax = st.vmax; corp.querySelectorAll("[data-v]").forEach((x) => (st.v3.st[x.dataset.v] = x.checked));
+      st.v3.legenda(st.vmax, (x) => nr(x, 0)); st.v3.coloreazaChiulasa(); leg2();
+      stare(`designul ${st.sel} (rețea ${m.nx} × ${m.ny} × ${m.nz} = ${m.celule.toLocaleString("ro-RO")} celule, ${nr(m.ms / 1000, 1)} s): m = ${nr(m.mIVC * 1e6, 1)} mg, η_v = ${nr(m.etaV, 3)}, C_d = ${nr(m.CdM, 3)}`);
+      redesen(); rezultate(); }
   }
-  function cadru(a) { const C = st.det.cadre; let b = C[0]; C.forEach((c) => { if (Math.abs(c.a - a) < Math.abs(b.a - a)) b = c; }); return b; }
+  function leg2() { if (!st.v3) return; const v = st.v3.st;
+    if (v.mef) st.v3.legenda2("Tensiunea echivalentă (von Mises) – biela", `MEF, starea plană de tensiune · scara: maximul pe ciclu (α = ${S3.aMax}°)`, 0, S3.sMax, "MPa");
+    else if (v.termic) st.v3.legenda2("Temperatura – chiulasa", "conducție staționară, placa de foc", S3.termic.Tmin, S3.termic.Tmax, "°C"); else st.v3.legenda2(null); }
+  function desenMEF(a) { const cv = $q(".po-mef"), { g: c2, w, h } = pregatesteCanvas(cv), fe = S3.fe, S = S3.forta[Math.round(Math.max(0, Math.min(720, a)))], camp = S >= 0 ? fe.comp : fe.intin;
+    c2.fillStyle = "#f2f4f6"; c2.fillRect(0, 0, w, h); const xs = fe.nod.map((p) => p[0]), ys = fe.nod.map((p) => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const sc = Math.min((w - 190) / (y1 - y0), (h - 30) / (x1 - x0)), ox = 150, oy = h / 2;   // biela culcată (axa pe orizontală)
+    const P = (p) => [ox + (p[1] - y0) * sc, oy - p[0] * sc]; let vmx = 0, kmx = 0;
+    fe.T.forEach((t) => { const v = (camp[t[0]] + camp[t[1]] + camp[t[2]]) / 3 * Math.abs(S) / 1e6; const c = culoareJet(v / S3.sMax); c2.fillStyle = `rgb(${c.join(",")})`; c2.strokeStyle = c2.fillStyle; c2.beginPath(); t.forEach((q, j) => { const [X, Y] = P(fe.nod[q]); j ? c2.lineTo(X, Y) : c2.moveTo(X, Y); }); c2.closePath(); c2.fill(); c2.stroke(); });
+    fe.nod.forEach((p, k) => { const v = camp[k] * Math.abs(S) / 1e6; if (v > vmx) { vmx = v; kmx = k; } });
+    c2.strokeStyle = "#1b2026"; c2.lineWidth = 0.8; c2.beginPath(); fe.contur.forEach(([a1, b1]) => { const [X1, Y1] = P(fe.nod[a1]), [X2, Y2] = P(fe.nod[b1]); c2.moveTo(X1, Y1); c2.lineTo(X2, Y2); }); c2.stroke();
+    const [mx, my] = P(fe.nod[kmx]); c2.fillStyle = "#d62020"; c2.fillRect(mx + 6, my - 20, 34, 15); c2.fillStyle = "#fff"; c2.font = "bold 10px system-ui"; c2.fillText("Max", mx + 11, my - 9); c2.strokeStyle = "#d62020"; c2.beginPath(); c2.moveTo(mx, my); c2.lineTo(mx + 6, my - 12); c2.stroke();
+    // legenda verticală
+    c2.font = "10px system-ui"; for (let k = 0; k < 10; k++) { const tt = 1 - k / 9, c = culoareJet(tt); c2.fillStyle = `rgb(${c.join(",")})`; c2.fillRect(10, 34 + k * 17, 14, 17); c2.fillStyle = "#111"; c2.fillText((S3.sMax * tt).toFixed(1) + (k ? "" : " Max"), 28, 46 + k * 17); }
+    c2.font = "bold 10px system-ui"; c2.fillText("σ_ech von Mises [MPa]", 8, 14); c2.font = "10px system-ui"; c2.fillText(`α = ${Math.round(a)}°RAC · S = ${nr(S / 1000, 1)} kN (${S >= 0 ? "compresiune" : "întindere"}) · max ${nr(vmx, 1)} MPa`, 8, 27); }
+  function desenTermic() { const cv = $q(".po-ter"), { g: c2, w, h } = pregatesteCanvas(cv), th = S3.termic; c2.fillStyle = "#f2f4f6"; c2.fillRect(0, 0, w, h);
+    const sc = Math.min((w - 110) / (2 * th.XH), (h - 30) / (2 * th.ZH)), ox = 100, oy = 18;
+    for (let k = 0; k < th.nz; k++) for (let i = 0; i < th.nx; i++) { const c = k * th.nx + i; if (th.tip[c]) { c2.fillStyle = "#1b2026"; } else { const col = culoareJet((th.T[c] - th.Tmin) / (th.Tmax - th.Tmin)); c2.fillStyle = `rgb(${col.join(",")})`; } c2.fillRect(ox + i * th.dx * sc, oy + k * th.dz * sc, th.dx * sc + 0.6, th.dz * sc + 0.6); }
+    c2.font = "10px system-ui"; for (let k = 0; k < 10; k++) { const tt = 1 - k / 9, c = culoareJet(tt); c2.fillStyle = `rgb(${c.join(",")})`; c2.fillRect(8, 30 + k * 17, 14, 17); c2.fillStyle = "#111"; c2.fillText((th.Tmin + (th.Tmax - th.Tmin) * tt).toFixed(0), 26, 42 + k * 17); }
+    c2.font = "bold 10px system-ui"; c2.fillText("T [°C]", 8, 14); c2.font = "10px system-ui"; c2.fillText("admisie ←   → evacuare", ox + th.XH * sc - 55, h - 4); }
+  function cadru(a) { const C = st.det.cadre; let b = C[0]; for (const c of C) if (Math.abs(c.a - a) < Math.abs(b.a - a)) b = c; return b; }
   function redesen() {
+    desenMEF(st.k); desenTermic();
     const D = st.D.filter(Boolean), pos = desenNor($q(".po-nor"), D, st.sel, st.baza); st.pos = pos;
     desenParalel($q(".po-par"), D, axe, st.sel);
     if (st.det) {
-      const geo = { nx: st.det.nx, ny: st.det.ny }, aIVC = 180 + g.isa, ang = [st.k, 90, aIVC];
-      ang.forEach((a, j) => { titlu("c" + j, `Optimizare canal admisie: ${Math.round(a)} °RAC – Design ${st.sel}`); desenCamp(cvs[j], cadru(a), geo, st.vmax, `Unghiul de RAC: ${a.toFixed(1)} (°)`); });
-      const base = st.D[st.baza];
+      const geo = { nx: st.det.nx, ny: st.det.ny }, ang = [st.k, 90, aIVC];
+      ang.forEach((a, j) => { titlu("c" + j, `Optimizare canal admisie: ${Math.round(a)} °RAC – Design ${st.sel} · secțiunea z = 0`); desenCamp(cvs[j], cadru(a), geo, st.vmax, `Unghiul de RAC: ${a.toFixed(1)} (°)`); });
+      const base = st.D[st.baza], cuB = base && st.sel !== st.baza;
       titlu("m", `Masa în cilindru – Design ${st.sel}`); desenLinie(cvR[0], [{ nume: "Masa_cilindru", pts: st.det.M.filter((q, j) => j % 4 === 0).map(([a, m]) => [a, m * 1e6]) }], "Unghiul de RAC (°)", "Masa în cilindru (mg)", "Masa în cilindru", st.k);
-      titlu("tb", `Tumble – Design ${st.sel}`); desenLinie(cvR[1], [{ nume: "Tumble_Y", pts: st.det.T }, ...(base && st.sel !== st.baza ? [{ nume: "Tumble_Y (bază)", pts: base.rez.T, c: "#7a8796", dash: [4, 3] }] : [])], "Unghiul de RAC (°)", "Tumble_Y", "Tumble_Y", st.k);
-      titlu("k", `TKE – Design ${st.sel}`); desenLinie(cvR[2], [{ nume: "TKE cilindru", pts: st.det.K }, ...(base && st.sel !== st.baza ? [{ nume: "TKE (bază)", pts: base.rez.K, c: "#7a8796", dash: [4, 3] }] : [])], "Unghiul de RAC (°)", "TKE (m²/s²)", "Energia cinetică turbulentă rezolvată în cilindru", st.k);
+      titlu("tb", `Tumble, tumble transversal și swirl – Design ${st.sel}`); desenLinie(cvR[1], [{ nume: "Tumble", pts: st.det.T }, { nume: "Tumble transversal", pts: st.det.X, c: "#2a8a84" }, { nume: "Swirl", pts: st.det.W, c: "#1d4f91" }, ...(cuB ? [{ nume: "Tumble (bază, plan)", pts: base.rez.T, c: "#7a8796", dash: [4, 3] }] : [])], "Unghiul de RAC (°)", "raportul (–)", "Mișcarea încărcăturii", st.k);
+      titlu("k", `TKE – Design ${st.sel}`); desenLinie(cvR[2], [{ nume: "TKE cilindru", pts: st.det.K }, ...(cuB ? [{ nume: "TKE (bază, plan)", pts: base.rez.K, c: "#7a8796", dash: [4, 3] }] : [])], "Unghiul de RAC (°)", "TKE (m²/s²)", "Energia cinetică turbulentă rezolvată în cilindru", st.k);
     }
   }
   function rezultate() {
-    const D = st.D, b = D[st.baza], s = D[st.sel]; if (!b || !s) return;
-    $q(".mod-rez").innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Design</th><th class="num">θ [°]</th><th class="num">b/D</th><th class="num">h<sub>ps</sub>/D</th><th class="num">Tumble_Y (PME)</th><th class="num">m reținută [mg]</th><th class="num">η<sub>v</sub></th><th class="num">TKE max compr. [m²/s²]</th><th class="num">C<sub>d</sub> mediu</th></tr></thead><tbody>
-      ${D.map((d, k) => `<tr${k === st.sel ? ' style="font-weight:600"' : ""}><td>${k}${k === st.baza ? " (bază)" : ""}${k === st.best ? " (compromis)" : ""}</td><td class="num">${nr(d.par.theta, 1)}</td><td class="num">${nr(d.par.b, 3)}</td><td class="num">${nr(d.par.hps, 3)}</td><td class="num">${nr(d.rez.tumble, 3)}</td><td class="num">${nr(d.rez.mIVC * 1e6, 1)}</td><td class="num">${nr(d.rez.etaV, 3)}</td><td class="num">${nr(d.rez.tke, 2)}</td><td class="num">${nr(d.rez.Cd, 3)}</td></tr>`).join("")}</tbody></table></div>
-      <p class="nota">Modelul: secțiunea mediană 2D, curgere incompresibilă (compresibilitate uniformă după închiderea supapei), rețea carteziană decalată cu frontiere imersate (pistonul și supapa mobile), advecție semi-lagrangiană, proiecție cu ecuația Poisson. Masa reținută provine din modelul de umplere 0D al cilindrului real cu coeficientul de debit al supapei obținut din câmpul 2D. TKE este energia cinetică a fluctuațiilor rezolvate față de câmpul filtrat local (fără model de turbulență).</p>`;
-    const corr = (() => { const x = D.map((d) => d.rez.mIVC), y = D.map((d) => Math.abs(d.rez.tumble)), mx = x.reduce((a, c) => a + c, 0) / x.length, my = y.reduce((a, c) => a + c, 0) / y.length; let sxy = 0, sx = 0, sy = 0; x.forEach((v, k) => { sxy += (v - mx) * (y[k] - my); sx += (v - mx) ** 2; sy += (y[k] - my) ** 2; }); return sxy / Math.sqrt(sx * sy || 1); })();
-    $q(".mod-ver").innerHTML = `<h3>Concluzii</h3>${concluzie(corr < 0 ? "ok" : "av", `Coeficientul de corelație între masa reținută și |Tumble_Y| pe cele ${D.length} designuri este ${nr(corr, 2)}: ${corr < 0 ? "canalele care generează mai mult tumble restrâng debitul (compromis tipic umplere – mișcarea încărcăturii)" : "nu apare compromisul tipic în domeniul explorat"}.`)}
+    const D = st.D, b = D[st.baza], s = D[st.sel]; if (!b || !s || !D.length) return;
+    $q(".mod-rez").innerHTML = `<div class="tabel-container"><table class="tabel"><thead><tr><th>Design</th><th class="num">θ [°]</th><th class="num">b/D</th><th class="num">h<sub>ps</sub>/D</th><th class="num">Tumble (PME)</th><th class="num">Swirl (PME)</th><th class="num">m reținută [mg]</th><th class="num">η<sub>v</sub></th><th class="num">TKE max compr. [m²/s²]</th><th class="num">C<sub>d</sub> mediu</th></tr></thead><tbody>
+      ${D.map((d, k) => `<tr${k === st.sel ? ' style="font-weight:600"' : ""}><td>${k}${k === st.baza ? " (bază)" : ""}${k === st.best ? " (compromis)" : ""}</td><td class="num">${nr(d.par.theta, 1)}</td><td class="num">${nr(d.par.b, 3)}</td><td class="num">${nr(d.par.hps, 3)}</td><td class="num">${nr(d.rez.tumble, 3)}</td><td class="num">${nr(d.rez.swirl, 3)}</td><td class="num">${nr(d.rez.mIVC * 1e6, 1)}</td><td class="num">${nr(d.rez.etaV, 3)}</td><td class="num">${nr(d.rez.tke, 2)}</td><td class="num">${nr(d.rez.Cd, 3)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="nota">Modelul: ecuațiile Euler incompresibile 3D cu compresibilitate uniformă după închiderea supapei (Mach mic), rețea carteziană decalată cu frontiere imersate (pistonul și supapa mobile), advecție semi-lagrangiană cu interpolare triliniară, proiecție cu ecuația Poisson (SOR roșu-negru). Masa reținută provine din modelul de umplere 0D al cilindrului cu coeficientul de debit al supapei obținut din câmpul 3D. TKE este energia cinetică a fluctuațiilor rezolvate față de câmpul filtrat local (fără model de turbulență); particulele-trasor sunt fără masă.</p>`;
+    let dT = null; if (st.det && JSON.stringify(st.det.par) === JSON.stringify(s.par)) { const at = (a) => (st.det.T.find((q) => q[0] >= a) || [0, 0])[1]; dT = at(180); }
+    const corr = (() => { const x = D.map((d) => d.rez.mIVC), y = D.map((d) => d.rez.tumble), mx = x.reduce((a, c) => a + c, 0) / x.length, my = y.reduce((a, c) => a + c, 0) / y.length; let sxy = 0, sx = 0, sy = 0; x.forEach((v, k) => { sxy += (v - mx) * (y[k] - my); sx += (v - mx) ** 2; sy += (y[k] - my) ** 2; }); return sxy / Math.sqrt(sx * sy || 1); })();
+    $q(".mod-ver").innerHTML = `<h3>Concluzii</h3>${concluzie(corr < 0 ? "ok" : "av", `Coeficientul de corelație între masa reținută și tumble pe cele ${D.length} designuri este ${nr(corr, 2)}: ${corr < 0 ? "canalele care generează mai mult tumble restrâng debitul (compromisul umplere – mișcarea încărcăturii)" : "în domeniul explorat nu apare compromisul tipic umplere – tumble"}.`)}
       ${concluzie("ok", `Designul ${st.sel} față de cel de bază: tumble ${nr(s.rez.tumble, 3)} (bază ${nr(b.rez.tumble, 3)}), masa reținută ${nr(s.rez.mIVC * 1e6, 1)} mg (bază ${nr(b.rez.mIVC * 1e6, 1)} mg), TKE la sfârșitul comprimării ${nr(s.rez.tke, 2)} (bază ${nr(b.rez.tke, 2)}) m²/s².`)}
-      ${concluzie("nd", "Valorile absolute ale tumble-ului și TKE dintr-o secțiune 2D fără model de turbulență nu sunt predicții 3D validate; ierarhia designurilor și tendințele sunt rezultatul utilizabil al studiului.")}`;
+      ${dT != null ? concluzie(Math.abs(dT - s.rez.tumble) < 0.3 * Math.max(0.3, Math.abs(dT)) ? "ok" : "av", `Studiul de rețea: tumble la PME ${nr(s.rez.tumble, 3)} pe rețeaua planului și ${nr(dT, 3)} pe rețeaua fină (${st.det.N} celule pe alezaj)${Math.abs(dT - s.rez.tumble) < 0.3 * Math.max(0.3, Math.abs(dT)) ? "" : ": rețeaua planului este prea grosieră pentru valori absolute; ierarhia designurilor se verifică recalculând câteva designuri pe rețeaua fină"}.`) : ""}
+      ${concluzie(Math.abs(S3.fe.sigMed / S3.fe.sigAn - 1) < 0.02 ? "ok" : "av", `Biela (MEF, ${S3.fe.n} noduri, ${S3.fe.ne} elemente): tensiunea medie la mijlocul tijei, pentru 1 N, este ${S3.fe.sigMed.toExponential(4)} Pa față de F/A = ${S3.fe.sigAn.toExponential(4)} Pa. Forța în bielă pe ciclu: ${nr(S3.Smax / 1000, 1)} kN la compresiune, ${nr(-S3.Smin / 1000, 1)} kN la întindere; tensiunea echivalentă maximă ${nr(S3.sMax, 1)} MPa la α = ${S3.aMax}° (concentrarea la racordarea tijei cu ochiul).`)}
+      ${concluzie(S3.termic.bilant < 1e-6 ? "ok" : "av", `Chiulasa: fluxul mediu de căldură pe camera de ardere ${nr(S3.qM / 1e6, 2)} MW/m²${S3.qEstimat ? " (valoare de referință; modelul 0D nu este disponibil pentru acest tip)" : " (35 % din căldura cedată pereților în modelul 0D)"}; ${nr(S3.termic.Qin, 0)} W intrați = ${nr(S3.termic.Qout, 0)} W preluați de lichid; temperatura maximă ${nr(S3.termic.Tmax, 0)} °C, pe puntea dintre supape spre evacuare.`)}
+      ${concluzie("nd", "Fără model de turbulență și fără perete vâscos, valorile absolute ale tumble-ului și TKE au incertitudinea rețelei; ierarhia designurilor și tendințele sunt rezultatul utilizabil al studiului.")}`;
   }
   $q('[data-a="run"]').addEventListener("click", ruleaza);
   $q(".po-nor").addEventListener("click", (e) => { if (!st.pos) return; const r = e.target.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let b = -1, dm = 1e9; st.pos.forEach(([px, py], k) => { const d = Math.hypot(px - x, py - y); if (d < dm) { dm = d; b = k; } }); if (b >= 0 && dm < 20) detaliu(b); });
   const bp = $q('[data-a="play"]'), sl = $q('[data-a="alfa"]');
   bp.addEventListener("click", () => { st.ruleaza = !st.ruleaza; bp.textContent = st.ruleaza ? "⏸ Pauză" : "▶ Pornește"; });
+  $q('[data-a="vit"]').addEventListener("change", (e) => { st.vit = +e.target.value; });
   sl.addEventListener("input", () => { st.k = +sl.value; st.ruleaza = false; bp.textContent = "▶ Pornește"; redesen(); });
+  $q('[data-a="vmax"]').addEventListener("change", (e) => { st.vmax = Math.max(1, +e.target.value || st.vmax); if (st.v3) { st.v3.st.vmax = st.vmax; st.v3.legenda(st.vmax, (x) => nr(x, 0)); } redesen(); });
+  corp.querySelectorAll("[data-v]").forEach((x) => x.addEventListener("change", () => { if (st.v3) { st.v3.st[x.dataset.v] = x.checked; st.v3.st.reface = true; if (x.dataset.v === "termic") st.v3.coloreazaChiulasa(); leg2(); } }));
   window.addEventListener("resize", () => redesen());
   ruleaza();
   let tg = 0;
   return {
-    pas(dt) { if (!st.det) return; if (st.ruleaza) st.k = (st.k + dt * 30) % 360; tg += dt; if (tg > 0.12) { tg = 0; const geo = { nx: st.det.nx, ny: st.det.ny }; titlu("c0", `Optimizare canal admisie: ${Math.round(st.k)} °RAC – Design ${st.sel}`); desenCamp(cvs[0], cadru(st.k), geo, st.vmax, `Unghiul de RAC: ${st.k.toFixed(1)} (°)`); if (document.activeElement !== sl) sl.value = Math.round(st.k); $q('[data-a="av"]').textContent = Math.round(st.k); } },
+    pas(dt) { if (!st.det) return; if (st.ruleaza) st.k = (st.k + dt * st.vit) % 360; const c = cadru(st.k);
+      if (st.v3) { st.v3.pozeaza(st.k); st.v3.sc.hud(`α = <b>${Math.round(c.a)}°</b> RAC · ${c.a < aIVC && c.L > 0 ? "admisia" : "comprimarea"} · ridicarea supapei ${nr(c.L * 1e3, 2)} mm<br>Tumble = <b>${nr((st.det.T.find((q) => q[0] >= c.a) || [0, 0])[1], 2)}</b> · TKE = <b>${nr((st.det.K.find((q) => q[0] >= c.a) || [0, 0])[1], 1)} m²/s²</b>`); }
+      tg += dt; if (tg > 0.12) { tg = 0; desenMEF(st.k); const geo = { nx: st.det.nx, ny: st.det.ny }; titlu("c0", `Optimizare canal admisie: ${Math.round(st.k)} °RAC – Design ${st.sel} · secțiunea z = 0`); desenCamp(cvs[0], c, geo, st.vmax, `Unghiul de RAC: ${c.a.toFixed(1)} (°)`); if (document.activeElement !== sl) sl.value = Math.round(st.k); $q('[data-a="av"]').textContent = Math.round(st.k); } },
     raport() { return $q(".mod-rez").innerHTML + $q(".mod-ver").innerHTML; },
-    distruge() { if (st.w) st.w.terminate(); if (st.wd) st.wd.terminate(); }
+    distruge() { st.W.forEach((w) => w.terminate()); if (st.wd) st.wd.terminate(); if (st.v3) st.v3.distruge(); }
   };
 }

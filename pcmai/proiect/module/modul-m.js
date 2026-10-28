@@ -4,7 +4,7 @@
 import { creeazaScena, grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii, V3 } from "./scena.js";
 import * as MC from "./multicorp.js";
 import { mecanismulMotor, reductorEV, planetar, linieArbori } from "./macheta3d.js";
-import { motorReal } from "./motor-real.js";
+import { motorReal } from "./motor-real.js?v=3";
 
 const T3 = (s) => `<span class="mod-prov">${s}</span>`;
 const nr = (v, d = 2) => fx(v, d);
@@ -97,7 +97,7 @@ function studiuMecanism(corp, ctx, dm) {
     pMax = Math.max(...ys); Fmax = Math.max(...sim.Fg.map(Math.abs), ...sim.S.map(Math.abs));
     sc3.goleste(sc3.grup);
     mec = motorReal({ D: g.D, S: d2.S, L: g.L, i: d2.i, man: ord.man, e: g.e, eps: d2.eps || 10, tip: d2.tip, tau: d2.tau, dist: d2.dist, dec: ord.dec }); sc3.grup.add(mec.G);
-    const Lm = d2.i * mec.pas + g.L; sc3.incadreaza([Lm * 0.9, g.L * 1.6, Lm * 1.25], [0, g.L * 0.75, 0]);
+    const Lm = d2.i * mec.pas + g.L; sc3.incadreaza([Lm * 0.9, g.L * 1.6, Lm * 1.25], [0, g.L * 0.75, 0]); { const t = sc3.ctl.target; sc3.camera.position.sub(t).multiplyScalar(1.22).add(t); sc3.camera.far *= 1.5; sc3.camera.updateProjectionMatrix(); sc3.ctl.update(); }
     sc3.et = { Fg: sc3.eticheta(""), N: sc3.eticheta(""), T: sc3.eticheta("") };
     rezultate(p, d2);
   }
@@ -173,7 +173,7 @@ function studiuReferinta(corp, ctx, varianta) {
   const geo = { R: R0.R, L: R0.L, e: 0, D: R0.D };
   sc3.goleste(sc3.grup); const mec = motorReal({ D: R0.D, S: 2 * R0.R, L: R0.L, i: 1, man: [0], eps: R0.eps || 10, tip: "MAS", tau: 4, dec: [0] }); sc3.grup.add(mec.G);
   Object.values(mec.sageti).forEach((s) => (s.visible = false));
-  sc3.incadreaza([0.35, 0.22, 0.42], [0, R0.L * 0.8, 0]);
+  sc3.incadreaza([0.35, 0.22, 0.42], [0, R0.L * 0.8, 0]); { const t = sc3.ctl.target; sc3.camera.position.sub(t).multiplyScalar(1.22).add(t); sc3.ctl.update(); }
   const et = sc3.eticheta("");
   const rows = [], K = [], AL = [];
   for (let a = 0; a <= 360; a += 10) { const k = MC.cinematicaExacta(geo, a, om), ind = MC.cinematicaIndrumar(R0.R, lam, om, a); rows.push([a, ind.x * 1e3, (Math.sqrt((R0.R + R0.L) ** 2) - k.yB) * 1e3, MC.xExact(R0.R, R0.L, a) * 1e3, ind.v, -k.yBd, ind.a, -k.yBdd]); }

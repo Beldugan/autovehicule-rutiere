@@ -13,7 +13,7 @@ const lift = (phi, dur, L) => (phi >= 0 && phi <= dur ? L * Math.pow(Math.sin((M
 
 /** geometria: g = { D, S, L (biela), eps, dsa, isa, Lmax }, par = { theta (°), b (deplasarea cotului / D), hps (înălțimea înainte de scaun / D) } */
 export function creeazaGeometrie(g, par) {
-  const D = g.D, R = g.S / 2, hc = g.S / (g.eps - 1), dv = 0.36 * D, xv = -0.24 * D, wP = 0.92 * dv;
+  const D = g.D, R = g.S / 2, hc = g.S / (g.eps - 1), dv = 0.42 * D, xv = -0.25 * D, wP = 0.92 * dv;
   const W = 2.1 * D, x0 = -W / 2 - 0.15 * D;
   const hps = par.hps * D, th = par.theta * RAD;
   // direcția de apropiere de scaun: cu atât mai culcată cu cât canalul este mai puțin înclinat (generează mișcarea tumble)

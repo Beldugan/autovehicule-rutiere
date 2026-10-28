@@ -245,3 +245,13 @@
 .po-anim input[type=range] { width: 220px; }
 @media (max-width: 1100px) { .po-tablou { grid-template-columns: 1fr 1fr; } .po-mij { grid-column: 1 / -1; grid-row: 1; grid-template-columns: 1fr 1fr; grid-template-rows: auto; } }
 @media (max-width: 680px) { .po-tablou { grid-template-columns: 1fr; } .po-mij { grid-template-columns: 1fr; } .po-mij .po-c { height: 300px; } }
+.po-h { margin: .9rem 0 .35rem; font-size: 1rem; }
+.po-3d .po-3d-sc { aspect-ratio: auto; height: min(62vh, 580px); background: #fff; border: 1px solid #9aa3ab; }
+.po-anim label { display: inline-flex; gap: .3rem; align-items: center; }
+.po-sol { grid-template-columns: 1fr 1fr; margin-top: 6px; }
+.po-sol .po-c { height: 250px; }
+@media (max-width: 680px) { .po-sol { grid-template-columns: 1fr; } }
+.mod-scena .po-leg2 { position: absolute; left: .5rem; bottom: 1.8rem; font-size: .68rem; line-height: 1.25; color: #111; background: rgba(255, 255, 255, .88); border: 1px solid #b7bec6; border-radius: 4px; padding: .35rem .5rem; pointer-events: none; }
+.mod-scena .po-leg2-b { margin-top: .25rem; }
+.mod-scena .po-leg2-b div { display: flex; align-items: center; gap: .35rem; height: 15px; font-variant-numeric: tabular-nums; }
+.mod-scena .po-leg2-b i { display: inline-block; width: 14px; height: 15px; }

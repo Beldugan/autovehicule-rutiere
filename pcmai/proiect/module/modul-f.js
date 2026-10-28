@@ -4,7 +4,7 @@
 import { grafic, lim, fx, tabelVerificare, concluzie, comutatorStudii } from "./scena.js";
 import { creeazaCompresie, izentrop, placaRacire } from "./cfd.js";
 import { cilindruCFD, placaCFD } from "./cfd3d.js";
-import { studiuPort } from "./port-ui.js?v=1";
+import { studiuPort } from "./port-ui.js?v=4";
 import { creeazaUI } from "./ui.js";
 
 const U = creeazaUI("post-procesare a câmpurilor calculate");
